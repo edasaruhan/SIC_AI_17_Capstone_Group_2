@@ -1,0 +1,755 @@
+{
+  "T5_detection_surface": [
+    {
+      "category": "Toys and Games",
+      "gift-flagged reviews": "1,374,807",
+      "evidence in title": "11.2%",
+      "median position in body": "0.031",
+      "90th pct position": "0.580",
+      "evidence lost @512 tok": "0.013%",
+      "evidence lost @1024 tok": "0.001%",
+      "recipient recoverable": "78.7%",
+      "occasion recoverable": "29.0%"
+    },
+    {
+      "category": "Video Games",
+      "gift-flagged reviews": "145,020",
+      "evidence in title": "9.8%",
+      "median position in body": "0.011",
+      "90th pct position": "0.464",
+      "evidence lost @512 tok": "0.044%",
+      "evidence lost @1024 tok": "0.008%",
+      "recipient recoverable": "87.7%",
+      "occasion recoverable": "25.6%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "gift-flagged reviews": "198,944",
+      "evidence in title": "9.3%",
+      "median position in body": "0.030",
+      "90th pct position": "0.608",
+      "evidence lost @512 tok": "0.013%",
+      "evidence lost @1024 tok": "0.001%",
+      "recipient recoverable": "78.3%",
+      "occasion recoverable": "24.6%"
+    },
+    {
+      "category": "All Beauty",
+      "gift-flagged reviews": "11,451",
+      "evidence in title": "8.3%",
+      "median position in body": "0.024",
+      "90th pct position": "0.607",
+      "evidence lost @512 tok": "0.018%",
+      "evidence lost @1024 tok": "0.000%",
+      "recipient recoverable": "80.9%",
+      "occasion recoverable": "19.9%"
+    }
+  ],
+  "T6_recipients": [
+    {
+      "category": "Toys and Games",
+      "recipient": "son",
+      "n": "273,736",
+      "share": "29.1%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "daughter",
+      "n": "244,549",
+      "share": "26.0%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "grandson",
+      "n": "138,015",
+      "share": "14.7%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "granddaughter",
+      "n": "107,731",
+      "share": "11.5%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "niece",
+      "n": "58,827",
+      "share": "6.3%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "nephew",
+      "n": "57,386",
+      "share": "6.1%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "kids",
+      "n": "35,761",
+      "share": "3.8%"
+    },
+    {
+      "category": "Toys and Games",
+      "recipient": "kid",
+      "n": "23,272",
+      "share": "2.5%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "son",
+      "n": "54,233",
+      "share": "49.8%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "daughter",
+      "n": "13,074",
+      "share": "12.0%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "grandson",
+      "n": "12,690",
+      "share": "11.6%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "husband",
+      "n": "10,179",
+      "share": "9.3%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "boyfriend",
+      "n": "5,946",
+      "share": "5.5%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "nephew",
+      "n": "5,197",
+      "share": "4.8%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "brother",
+      "n": "3,951",
+      "share": "3.6%"
+    },
+    {
+      "category": "Video Games",
+      "recipient": "kids",
+      "n": "3,700",
+      "share": "3.4%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "husband",
+      "n": "29,726",
+      "share": "26.0%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "son",
+      "n": "22,098",
+      "share": "19.3%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "daughter",
+      "n": "21,847",
+      "share": "19.1%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "wife",
+      "n": "12,364",
+      "share": "10.8%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "mom",
+      "n": "10,135",
+      "share": "8.9%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "sister",
+      "n": "6,260",
+      "share": "5.5%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "mother",
+      "n": "6,090",
+      "share": "5.3%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "recipient": "kids",
+      "n": "5,942",
+      "share": "5.2%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "daughter",
+      "n": "2,896",
+      "share": "38.8%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "husband",
+      "n": "1,095",
+      "share": "14.7%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "wife",
+      "n": "1,031",
+      "share": "13.8%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "son",
+      "n": "602",
+      "share": "8.1%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "mom",
+      "n": "574",
+      "share": "7.7%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "sister",
+      "n": "504",
+      "share": "6.7%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "granddaughter",
+      "n": "437",
+      "share": "5.8%"
+    },
+    {
+      "category": "All Beauty",
+      "recipient": "niece",
+      "n": "332",
+      "share": "4.4%"
+    }
+  ],
+  "T6b_occasions": [
+    {
+      "category": "Toys and Games",
+      "occasion": "birthday",
+      "n": "192,775",
+      "share": "49.3%"
+    },
+    {
+      "category": "Toys and Games",
+      "occasion": "christmas",
+      "n": "182,652",
+      "share": "46.7%"
+    },
+    {
+      "category": "Toys and Games",
+      "occasion": "xmas",
+      "n": "8,672",
+      "share": "2.2%"
+    },
+    {
+      "category": "Toys and Games",
+      "occasion": "baby shower",
+      "n": "3,477",
+      "share": "0.9%"
+    },
+    {
+      "category": "Toys and Games",
+      "occasion": "graduation",
+      "n": "1,673",
+      "share": "0.4%"
+    },
+    {
+      "category": "Toys and Games",
+      "occasion": "valentine",
+      "n": "1,458",
+      "share": "0.4%"
+    },
+    {
+      "category": "Video Games",
+      "occasion": "christmas",
+      "n": "23,002",
+      "share": "62.8%"
+    },
+    {
+      "category": "Video Games",
+      "occasion": "birthday",
+      "n": "11,760",
+      "share": "32.1%"
+    },
+    {
+      "category": "Video Games",
+      "occasion": "xmas",
+      "n": "1,454",
+      "share": "4.0%"
+    },
+    {
+      "category": "Video Games",
+      "occasion": "anniversary",
+      "n": "193",
+      "share": "0.5%"
+    },
+    {
+      "category": "Video Games",
+      "occasion": "father's day",
+      "n": "137",
+      "share": "0.4%"
+    },
+    {
+      "category": "Video Games",
+      "occasion": "valentine's day",
+      "n": "106",
+      "share": "0.3%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "occasion": "birthday",
+      "n": "19,435",
+      "share": "45.2%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "occasion": "christmas",
+      "n": "19,078",
+      "share": "44.4%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "occasion": "wedding",
+      "n": "1,571",
+      "share": "3.7%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "occasion": "xmas",
+      "n": "990",
+      "share": "2.3%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "occasion": "valentine's day",
+      "n": "968",
+      "share": "2.3%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "occasion": "mother's day",
+      "n": "957",
+      "share": "2.2%"
+    },
+    {
+      "category": "All Beauty",
+      "occasion": "christmas",
+      "n": "1,083",
+      "share": "49.6%"
+    },
+    {
+      "category": "All Beauty",
+      "occasion": "birthday",
+      "n": "864",
+      "share": "39.6%"
+    },
+    {
+      "category": "All Beauty",
+      "occasion": "wedding",
+      "n": "131",
+      "share": "6.0%"
+    },
+    {
+      "category": "All Beauty",
+      "occasion": "xmas",
+      "n": "66",
+      "share": "3.0%"
+    },
+    {
+      "category": "All Beauty",
+      "occasion": "mother's day",
+      "n": "21",
+      "share": "1.0%"
+    },
+    {
+      "category": "All Beauty",
+      "occasion": "baby shower",
+      "n": "18",
+      "share": "0.8%"
+    }
+  ],
+  "T7_sequence_feasibility": [
+    {
+      "category": "Toys and Games",
+      "users in k-core": "268,652",
+      "with ≥1 gift": "128,546 (47.8%)",
+      "last item is a gift": "11.32%",
+      "entire sequence is gifts": "0.146%",
+      "**eval-eligible users**": "**88.7%**",
+      "mean contamination (gift users)": "24.2%"
+    },
+    {
+      "category": "Video Games",
+      "users in k-core": "47,663",
+      "with ≥1 gift": "5,958 (12.5%)",
+      "last item is a gift": "2.77%",
+      "entire sequence is gifts": "0.109%",
+      "**eval-eligible users**": "**97.2%**",
+      "mean contamination (gift users)": "22.5%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "users in k-core": "268,991",
+      "with ≥1 gift": "25,767 (9.6%)",
+      "last item is a gift": "1.33%",
+      "entire sequence is gifts": "0.003%",
+      "**eval-eligible users**": "**98.7%**",
+      "mean contamination (gift users)": "14.7%"
+    },
+    {
+      "category": "All Beauty",
+      "users in k-core": "0",
+      "with ≥1 gift": "—",
+      "last item is a gift": "—",
+      "entire sequence is gifts": "—",
+      "**eval-eligible users**": "**n/a — no k-core**",
+      "mean contamination (gift users)": "—"
+    }
+  ],
+  "T8_clean_vs_kcore": [
+    {
+      "category": "Toys and Games",
+      "clean corpus": "11.07%",
+      "k-core corpus": "11.27%",
+      "shift": "+1.8%",
+      "k-core interactions": "2,164,018"
+    },
+    {
+      "category": "Video Games",
+      "clean corpus": "4.40%",
+      "k-core corpus": "2.68%",
+      "shift": "-39.2%",
+      "k-core interactions": "368,476"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "clean corpus": "1.85%",
+      "k-core corpus": "1.34%",
+      "shift": "-27.5%",
+      "k-core interactions": "2,434,594"
+    },
+    {
+      "category": "All Beauty",
+      "clean corpus": "2.13%",
+      "k-core corpus": "—",
+      "shift": "k-core bos"
+    }
+  ],
+  "T9_confounds": [
+    {
+      "category": "Toys and Games",
+      "gift rate, shortest 20%": "8.23%",
+      "gift rate, longest 20%": "12.56%",
+      "length ratio": "1.53×",
+      "unverified share (raw)": "8.6%",
+      "non-ASCII text": "11.75%",
+      "duplicated text, raw": "15.90%",
+      "duplicated text, after filters": "3.47%"
+    },
+    {
+      "category": "Video Games",
+      "gift rate, shortest 20%": "4.38%",
+      "gift rate, longest 20%": "2.64%",
+      "length ratio": "0.60×",
+      "unverified share (raw)": "13.9%",
+      "non-ASCII text": "8.19%",
+      "duplicated text, raw": "14.67%",
+      "duplicated text, after filters": "2.30%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "gift rate, shortest 20%": "0.96%",
+      "gift rate, longest 20%": "2.27%",
+      "length ratio": "2.36×",
+      "unverified share (raw)": "8.0%",
+      "non-ASCII text": "10.92%",
+      "duplicated text, raw": "14.89%",
+      "duplicated text, after filters": "1.96%"
+    },
+    {
+      "category": "All Beauty",
+      "gift rate, shortest 20%": "1.39%",
+      "gift rate, longest 20%": "2.37%",
+      "length ratio": "1.70×",
+      "unverified share (raw)": "9.5%",
+      "non-ASCII text": "14.83%",
+      "duplicated text, raw": "10.09%",
+      "duplicated text, after filters": "0.49%"
+    }
+  ],
+  "T10_cross_category": [
+    {
+      "metric": "customers observed in ≥2 of the four categories",
+      "value": "2,316,411",
+      "of": "12,690,408 distinct customers (18.3%)"
+    },
+    {
+      "metric": "…of those, entered ≥1 category **only** via a gift",
+      "value": "207,155",
+      "of": "8.9% of multi-category customers"
+    },
+    {
+      "metric": "customers in all four categories",
+      "value": "15,162",
+      "of": "upper bound on a full cross-category profile"
+    }
+  ],
+  "T11_temporal_resolution": [
+    {
+      "category": "Toys and Games",
+      "consecutive pairs on the same day": "43.0%",
+      "median gap (days)": "15",
+      "**held-out item same day as previous**": "**31.2%**",
+      "median gap before held-out item (days)": "93"
+    },
+    {
+      "category": "Video Games",
+      "consecutive pairs on the same day": "42.3%",
+      "median gap (days)": "17",
+      "**held-out item same day as previous**": "**31.5%**",
+      "median gap before held-out item (days)": "101"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "consecutive pairs on the same day": "34.8%",
+      "median gap (days)": "34",
+      "**held-out item same day as previous**": "**24.5%**",
+      "median gap before held-out item (days)": "99"
+    }
+  ],
+  "T12_gift_rating_signature": [
+    {
+      "category": "Toys and Games",
+      "gift mean": "4.517",
+      "rest mean": "4.104",
+      "difference": "+0.412",
+      "gift 5★": "77.8%",
+      "rest 5★": "63.7%"
+    },
+    {
+      "category": "Video Games",
+      "gift mean": "4.482",
+      "rest mean": "3.974",
+      "difference": "+0.508",
+      "gift 5★": "77.6%",
+      "rest 5★": "58.6%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "gift mean": "4.490",
+      "rest mean": "4.049",
+      "difference": "+0.442",
+      "gift 5★": "79.0%",
+      "rest 5★": "64.8%"
+    },
+    {
+      "category": "All Beauty",
+      "gift mean": "4.542",
+      "rest mean": "3.870",
+      "difference": "+0.673",
+      "gift 5★": "78.6%",
+      "rest 5★": "57.2%"
+    }
+  ],
+  "T13_duplication_by_length": [
+    {
+      "category": "Toys and Games",
+      "length (words)": "1-2",
+      "reviews": "1,146,836",
+      "duplicated text": "92.5%"
+    },
+    {
+      "category": "Toys and Games",
+      "length (words)": "3-5",
+      "reviews": "1,778,495",
+      "duplicated text": "53.5%"
+    },
+    {
+      "category": "Toys and Games",
+      "length (words)": "6-10",
+      "reviews": "2,368,574",
+      "duplicated text": "9.7%"
+    },
+    {
+      "category": "Toys and Games",
+      "length (words)": "11-25",
+      "reviews": "4,649,687",
+      "duplicated text": "3.5%"
+    },
+    {
+      "category": "Toys and Games",
+      "length (words)": "26-50",
+      "reviews": "3,527,746",
+      "duplicated text": "2.9%"
+    },
+    {
+      "category": "Toys and Games",
+      "length (words)": "50+",
+      "reviews": "2,789,068",
+      "duplicated text": "2.8%"
+    },
+    {
+      "category": "Video Games",
+      "length (words)": "1-2",
+      "reviews": "388,192",
+      "duplicated text": "91.4%"
+    },
+    {
+      "category": "Video Games",
+      "length (words)": "3-5",
+      "reviews": "409,901",
+      "duplicated text": "44.6%"
+    },
+    {
+      "category": "Video Games",
+      "length (words)": "6-10",
+      "reviews": "517,752",
+      "duplicated text": "7.5%"
+    },
+    {
+      "category": "Video Games",
+      "length (words)": "11-25",
+      "reviews": "1,076,198",
+      "duplicated text": "3.7%"
+    },
+    {
+      "category": "Video Games",
+      "length (words)": "26-50",
+      "reviews": "930,543",
+      "duplicated text": "2.9%"
+    },
+    {
+      "category": "Video Games",
+      "length (words)": "50+",
+      "reviews": "1,302,029",
+      "duplicated text": "2.7%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "length (words)": "1-2",
+      "reviews": "1,222,977",
+      "duplicated text": "91.9%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "length (words)": "3-5",
+      "reviews": "1,611,148",
+      "duplicated text": "41.8%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "length (words)": "6-10",
+      "reviews": "2,193,877",
+      "duplicated text": "5.4%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "length (words)": "11-25",
+      "reviews": "4,153,328",
+      "duplicated text": "2.4%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "length (words)": "26-50",
+      "reviews": "2,981,719",
+      "duplicated text": "2.3%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "length (words)": "50+",
+      "reviews": "2,155,471",
+      "duplicated text": "2.4%"
+    },
+    {
+      "category": "All Beauty",
+      "length (words)": "1-2",
+      "reviews": "50,058",
+      "duplicated text": "81.9%"
+    },
+    {
+      "category": "All Beauty",
+      "length (words)": "3-5",
+      "reviews": "68,096",
+      "duplicated text": "25.0%"
+    },
+    {
+      "category": "All Beauty",
+      "length (words)": "6-10",
+      "reviews": "101,006",
+      "duplicated text": "2.8%"
+    },
+    {
+      "category": "All Beauty",
+      "length (words)": "11-25",
+      "reviews": "201,482",
+      "duplicated text": "2.0%"
+    },
+    {
+      "category": "All Beauty",
+      "length (words)": "26-50",
+      "reviews": "153,037",
+      "duplicated text": "2.1%"
+    },
+    {
+      "category": "All Beauty",
+      "length (words)": "50+",
+      "reviews": "127,849",
+      "duplicated text": "2.0%"
+    }
+  ],
+  "T14_seasonality_summary": [
+    {
+      "category": "Toys and Games",
+      "Jan": "13.72%",
+      "Feb": "11.88%",
+      "Jun–Sep trough (mean)": "9.67%",
+      "Nov": "10.60%",
+      "Dec": "12.94%",
+      "Dec ÷ summer": "1.34×"
+    },
+    {
+      "category": "Video Games",
+      "Jan": "6.97%",
+      "Feb": "4.97%",
+      "Jun–Sep trough (mean)": "3.51%",
+      "Nov": "3.42%",
+      "Dec": "5.90%",
+      "Dec ÷ summer": "1.68×"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "Jan": "2.68%",
+      "Feb": "2.15%",
+      "Jun–Sep trough (mean)": "1.52%",
+      "Nov": "1.61%",
+      "Dec": "2.70%",
+      "Dec ÷ summer": "1.77×"
+    },
+    {
+      "category": "All Beauty",
+      "Jan": "3.50%",
+      "Feb": "2.35%",
+      "Jun–Sep trough (mean)": "1.75%",
+      "Nov": "1.98%",
+      "Dec": "3.33%",
+      "Dec ÷ summer": "1.90×"
+    }
+  ]
+}

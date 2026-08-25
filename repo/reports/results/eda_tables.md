@@ -31,12 +31,12 @@ _Uretim: `python -m gift_contamination.analysis.eda`_
 
 ## T2 corpus profile
 
-| category | interactions | users | items | density | int/user (mean) | int/user (median) | users ≥5 | int/item (mean) | items ≥5 | item Gini | median words | period |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Toys and Games | 12,417,784 | 6,824,523 | 801,297 | 2.27e-06 | 1.82 | 1 | 5.71% | 15.50 | 37.1% | 0.805 | 22 | 2000-08 → 2023-09 |
-| Video Games | 3,296,440 | 2,185,291 | 122,578 | 1.23e-05 | 1.51 | 1 | 3.03% | 26.89 | 42.3% | 0.850 | 27 | 1999-03 → 2023-09 |
-| Grocery and Gourmet Food | 10,774,599 | 5,801,858 | 541,797 | 3.43e-06 | 1.86 | 1 | 5.85% | 19.89 | 40.2% | 0.826 | 21 | 2001-08 → 2023-09 |
-| All Beauty | 537,261 | 503,388 | 99,296 | 1.07e-05 | 1.07 | 1 | 0.08% | 5.41 | 21.6% | 0.684 | 22 | 2002-10 → 2023-09 |
+| category | interactions | users | items | density | int/user (mean) | int/user (median) | users ≥5 | int/item (mean) | items ≥5 | item Gini | top-10% items' share | median words | >768 words | period |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Toys and Games | 12,417,784 | 6,824,523 | 801,297 | 2.27e-06 | 1.82 | 1 | 5.71% | 15.50 | 37.1% | 0.805 | 73.5% | 22 | 0.015% | 2000-08 → 2023-09 |
+| Video Games | 3,296,440 | 2,185,291 | 122,578 | 1.23e-05 | 1.51 | 1 | 3.03% | 26.89 | 42.3% | 0.850 | 79.6% | 27 | 0.190% | 1999-03 → 2023-09 |
+| Grocery and Gourmet Food | 10,774,599 | 5,801,858 | 541,797 | 3.43e-06 | 1.86 | 1 | 5.85% | 19.89 | 40.2% | 0.826 | 76.0% | 21 | 0.005% | 2001-08 → 2023-09 |
+| All Beauty | 537,261 | 503,388 | 99,296 | 1.07e-05 | 1.07 | 1 | 0.08% | 5.41 | 21.6% | 0.684 | 61.8% | 22 | 0.007% | 2002-10 → 2023-09 |
 
 
 ## T3 keyword proxy rates

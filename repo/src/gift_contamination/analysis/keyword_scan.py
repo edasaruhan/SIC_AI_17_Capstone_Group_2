@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import NamedTuple
 
 import polars as pl
 import yaml
@@ -45,7 +46,15 @@ def rates_path(cfg: Config, role: str) -> Path:
 
 
 # ------------------------------------------------------------------- desenler
-def load_patterns(cfg: Config) -> dict[str, str]:
+class Patterns(NamedTuple):
+    """Derlenmis desenler + alici/vesile cikarimi icin yakalama gruplu regexler."""
+
+    families: dict[str, str]
+    recipient: str
+    occasion: str
+
+
+def load_patterns(cfg: Config) -> Patterns:
     """Aile adi -> tek bir birlesik, buyuk/kucuk harf duyarsiz regex."""
     path = Path(cfg.get("keywords.path"))
     if not path.is_absolute():
@@ -64,7 +73,14 @@ def load_patterns(cfg: Config) -> dict[str, str]:
         ]
         compiled[family] = "(?i)" + "|".join(f"(?:{p})" for p in parts)
     log.info("desen aileleri yuklendi: %s (%s)", list(compiled), path.name)
-    return compiled
+
+    # Alici ve vesile cikarimi. Iliski listesindeki tum ic gruplar non-capturing
+    # oldugu icin disarideki parantez guvenle 1. yakalama grubu olur.
+    return Patterns(
+        families=compiled,
+        recipient=rf"(?i)\b(?:my|our|her|his|their)\s+({rel})\b",
+        occasion=rf"(?i)\b({occ})\b",
+    )
 
 
 def _validate(patterns: dict[str, str]) -> None:
@@ -90,27 +106,49 @@ def scan_category(cfg: Config, role: str, *, force: bool = False) -> Path:
     if not src.exists():
         build_clean(cfg, role)
 
-    patterns = load_patterns(cfg)
-    _validate(patterns)
+    pat = load_patterns(cfg)
+    _validate(pat.families)
 
     # Basligi da tariyoruz: kisa ama sinyal yogun ("Perfect gift!").
     haystack = (
         pl.col("title").fill_null("") + pl.lit(" ") + pl.col("text").fill_null("")
     )
+    body = pl.col("text").fill_null("")
+    evidence_rx = pat.families["gift_evidence"]
 
     flags = [
-        haystack.str.contains(rx).alias(f"kw_{family}") for family, rx in patterns.items()
+        haystack.str.contains(rx).alias(f"kw_{family}")
+        for family, rx in pat.families.items()
     ]
 
     df = (
         pl.scan_parquet(src)
-        .select("row_id", "user_id", "parent_asin", "rating", "n_words", "ts", "year", "month", "title", "text")
+        .select(
+            "row_id", "user_id", "parent_asin", "rating", "n_words",
+            "ts", "year", "month", "seq_pos", "title", "text",
+        )
         .with_columns(flags)
         .with_columns(
             # Hediye ALMAK vermek degildir; oncelik received'da.
-            (pl.col("kw_gift_evidence") & ~pl.col("kw_gift_received")).alias(PROXY_COL)
+            (pl.col("kw_gift_evidence") & ~pl.col("kw_gift_received")).alias(PROXY_COL),
+            # --- tespit yuzeyi: kanit metnin NERESINDE geciyor? ---
+            # ModernBERT'in 8192 context gerekcesi tam olarak bu soruya dayaniyor:
+            # alici bilgisi review'un sonundaysa 512 token'da kesilir.
+            pl.col("title").fill_null("").str.contains(evidence_rx).alias("kw_in_title"),
+            body.str.find(evidence_rx).alias("_kw_char"),
+            body.str.len_chars().alias("text_len_chars"),
+            # --- alici ve vesile: annotation semasini ve prompt'u besler ---
+            haystack.str.extract(pat.recipient, 1).str.to_lowercase().alias("kw_recipient"),
+            haystack.str.extract(pat.occasion, 1).str.to_lowercase().alias("kw_occasion"),
         )
-        .drop("title", "text")  # metin tasinmaz: gizlilik + dosya boyutu
+        .with_columns(
+            # Metnin basindan sonuna 0..1 arasi goreli konum.
+            pl.when(pl.col("_kw_char").is_not_null() & (pl.col("text_len_chars") > 0))
+            .then(pl.col("_kw_char") / pl.col("text_len_chars"))
+            .otherwise(None)
+            .alias("kw_pos_rel")
+        )
+        .drop("title", "text", "_kw_char")  # metin tasinmaz: gizlilik + dosya boyutu
         .collect()
     )
 
@@ -121,8 +159,16 @@ def scan_category(cfg: Config, role: str, *, force: bool = False) -> Path:
 
 
 # ----------------------------------------------------------------------- ozet
+FAMILY_FLAGS = ("kw_gift_evidence", "kw_gift_speculative", "kw_gift_received")
+
+
 def summarise(df: pl.DataFrame, cfg: Config, role: str) -> dict:
-    flag_cols = [c for c in df.columns if c.startswith("kw_")]
+    """Sadece boolean aile bayraklari ozetlenir.
+
+    `kw_recipient` / `kw_occasion` (string) ve `kw_pos_rel` (float) de "kw_" ile
+    basliyor ama bayrak degil; onlar derin analizde ayrica ele alinir.
+    """
+    flag_cols = [c for c in FAMILY_FLAGS if c in df.columns]
     n = df.height
 
     overall = {c: {"n": int(df[c].sum()), "rate": round(df[c].mean(), 6)} for c in flag_cols}

@@ -116,6 +116,10 @@ def table_corpus(cfg: Config, roles: list[str]) -> list[dict]:
             .row(0)
         )
         med_words = lf.select(pl.col("n_words").median()).collect().item()
+        # ModernBERT context tartismasi icin: ~1024 token'i asan review payi
+        long_share = lf.select((pl.col("n_words") > 768).mean()).collect().item()
+        # Uzun kuyruk yogunlugu: en populer %10 item kac etkilesim tasiyor
+        top10 = float(np.sort(i)[::-1][: max(1, i.size // 10)].sum() / i.sum())
 
         rows.append(
             {
@@ -130,7 +134,9 @@ def table_corpus(cfg: Config, roles: list[str]) -> list[dict]:
                 "int/item (mean)": f"{i.mean():.2f}",
                 f"items ≥{k}": _pct(float((i >= k).mean()), 1),
                 "item Gini": f"{gini(i):.3f}",
+                "top-10% items' share": _pct(top10, 1),
                 "median words": f"{int(med_words)}",
+                ">768 words": _pct(long_share, 3),
                 "period": f"{span[0]:%Y-%m} → {span[1]:%Y-%m}",
             }
         )
@@ -486,11 +492,11 @@ def run(cfg: Config) -> None:
     for name, fn in FIGURES:
         fn(cfg, roles, cfg.path("figures", f"{name}.{ext}"))
 
-    _publish(cfg, ext)
+    _publish(cfg, ext, FIGURES)
     log.info("EDA tamam: %d tablo, %d figur", len(tables), len(FIGURES))
 
 
-def _publish(cfg: Config, ext: str) -> None:
+def _publish(cfg: Config, ext: str, figures: list) -> None:
     """Figurleri teslim klasorune kopyalar; kanonik kaynak reports/figures kalir."""
     import shutil
 
@@ -503,7 +509,7 @@ def _publish(cfg: Config, ext: str) -> None:
     if not dest.is_absolute():
         dest = (REPO_ROOT / dest).resolve()
     dest.mkdir(parents=True, exist_ok=True)
-    for name, _ in FIGURES:
+    for name, _ in figures:
         src = cfg.path("figures", f"{name}.{ext}")
         if src.exists():
             shutil.copy2(src, dest / src.name)

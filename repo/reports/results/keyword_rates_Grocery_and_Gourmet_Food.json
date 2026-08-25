@@ -14,10 +14,6 @@
     "kw_gift_received": {
       "n": 8918,
       "rate": 0.000828
-    },
-    "kw_gift_proxy": {
-      "n": 198944,
-      "rate": 0.018464
     }
   },
   "proxy_rate": 0.018464,

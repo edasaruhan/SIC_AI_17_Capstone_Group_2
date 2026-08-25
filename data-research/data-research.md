@@ -7,8 +7,10 @@
 
 **Team Members:** [Team Member 1] / [Team Member 2] / [Team Member 3]
 
-> **Reproducibility.** Every number and figure in this document is produced by the code in
-> `repo/`. Nothing is hand-entered. To regenerate from scratch:
+> **Reproducibility.** Every statistic and figure in this document is computed by the code
+> in `repo/` and cross-checked against the generated tables. The only figures typed by
+> hand are the raw file sizes in §2.3, which come from the HuggingFace file listing.
+> To regenerate from scratch:
 >
 > ```bash
 > cd repo && pip install -r requirements.txt && pip install -e .
@@ -16,10 +18,11 @@
 > python -m gift_contamination.data.preprocess        --category all
 > python -m gift_contamination.analysis.keyword_scan  --category all
 > python -m gift_contamination.analysis.eda
+> python -m gift_contamination.analysis.deep_eda
 > ```
 >
-> Tables are written to `repo/reports/results/eda_tables.md`, figures to
-> `repo/reports/figures/`. Analysis date: 25 August 2026.
+> Tables land in `repo/reports/results/` (`eda_tables.md`, `deep_eda_tables.md`), figures in
+> `repo/reports/figures/`. 15 tables, 16 figures. Analysis date: 25 August 2026.
 
 ---
 
@@ -62,8 +65,11 @@ is why the detection signal must be recovered from text.
 | RQ3 | Remove the signal, or model it? | Per-interaction labels | Choice of intervention |
 | RQ4 | How long does a gift purchase distort the slate? | Timestamps + sequences | **Contamination half-life (M2)** |
 
-This document establishes whether the data can carry that weight. **It can — with three
-specific caveats, one of which changes the project plan.**
+This document does two jobs. It establishes whether the data can carry that weight — **it
+can, with caveats, several of which change the project plan.** And it measures, before any
+model is trained, a set of assumptions the later stages were going to inherit unchecked.
+**Two of those assumptions turn out to be wrong**, and finding that out now costs a week
+rather than a month.
 
 ---
 
@@ -102,7 +108,7 @@ assumed from documentation:
 | `title` | str | Short but signal-dense ("Perfect gift!") |
 | `rating` | float | Tests whether gift purchases are rated differently (§4.7) |
 | `timestamp` | int | **Load-bearing** — the seasonality validation depends on it |
-| `user_id` | str | Builds per-user chronological sequences |
+| `user_id` | str | Builds per-user sequences; **global across categories**, which makes M1 computable (§4.13) |
 | `parent_asin` | str | Metadata join key — **not `asin`**, which varies by size/colour variant |
 | `verified_purchase` | bool | Quality filter |
 
@@ -127,7 +133,7 @@ Four categories, chosen so that the study can **falsify itself**:
 **Why the control category is the most important one.** If the detector reports the same
 contamination in groceries as in toys, it is not measuring gift intent — it is measuring
 something else, and every downstream result is void. The category ordering is a prediction
-registered *before* measurement. §4.6 reports the outcome.
+registered *before* measurement. §4.4 reports the outcome.
 
 Total download: **16.3 GB**.
 
@@ -137,8 +143,7 @@ Total download: **16.3 GB**.
 
 ### 3.1 Preprocessing and what each filter removes
 
-Four quality steps, applied once, with every stage counted (T1, full table in
-`repo/reports/results/eda_tables.md`):
+Four quality steps, applied once, with every stage counted (T1):
 
 | Category | Raw | `verified_purchase` | ≥ 5 words | Deduplicated | **5-core** |
 |---|---|---|---|---|---|
@@ -152,6 +157,24 @@ Four quality steps, applied once, with every stage counted (T1, full table in
   gift evidence ("Great!", "Five stars") and would enter the detector as guaranteed
   `unclear`.
 - **Duplicate user–item pairs:** 1.1–1.5% of remaining rows. The earliest timestamp is retained.
+
+**The five-word filter turns out to do a second job nobody planned for.** Measured on the
+raw corpus, **10–16% of all reviews share their exact text with at least one other review** —
+on its face a serious quality problem. Broken down by length, it is not:
+
+| Review length | Share that is duplicated text (Toys) |
+|---|---|
+| 1–2 words | **92.5%** |
+| 3–5 words | 53.5% |
+| 6–10 words | 9.7% |
+| 11–25 words | 3.5% |
+| 26+ words | ~2.8% |
+
+The duplication is almost entirely generic praise — the six most repeated strings in Toys
+and Games are *"Great"* (35,139×), *"Good"* (30,351×), a single space (23,229×),
+*"Love it"*, *"Perfect"* and *"Great product"*. After the five-word filter, duplication
+falls to **0.49%–3.47%** (T9). A filter adopted for signal reasons removes the near-totality
+of a data-quality problem as a side effect.
 
 ### 3.2 The finding that changes the plan: the review graph is extremely sparse
 
@@ -170,7 +193,8 @@ the review graph is not the purchase graph.
 The consequence is concrete. 5-core filtering — the recommender-systems standard, and a
 fixed rule in our experimental design — must be applied iteratively, because removing a
 user can push an item below the threshold and vice versa. Convergence took **20 iterations**
-for Toys and Games and **17** for Video Games. Its effect:
+for Toys and Games and **17** for Video Games; a single-pass implementation would have
+produced a dataset that is not 5-core while claiming to be. Its effect:
 
 - Toys and Games, Video Games and Grocery survive, retaining 8–17% of interactions. The
   resulting corpora (e.g. 2.16M interactions / 269K users / 104K items for Toys) are
@@ -181,12 +205,13 @@ for Toys and Games and **17** for Video Games. Its effect:
 **This is a real property of the data, not a bug** — and it invalidates the pilot category
 chosen in the project plan for any experimental purpose. `All_Beauty` remains usable for
 detector development, where per-user sequences are irrelevant, and every detection result
-below includes it. It cannot host the recommender experiment. §5 states the consequence.
+below includes it. It cannot host the recommender experiment.
 
 Our pipeline therefore maintains **two corpora per category**: a `clean` corpus (quality
 filters + deduplication) for detection and descriptive analysis, and a `kcore` corpus for
 the recommender experiment. Prevalence is a question about reviews; it should not be
-answered on a graph pruned for a different purpose.
+answered on a graph pruned for a different purpose. §4.11 shows this separation was not
+cosmetic — the two corpora carry materially different contamination.
 
 ### 3.3 Field-level quality
 
@@ -199,19 +224,22 @@ answered on a graph pruned for a different purpose.
   bars to array positions rather than to rating values. It is now excluded and counted.
   A defect too small to matter statistically was large enough to produce a wrong figure.
 - **Missing values.** No nulls in the fields we use, after the empty-text filter.
-- **Duplicates.** Handled explicitly (§3.1).
+- **Non-ASCII text:** 8.2%–14.8% of raw reviews contain at least one non-ASCII character
+  (T9) — a mixture of emoji, typographic punctuation and genuinely non-English writing. It
+  is a loose upper bound on the multilingual share, and the empirical basis for the
+  linguistic-bias limitation in §3.5, which would otherwise be an unsupported assertion.
 
 ### 3.4 Class imbalance
 
-The target class is a minority everywhere: the lexical proxy finds 1.85%–11.07% (§4.5).
-The true rate is higher, since lexical matching has poor recall (§4.8). Two consequences:
+The target class is a minority everywhere: the lexical proxy finds 1.85%–11.07% (§4.4).
+The true rate is higher, since lexical matching has poor recall (§4.9). Two consequences:
 
 - **Annotation sampling must be stratified**, not random, or the sample will contain too
   few positives to train on. A keyword-enriched subset is drawn separately and held **out**
   of the prevalence estimate, so enrichment does not inflate the headline number.
 - **Precision must be prioritised over recall** in the deployed detector. A false positive
-  suppresses personalisation for a customer who made no gift purchase — an active harm — while
-  a false negative merely leaves existing contamination in place.
+  suppresses personalisation for a customer who made no gift purchase — an active harm —
+  while a false negative merely leaves existing contamination in place.
 
 ### 3.5 Bias and representativeness
 
@@ -226,17 +254,18 @@ than self-purchases: the buyer does not possess the item and cannot assess it.
 - This bounds the *external* claim without weakening the *internal* experiment: the
   intervention is applied to exactly the interaction graph the recommender trains on.
 
-Two further boundaries: the estimates do not generalise beyond the four categories studied,
-and reviews are predominantly English, so detector quality for other registers and dialects
-is untested and is reported as a limitation rather than assumed away.
+Three further boundaries: the estimates do not generalise beyond the four categories
+studied; a measurable non-English minority exists (§3.3) whose detection quality is
+untested; and **the sequences are only partly purchase sequences** — §4.12 quantifies how
+much of the apparent chronology is really a reviewing session.
 
 ### 3.6 Privacy, consent, and responsible use
 
 The dataset is public and pseudonymous — `user_id` is an opaque identifier with no direct
 personal data attached. **The residual risk is real and specific to our method:** review
 text is free-form and frequently contains personal detail *precisely because our task
-depends on that detail*. A review reading "bought this for my daughter's seventh birthday"
-is simultaneously our most valuable signal and a disclosure about a child.
+depends on that detail*. §4.6 makes this concrete rather than hypothetical: for **78–88%**
+of gift-flagged reviews the recipient relation is mechanically recoverable.
 
 Controls actually implemented in this repository, not merely promised:
 
@@ -244,28 +273,36 @@ Controls actually implemented in this repository, not merely promised:
 |---|---|
 | No verbatim review text in any published output | This document reports only aggregate statistics; illustrative cases are paraphrased |
 | Human-annotation files stay local | `data/annotations/human/` is in `.gitignore`; only the aggregated result (`keyword_precision.json`) is committed |
-| Evidence text never enters shared artefacts | `keyword_scan` drops `title` and `text` before writing its output |
+| Evidence text never enters shared artefacts | `keyword_scan` drops `title` and `text` before writing; only derived flags, a relation label and a position offset survive |
 | No re-identification | No linkage across datasets, no enrichment of pseudonymous identifiers |
 
 **On consent.** Reviewers consented to public display of their reviews on a commercial
-platform. They did not consent to inference about their household composition. Detecting
-"bought for my child" is, in effect, inferring that a customer has children. We treat such
-inferred attributes as **strictly instrumental**: used to *exclude* an interaction from
-training, never to *target*. The distinction between suppression and targeting is the
-central ethical line in this project.
+platform. They did not consent to inference about their household composition. §4.6 shows
+how sharp this is: the dominant recipients in Toys and Games are sons, daughters, grandsons
+and granddaughters — detecting them is, in effect, inferring family structure at scale. We
+treat such inferred attributes as **strictly instrumental**: used to *exclude* an interaction
+from training, never to *target*. The distinction between suppression and targeting is the
+central ethical line in this project, and §4.6 is the reason it needs stating rather than
+assuming. §4.13 offers a concrete alternative that avoids the inference entirely.
 
 ### 3.7 Freshness
 
-The data ends **September 2023**, roughly three years before this study. Absolute
-contamination rates may have drifted; the structural finding (gift purchases concentrate by
-category and season) is not time-sensitive. 2023 is a partial year and is treated as such
-in all time series.
+The data ends **September 2023**, roughly three years before this study. §4.14 shows the
+contamination rate is **not stationary** across years, so absolute figures should be read as
+period estimates rather than constants. The structural findings — category ordering,
+seasonality, recipient composition — are stable across the observed window. 2023 is a
+partial year and is treated as such in all time series.
 
 ---
 
 ## 4. Exploratory Analysis and Marketing Insights
 
-### 4.1 Rating distribution — the signal is almost all positive
+Fourteen analyses in three blocks: **what the corpus looks like** (4.1–4.3), **what the gift
+signal looks like** (4.4–4.9), and **what both mean for the experiment that follows**
+(4.10–4.14). The third block carries most of the value: it tests assumptions the later
+stages were going to inherit without checking.
+
+### 4.1 Rating and review length — the raw material
 
 ![F1](figures/F1_rating_distribution.png)
 
@@ -273,42 +310,23 @@ Between 58% and 65% of reviews carry the top rating. Second place is a distant c
 1★ leads in Grocery (14.0%) and All Beauty (15.7%), 4★ in Toys (11.2%) and Video Games
 (13.5%). Either way the distribution is J-shaped and top-heavy.
 
-> **Marketing read.** A recommender trained on this signal sees almost no negative evidence.
-> That is precisely why a *structural* noise class matters more here than a random one:
-> there is no counterweight in the data to correct a mislearned preference.
-
-### 4.2 Review length — enough text to work with
-
 ![F2](figures/F2_text_length.png)
 
 Median review length is 21–27 words. 14.5–17.0% of verified reviews fall under the
 five-word threshold and are excluded.
 
-> **Marketing read.** Roughly one in six reviewed interactions is undecidable at any cost —
-> a permanent coverage ceiling on any text-based detector, and a number to state up front
-> rather than discover later.
+> **Marketing read.** A recommender trained on this signal sees almost no negative evidence,
+> which is exactly why a *structural* noise class matters more here than a random one: there
+> is no counterweight in the data to correct a mislearned preference. And roughly one in six
+> reviewed interactions is undecidable at any cost — a permanent coverage ceiling on any
+> text-based detector, worth stating up front rather than discovering later.
 
-**A settled side question.** Only **0.03%–0.45%** of reviews exceed 768 words (≈1,024
-tokens). The project's plan justifies its distillation model partly by its 8,192-token
-context window; on this corpus, that capacity is almost never exercised, and a 1,024-token
-limit truncates under half a percent of reviews. The argument for the model may stand on
-efficiency grounds, but not on truncation.
-
-### 4.3 Reviewer activity — where contamination does the most damage
+### 4.2 Reviewer activity and catalogue concentration
 
 ![F3](figures/F3_user_activity.png)
 
 The survival curves are steep. 94–97% of reviewers in the three main categories have fewer
 than five interactions; in All Beauty, 99.92% do.
-
-> **Marketing read.** This is the empirical basis for the sparse-profile argument. For a
-> customer with three recorded interactions, a single gift purchase misdirects a third of
-> the available signal. Contamination does most damage exactly where personalisation is
-> already weakest — the new or low-frequency customer, who is also the most valuable to
-> convert into a repeat buyer. It also sets up marketing metric **M3**, which stratifies the
-> intervention's effect by interaction count.
-
-### 4.4 Catalogue concentration — the cost of a wasted slot
 
 ![F4](figures/F4_item_longtail.png)
 
@@ -316,24 +334,26 @@ Item popularity is heavily concentrated (Gini 0.68–0.85). The most popular **1
 absorbs 74–80%** of all interactions in the three main categories (Video Games 79.6%,
 Grocery 76.0%, Toys 73.5%).
 
-> **Marketing read.** Recommendation surfaces have fixed capacity — roughly twenty homepage
-> positions, six email slots, one to three retargeting placements. When attention is this
-> concentrated, a slot occupied by a contaminated recommendation displaces a product with
-> genuinely high conversion probability. The opportunity cost per impression is not
-> hypothetical.
+> **Marketing read.** These two figures set the stakes from both ends. On the demand side,
+> contamination does most damage where personalisation is already weakest: for a customer
+> with three recorded interactions, one gift misdirects a third of the signal — the empirical
+> basis for marketing metric **M3**. On the supply side, recommendation surfaces have fixed
+> capacity (roughly twenty homepage positions, six email slots, one to three retargeting
+> placements); when attention is this concentrated, a slot spent on a contaminated
+> recommendation displaces a product with genuinely high conversion probability.
 
-### 4.5 Volume over time
+### 4.3 Volume over time
 
 ![F5](figures/F5_volume_over_time.png)
 
 Review volume grows by four orders of magnitude from 2000 to its 2020–2022 peak. The usable
 corpus is effectively post-2015.
 
-> **Marketing read.** Any conclusion drawn from this data describes the recent era, which is
-> the relevant one for a personalisation decision today. It also means the annotation sample
-> should be drawn with month-level balance, or it will silently become a study of 2021.
+> **Marketing read.** Any conclusion drawn here describes the recent era, which is the
+> relevant one for a personalisation decision today. It also means the annotation sample
+> must be drawn with month-level balance, or it will silently become a study of 2021.
 
-### 4.6 ★ Gift prevalence by category — the falsification test
+### 4.4 ★ Gift prevalence by category — the falsification test
 
 ![F7](figures/F7_gift_rate_by_category.png)
 
@@ -357,7 +377,95 @@ should.
 > a personalisation team can reasonably deprioritise it. **This is already an actionable
 > allocation decision, before any recommender is trained.**
 
-### 4.7 Rating distribution, gift versus rest
+### 4.5 ★ Seasonality — external validity, obtained without labels
+
+![F6](figures/F6_gift_rate_by_month.png)
+
+| Category | Jan | Feb | Jun–Sep (trough) | Nov | Dec | Dec ÷ summer |
+|---|---|---|---|---|---|---|
+| Toys and Games | 13.72% | 11.88% | 9.67% | 10.60% | 12.94% | 1.34× |
+| Video Games | 6.97% | 4.97% | 3.51% | 3.42% | 5.90% | 1.68× |
+| All Beauty | 3.50% | 2.35% | 1.75% | 1.98% | 3.33% | 1.90× |
+| Grocery and Gourmet Food | 2.68% | 2.15% | 1.52% | 1.61% | 2.70% | 1.77× |
+
+**The detector reads text. It has no access to the calendar.** It nonetheless reproduces the
+retail gift calendar in all four categories: a December–January maximum, a distinct February
+secondary peak, and a summer trough.
+
+**The peak lands in January, and that was predicted in advance.** Review timestamps are not
+purchase timestamps — people write weeks after delivery, so a December gifting season
+surfaces as a December–January reviewing season. This was stated as an expectation in the
+project plan before the data was touched; it is confirmation, not a defect. The February
+peak (Valentine's Day) survives the same lag.
+
+One nuance the plan did not anticipate: **seasonal amplitude runs opposite to the base
+rate.** Toys has the highest level (11.07%) but the flattest curve (1.34×); All Beauty has a
+low base but the sharpest holiday concentration (1.90×). §4.6 explains why.
+
+> **Marketing read.** **Timing:** suppression rules matter most in a December–February
+> window, when up to one in seven toy interactions is a gift — and because the *review* peak
+> lags the *purchase* peak, a team acting on review-derived signals is acting on a delay it
+> must model. **Budget:** retargeting spend placed in January against categories a customer
+> entered in December is the highest-risk spend in the calendar. This figure is the direct
+> input to marketing metric **M2**.
+
+### 4.6 ★ Who the gifts are for, and when — and why the calendar approach cannot work
+
+![F10](figures/F10_recipient_occasion.png)
+
+For gift-flagged reviews the recipient relation is recoverable in **78–88%** of cases and a
+named occasion in **20–29%** (T5). Among those, the composition is sharply category-specific
+(T6):
+
+| Category | Top recipients |
+|---|---|
+| **Toys and Games** | son 29.1%, daughter 26.0%, **grandson 14.7%, granddaughter 11.5%**, niece 6.3%, nephew 6.1% |
+| **Video Games** | **son 49.8%**, daughter 12.0%, grandson 11.6%, husband 9.3%, boyfriend 5.5% |
+| **Grocery and Gourmet Food** | **husband 26.0%**, son 19.3%, daughter 19.1%, wife 10.8%, mom 8.9% |
+| **All Beauty** | **daughter 38.8%**, husband 14.7%, wife 13.8%, son 8.1%, mom 7.7% |
+
+And the occasions, among reviews that name one:
+
+| Category | Christmas | Birthday | Next largest |
+|---|---|---|---|
+| Toys and Games | 46.7% | **49.3%** | baby shower 0.9% |
+| Video Games | **62.8%** | 32.1% | anniversary 0.5% |
+| Grocery and Gourmet Food | 44.4% | **45.2%** | wedding 3.7% |
+| All Beauty | **49.6%** | 39.6% | wedding 6.0% |
+
+**This is the most consequential table in the document, and it does two things.**
+
+**First, it settles the project's central methodological argument with a number.** The
+closest prior work — Wang et al. (WSDM 2020) — detects gift occasions from the **calendar**.
+That approach can only see occasions falling on a shared date. But **birthdays are as large
+as Christmas** in three of four categories, and larger in Toys and Games (49.3% vs 46.7%).
+Birthdays are spread across all 365 days and are invisible to a calendar model. On these
+figures, **a calendar-anchored detector is structurally blind to roughly half of the gift
+signal.** Until now the project asserted this; it is now measured. It also explains §4.5:
+Toys has the flattest seasonal curve precisely because half its gift volume is birthdays,
+which do not cluster in December.
+
+**Second, it exposes a gap in our own annotation schema.** The schema's `recipient` field
+(`configs/annotation_schema.json`) offers `child | spouse | parent | friend | colleague |
+unknown | null`. But **grandchildren are 26.2% of Toys recipients** and do not map cleanly to
+`child`; siblings appear consistently (brother 3.6% in Video Games, sister 5.5% in Grocery)
+with no slot at all; and `colleague` — which has a slot — barely registers anywhere. The
+schema was designed by intuition. The data says it should gain `grandchild` and `sibling`,
+and that `colleague` can fold into `friend`. **This is the schema's first contact with
+evidence, and it should be revised before the LLM run, not after.**
+
+*Caveat.* The occasion figure is extracted anywhere in the review, so it may occasionally
+catch an incidental mention rather than the purchase occasion. The birthday-vs-Christmas
+*ordering* is robust to this; the exact shares are indicative.
+
+> **Marketing read.** Two things a personalisation lead can act on immediately. The gift
+> signal in a toy catalogue is overwhelmingly *adults buying for children in their own
+> family* — a stable, recurring relationship rather than a one-off event, which means
+> suppression rules can be persistent rather than seasonal. And because birthdays are half
+> the volume, **any vendor solution sold on "holiday gift detection" addresses at most half
+> the problem.**
+
+### 4.7 The rating signature of a gift purchase
 
 ![F8](figures/F8_rating_gift_vs_self.png)
 
@@ -373,44 +481,45 @@ stars — in all four categories.
 
 > **Marketing read.** This behaves exactly as a distinct purchase mode should: a buyer who
 > did not use the product cannot criticise it. The consistency across four independent
-> categories is corroborating evidence that the flag is separating a real behavioural class
-> rather than partitioning noise. It also carries a warning for anyone using average rating
-> as a quality signal — in gift-dense categories, that average is partly measuring who was
-> asked, not how good the product is.
+> categories is corroborating evidence that the flag separates a real behavioural class
+> rather than partitioning noise. It also warns anyone using average rating as a quality
+> signal — in gift-dense categories that average is partly measuring who was asked, not how
+> good the product is.
 
-### 4.8 ★ Seasonality — external validity, obtained without labels
+### 4.8 Where the evidence lives — and a project assumption that does not survive
 
-![F6](figures/F6_gift_rate_by_month.png)
+![F9](figures/F9_evidence_position.png)
 
-| Category | Jan | Feb | Jun–Sep (trough) | Nov | Dec | Dec ÷ summer |
-|---|---|---|---|---|---|---|
-| Toys and Games | 13.72% | 11.88% | 9.67% | 10.60% | 12.94% | 1.34× |
-| Video Games | 6.97% | 4.97% | 3.51% | 3.42% | 5.90% | 1.68× |
-| All Beauty | 3.50% | 2.35% | 1.75% | 1.98% | 3.33% | 1.90× |
-| Grocery and Gourmet Food | 2.68% | 2.15% | 1.53% | 1.61% | 2.70% | 1.77× |
+**T5 — detection surface**
 
-**The detector reads text. It has no access to the calendar.** It nonetheless reproduces the
-retail gift calendar in all four categories: a December–January maximum, a distinct February
-secondary peak, and a summer trough.
+| Category | Evidence in title | Median position in body | 90th pct | **Evidence lost @512 tok** | @1024 tok |
+|---|---|---|---|---|---|
+| Toys and Games | 11.2% | 0.031 | 0.580 | **0.013%** | 0.001% |
+| Video Games | 9.8% | 0.011 | 0.464 | **0.044%** | 0.008% |
+| Grocery and Gourmet Food | 9.3% | 0.030 | 0.608 | **0.013%** | 0.001% |
+| All Beauty | 8.3% | 0.024 | 0.607 | **0.018%** | 0.000% |
 
-**The peak lands in January, and that was predicted in advance.** Review timestamps are not
-purchase timestamps — people write weeks after delivery, so a December gifting season
-surfaces as a December–January reviewing season. This was stated as an expectation in the
-project plan before the data was touched; it is confirmation, not a defect. The February
-peak (Valentine's Day) survives the same lag.
+Reviewers disclose the recipient **at the very start**. The median gift evidence sits 1–3%
+of the way into the review body; 90% of it appears within the first 60%.
 
-One nuance the plan did not anticipate: **seasonal amplitude runs opposite to the base
-rate.** Toys has the highest level (11.07%) but the flattest curve (1.34×), because toys are
-gifted year-round for birthdays. All Beauty has a low base but the sharpest holiday
-concentration (1.90×). Level and seasonality are two different signals, and only the level
-distinguishes categories.
+**Three project documents justify the choice of ModernBERT partly on its 8,192-token
+context, on the stated grounds that "the sentence disclosing the recipient frequently
+appears late in a review, after the product discussion." On this corpus that is false.**
+Truncating at **512 tokens — plain BERT, the model the argument was made against — would
+lose the evidence in fewer than 1 gift review in 2,000.** At the 1,024 tokens our config
+actually specifies, the loss is at most 8 in 100,000. Combined with T2 — where only **0.005%–0.19%**
+of annotation-corpus reviews exceed 768 words (≈1,024 tokens) — the truncation argument is
+not supported by the data.
 
-> **Marketing read.** Two operational implications. **Timing:** suppression rules matter most
-> in a December–February window, when up to one in seven toy interactions is a gift. And
-> because the *review* peak lags the *purchase* peak, a team acting on review-derived signals
-> is acting on a delay it must model. **Budget:** retargeting spend placed in January against
-> categories a customer entered in December is the highest-risk spend in the calendar. This
-> figure is the direct input to marketing metric **M2**, contamination half-life.
+*Caveat, stated because it matters:* this measures where a **lexical pattern** first
+matches, and phrases such as "bought this for my ⟨relation⟩" are plausibly biased toward
+review openings. An LLM reading for meaning might find evidence elsewhere. But the margin is
+three orders of magnitude — the conclusion does not depend on the caveat.
+
+> **Marketing read.** This is a cost decision, not an accuracy one. A short-context encoder
+> is cheaper to run and faster to fine-tune at essentially no measured loss on this corpus.
+> The case for ModernBERT should be re-argued on inference efficiency, where it is strong,
+> rather than on truncation, where the data does not support it.
 
 ### 4.9 ★ Why a keyword scan is not enough — the case for the LLM
 
@@ -434,9 +543,9 @@ project's central technical claim is that this problem *requires* semantic under
 Three findings, each with a direct consequence:
 
 **1. Precision is 58%.** Two in five flagged reviews are not gifts. The failure modes are
-readable in the sample. Some are outright false positives: *"between this and the red cherie
-scent I am in heaven… my boyfriend adores it"* matches a "my ⟨relation⟩ loved it" pattern
-while describing the reviewer's own purchase. Others are near-misses the four-class schema
+readable in the sample. Some are outright false positives: a reviewer enthusing about a
+scent she wears herself, adding that her boyfriend adores it, matches a "my ⟨relation⟩ loved
+it" pattern while describing her own purchase. Others are near-misses the four-class schema
 was designed for — 14 of the 60 are **household** purchases (bought for a spouse or child
 with no gift framing), which are not gifts but do not reflect the buyer's own taste either.
 Read as a "not the buyer's own preference" detector rather than a gift detector, the same
@@ -444,11 +553,10 @@ proxy reaches **81.7%**. *The schema's `household` class is doing real work, and
 first empirical support for keeping it.*
 
 **2. The error is not only in the obvious places.** Our audit surfaced a specific,
-diagnosable flaw: the phrase *"stocking stuffer"* sits in the evidence family, but appears
-speculatively about as often as it appears factually (*"would be an excellent stocking
-stuffer"*). **We have deliberately not patched it.** Tuning patterns after seeing the
-validation labels would be fitting to the test set. It is recorded as a diagnosed limitation
-and as an input to prompt design.
+diagnosable flaw: the phrase *"stocking stuffer"* sits in the evidence family but appears
+speculatively about as often as factually. **We have deliberately not patched it.** Tuning
+patterns after seeing the validation labels would be fitting to the test set. It is recorded
+as a diagnosed limitation and as an input to prompt design.
 
 **3. Recall is the bigger problem, and we can only bound it.** One of 20 reviews with **no
 keyword match whatsoever** was a genuine gift — and that single case is itself ambiguous.
@@ -472,6 +580,177 @@ single `gift` regex — the obvious first implementation — inflates the report
 
 ---
 
+*The five analyses that follow test whether the planned experiment can be run on this data,
+and what it will be measuring when it is.*
+
+### 4.10 Contamination inside a single customer profile
+
+![F12](figures/F12_user_contamination.png)
+
+![F13](figures/F13_rate_by_seq_position.png)
+
+**T7 — sequence feasibility, computed on the k-core (experimental) corpus**
+
+| Category | Users in k-core | With ≥1 gift | Last item is a gift | Entire sequence is gifts | **Eval-eligible** | Mean contamination among affected |
+|---|---|---|---|---|---|---|
+| Toys and Games | 268,652 | 128,546 (**47.8%**) | 11.32% | 0.146% | **88.7%** | 24.2% |
+| Video Games | 47,663 | 5,958 (12.5%) | 2.77% | 0.109% | **97.2%** | 22.5% |
+| Grocery and Gourmet Food | 268,991 | 25,767 (9.6%) | 1.33% | 0.003% | **98.7%** | 14.7% |
+| All Beauty | 0 | — | — | — | n/a — no k-core | — |
+
+Four results the experiment needs:
+
+- **Nearly half of Toys customers (47.8%) are affected** by at least one gift interaction.
+  There is ample signal for RQ2 to detect an effect if one exists.
+- **Among affected customers, gifts are 14.7%–24.2% of the profile on average** — a
+  meaningful minority, consistent with the sparse-profile argument in §4.2.
+- **The evaluation rule is cheap.** The mandatory "test item must be a self-purchase" rule
+  costs only **1.3% to 11.3%** of customers. This was an open risk in the plan; it is now a
+  known, small number.
+- **The "entire sequence is a gift" edge case is negligible** — 0.003%–0.146%. The plan
+  flagged it as something to handle; simple exclusion suffices.
+
+F13 adds a modest but consistent tilt: a gift is slightly *more* likely to be a customer's
+**first** recorded interaction (12.8% in Toys) than a middle (11.0%) or last (11.3%) one.
+
+> **Marketing read.** Gift buying is disproportionately an *entry point* into a category —
+> the first thing the platform ever learns about a customer is, more often than the base
+> rate, something that customer does not want. That is the worst possible position for a
+> contaminated signal to occupy, and it is precisely the scenario the Amazon patents describe
+> as most damaging.
+
+### 4.11 What 5-core filtering does to the signal — a warning for the experiment
+
+**T8 — contamination rate, full corpus versus experimental corpus**
+
+| Category | Clean corpus | k-core corpus | **Shift** |
+|---|---|---|---|
+| Toys and Games | 11.07% | 11.27% | **+1.8%** |
+| Video Games | 4.40% | 2.68% | **−39.2%** |
+| Grocery and Gourmet Food | 1.85% | 1.34% | **−27.5%** |
+| All Beauty | 2.13% | — | no k-core |
+
+**5-core filtering systematically removes gift buyers** in two of the three viable
+categories. The mechanism is easy to see once measured: a gift purchase is often a one-off —
+you buy a nephew a game, review it, and never return to the category — and one-off reviewers
+are precisely who *k*-core deletes.
+
+The consequence for the experiment is direct and was not anticipated in the plan: **the
+recommender experiment will run on a corpus 27–39% less contaminated than the one we
+measured**, in Video Games and Grocery. The experiment is therefore biased *toward finding
+no effect* in exactly the two categories where the effect was already expected to be small.
+Toys and Games is the exception — contamination survives *k*-core intact (+1.8%) — which
+makes it the correct primary category for RQ2, not merely the most gift-dense one.
+
+> **Marketing read.** A methodological caution that generalises well beyond this study: the
+> standard preprocessing recipe of recommender-systems research **preferentially deletes the
+> very customers whose data is most contaminated**. Any team measuring data-quality effects
+> on a *k*-cored benchmark is measuring them on an unrepresentative sample, and should say
+> so.
+
+### 4.12 The sequences are only partly purchase sequences
+
+![F15](figures/F15_time_to_next.png)
+
+**T11 — temporal resolution**
+
+| Category | Consecutive pairs on the same day | Median gap | **Held-out item same day as previous** | Median gap before held-out item |
+|---|---|---|---|---|
+| Toys and Games | **43.0%** | 15 days | **31.2%** | 93 days |
+| Video Games | **42.3%** | 17 days | **31.5%** | 101 days |
+| Grocery and Gourmet Food | **34.8%** | 34 days | **24.5%** | 99 days |
+
+**Between a third and 43% of consecutive interactions occur on the same calendar day**, and
+22–29% of customer-days contain more than one review. People review in batches: they sit
+down and write up several past purchases at once.
+
+For a sequential recommender evaluated leave-one-out, this matters. In **24.5%–31.5% of
+customers, the held-out "next" item shares its date with the previous interaction** — so the
+model is not being asked to predict a future purchase but another item from the same
+reviewing session. That is a different, easier task.
+
+This does not invalidate the experiment. It does mean the results table should carry a
+robustness column computed on the subset whose held-out item is genuinely later — the median
+gap before the held-out item is 93–101 days, so a clean majority of the evaluation is
+well-separated. **Reporting it is the difference between a defensible result and one that
+falls apart under the first informed question.**
+
+> **Marketing read.** Review timestamps are a *reviewing* clock, not a *purchasing* clock.
+> Any duration expressed in this data — including marketing metric **M2**, contamination
+> half-life — inherits that distortion and must be reported as "weeks of review activity",
+> not "weeks of customer life".
+
+### 4.13 Item concentration and cross-category reach
+
+![F14](figures/F14_item_concentration.png)
+
+Contamination is not spread evenly across the catalogue. Restricted to items with at least
+20 reviews, the per-item gift rate spans the full range: a long tail of products is barely
+gift-bought, while the top of each curve is a dense, identifiable set of gift-dominated
+products.
+
+**T10 — cross-category customers**
+
+| Metric | Value |
+|---|---|
+| Distinct customers across all four categories | 12,690,408 |
+| Customers observed in **≥2** categories | **2,316,411 (18.3%)** |
+| …of those, entered **≥1 category only via a gift** | **207,155 (8.9%)** |
+| Customers present in all four categories | 15,162 |
+
+`user_id` is **global across categories** in Amazon Reviews 2023 — verified, not assumed.
+That makes marketing metric **M1** (wasted personalisation inventory: slots drawn from
+categories a customer entered *only* via a gift) computable from this data, which was
+previously an open question. The population is now sized: **8.9% of multi-category customers
+have at least one category in their profile that exists purely because of a gift.**
+
+> **Marketing read.** Both halves are directly operational. Item-level concentration means a
+> retailer can maintain a **gift-dominated product list** and apply suppression at the
+> product level — no per-customer inference, and therefore no household-composition
+> profiling. That is the cheapest intervention available and the one that best respects the
+> ethical line drawn in §3.6. And the cross-category figure is the first direct estimate of
+> M1's reach: for roughly one multi-category customer in eleven, an entire interest category
+> on their profile is an artefact of a gift.
+
+### 4.14 Confound and robustness checks
+
+![F11](figures/F11_rate_by_length.png)
+
+![F16](figures/F16_rate_over_time.png)
+
+**T9 — confounds**
+
+| Category | Gift rate, shortest 20% | Gift rate, longest 20% | Ratio | Unverified (raw) | Non-ASCII | Dup. text raw → filtered |
+|---|---|---|---|---|---|---|
+| Toys and Games | 8.23% | 12.56% | 1.53× | 8.6% | 11.75% | 15.90% → 3.47% |
+| Video Games | 4.38% | 2.64% | **0.60×** | 13.9% | 8.19% | 14.67% → 2.30% |
+| Grocery and Gourmet Food | 0.96% | 2.27% | 2.36× | 8.0% | 10.92% | 14.89% → 1.96% |
+| All Beauty | 1.39% | 2.37% | 1.70× | 9.5% | 14.83% | 10.09% → 0.49% |
+
+**Length is a genuine confound, and it is reported rather than hidden.** Longer reviews
+contain more gift signal in three of four categories (1.5×–2.4×), for the obvious reason
+that more text means more opportunity to disclose a recipient. The category ordering in §4.4
+survives it: the gradient is similar across categories while the levels differ by 6×, so
+length cannot be what separates Toys from Grocery.
+
+**Video Games inverts the gradient (0.60×)** — its *shortest* reviews carry the most gift
+signal. The likely mechanism is visible in the corpus: a short Video Games review is often a
+complete gift statement ("Bought for my son, he loves it"), while a long one is a detailed
+gameplay critique, which is a self-purchase. This is a category-specific quirk worth knowing
+before interpreting any Video Games result, and the kind of thing that only appears if you
+look.
+
+**The rate is not stationary** (F16). Gift prevalence drifts across years in every category.
+Absolute figures are therefore period estimates, not constants — relevant given that the
+data ends in September 2023.
+
+> **Marketing read.** The honest summary: the *level* of contamination is category-specific,
+> time-varying, and partly a function of how much customers write — while the *ordering*
+> between categories is robust to all three. Act on the ordering; treat any single percentage
+> as an estimate with a date on it.
+
+---
+
 ## 5. Conclusion
 
 ### 5.1 Is the data suitable for the next stage?
@@ -482,37 +761,60 @@ pilot category as an experimental site.**
 | Requirement | Verdict | Evidence |
 |---|---|---|
 | Enough text to detect gift intent | **Yes** | Median 21–27 words; 83–86% of verified reviews clear the 5-word floor |
-| Gift signal actually present | **Yes** | 1.85%–11.07% by lexical lower bound, with 6× spread across the designed spectrum |
-| Detector separates a real class | **Yes — three independent checks** | Category ordering as predicted (§4.6); seasonality without calendar access (§4.8); distinct rating distribution (§4.7) |
+| Gift signal actually present | **Yes** | 1.85%–11.07% by lexical lower bound, 6× spread across the designed spectrum |
+| Detector separates a real class | **Yes — four independent checks** | Category ordering as predicted (§4.4); seasonality without calendar access (§4.5); distinct rating distribution (§4.7); coherent recipient composition (§4.6) |
 | Timestamps usable for seasonality | **Yes** | Millisecond units confirmed; zero out-of-range rows |
-| Sequences usable for sequential recommendation | **Yes, in 3 of 4** | 5-core retains 0.37M–2.43M interactions in Toys, Video Games and Grocery — ordinary benchmark scale |
-| Pilot category usable for the experiment | **No** | `All_Beauty` retains 0 interactions after 5-core; 0.08% of its reviewers reach the threshold |
-| Lexical detection sufficient on its own | **No** | 58% precision; recall bounded but clearly poor |
+| Sequences usable for sequential recommendation | **Yes in 3 of 4, with a caveat** | 0.37M–2.43M interactions after 5-core; but 24.5–31.5% of held-out items share a date with the previous interaction (§4.12) |
+| Evaluation rule affordable | **Yes** | "Test item must be self" costs only 1.3–11.3% of customers (§4.10) |
+| Marketing metric M1 computable | **Yes** | `user_id` is global across categories; 8.9% of multi-category customers qualify (§4.13) |
+| Pilot category usable for the experiment | **No** | `All_Beauty` retains 0 interactions after 5-core |
+| Lexical detection sufficient on its own | **No** | 58% precision; recall bounded but clearly poor (§4.9) |
+| Long-context classifier necessary | **No** | Evidence lost at 512 tokens: 0.013–0.044% (§4.8) |
 
 ### 5.2 What this changes in the project plan
 
-1. **`All_Beauty` is retired as the experimental pilot** and retained as the detector-development
-   pilot, where its 537K reviews and 32-second download remain ideal. The recommender
-   experiment should pilot on **Video Games** — at 368K interactions after 5-core it is the
-   smallest of the three viable categories and the fastest to iterate on.
-2. **Two corpora per category are now standard** in the pipeline: `clean` for detection and
-   descriptive analysis, `kcore` for the experiment. The experimental rule that the user/item
-   universe is frozen once, on the baseline condition, applies to `kcore` and is unaffected.
-3. **The `household` class survives its first empirical test** (§4.9) and should be retained
-   into the annotation schema rather than merged pre-emptively.
-4. **The distillation context-length argument needs restating** — on this corpus, under 0.5%
-   of reviews would be truncated at 1,024 tokens (§4.2).
+Six concrete revisions, in descending order of importance:
+
+1. **`All_Beauty` is retired as the experimental pilot** and retained as the
+   detector-development pilot, where its 537K reviews and 32-second download remain ideal.
+   The recommender experiment should pilot on **Video Games** — at 368K interactions after
+   5-core it is the smallest viable category and the fastest to iterate on.
+2. **Toys and Games becomes the primary category for RQ2**, not merely the most gift-dense
+   one. It is the only category where contamination survives 5-core intact (§4.11); in the
+   other two the experiment would run on a corpus 27–39% cleaner than reality, biased toward
+   a null result.
+3. **The annotation schema should be revised before the LLM run** (§4.6): add `grandchild`
+   (26% of Toys recipients) and `sibling`; fold the near-empty `colleague` into `friend`.
+4. **The results table needs a same-day robustness column** (§4.12). A quarter to a third of
+   the evaluation is same-session prediction rather than next-purchase prediction.
+5. **The distillation context-length argument must be restated** (§4.8). ModernBERT remains
+   defensible on inference efficiency; it is not defensible on truncation, and
+   `distill.max_length: 1024` is more than sufficient.
+6. **Two corpora per category are now standard**: `clean` for detection and descriptive
+   analysis, `kcore` for the experiment. The rule that the user/item universe freezes once,
+   on the baseline condition, applies to `kcore` and is unaffected.
 
 ### 5.3 What the data already supports
 
-Before a single model is trained, the data yields a marketing-actionable result: **gift
-contamination in reviewed Amazon interactions ranges from under 2% in groceries to at least
-11% in toys, rises by a third to a half in the December–February window, and concentrates in
-customer profiles too sparse to absorb it.** Every one of those numbers is a lower bound.
+Before a single model is trained, this analysis yields marketing-actionable results:
 
-That is enough to prioritise where a personalisation team should look. It is not enough to
-tell them what to do about it — which is the question the recommender experiment exists to
-answer, and which requires a detector considerably better than the one used here.
+- **Gift contamination ranges from under 2% in groceries to at least 11% in toys**, rises by
+  a third to a half in the December–February window, and concentrates in customer profiles
+  too sparse to absorb it. Every figure is a lower bound.
+- **Roughly half the gift signal is birthdays, not holidays** — so calendar-based occasion
+  detection, the deployed industry alternative, is structurally blind to about half the
+  problem. This is the project's differentiating claim, now measured rather than argued.
+- **Gift buying is disproportionately a customer's entry point into a category**, and for
+  8.9% of multi-category customers at least one interest category exists purely because of a
+  gift.
+- **Contamination concentrates in identifiable products**, so a product-level suppression
+  list is a viable intervention requiring no household-composition inference at all — the
+  cheapest and most privacy-respecting option on the table.
+
+That is enough to tell a personalisation team where to look and what kind of remedy to
+consider. It is not enough to tell them whether the remedy works — which is the question the
+recommender experiment exists to answer, and which requires a detector considerably better
+than the one used here.
 
 ---
 
@@ -534,22 +836,23 @@ answer, and which requires a detector considerably better than the one used here
 6. Wang, W., Feng, F., He, X., Nie, L., & Chua, T.-S. (2021). Denoising Implicit Feedback for Recommendation. *WSDM '21*, 373–381. https://doi.org/10.1145/3437963.3441800
 7. Wang, J., Louca, R., Hu, D., Cellier, C., Caverlee, J., & Hong, L. (2020). Time to Shop for Valentine's Day: Shopping Occasions and Sequential Recommendation in E-commerce. *WSDM '20*, 645–653. https://doi.org/10.1145/3336191.3371836
 
-**LLM annotation and validation methodology**
+**LLM annotation, validation, and encoders**
 
 8. Gilardi, F., Alizadeh, M., & Kubli, M. (2023). ChatGPT outperforms crowd workers for text-annotation tasks. *PNAS*.
 9. Pangakis, N., Wolken, S., & Fasching, N. (2023). Automated Annotation with Generative AI Requires Validation. arXiv preprint.
 10. Calderon, N., Reichart, R., & Dror, R. (2025). The Alternative Annotator Test for LLM-as-a-Judge. *ACL 2025*, 16051–16081.
+11. Warner, B., et al. (2025). Smarter, Better, Faster, Longer: A Modern Bidirectional Encoder for Fast, Memory Efficient, and Long Context Finetuning and Inference. *ACL 2025*, 2526–2547. arXiv:2412.13663
 
 **Industry context**
 
-11. Amazon Technologies, Inc. US Patents 9,818,145; 10,445,809; 8,352,331; 11,367,117 — cited as documentary evidence of industry problem recognition, not of measured effect.
-12. Gift recommendation systems: a review. (2023). *Electronic Commerce Research*. https://doi.org/10.1007/s10660-023-09790-6
+12. Amazon Technologies, Inc. US Patents 9,818,145; 10,445,809; 8,352,331; 11,367,117 — cited as documentary evidence of industry problem recognition, not of measured effect.
+13. Gift recommendation systems: a review. (2023). *Electronic Commerce Research*. https://doi.org/10.1007/s10660-023-09790-6
 
 **Tooling**
 
-13. polars — DataFrame library. https://pola.rs/
-14. HuggingFace `huggingface_hub` documentation. https://huggingface.co/docs/huggingface_hub
-15. Dataset scripts deprecation, `datasets` 4.x. https://github.com/huggingface/datasets/issues/7693
+14. polars — DataFrame library. https://pola.rs/
+15. HuggingFace `huggingface_hub` documentation. https://huggingface.co/docs/huggingface_hub
+16. Dataset scripts deprecation, `datasets` 4.x. https://github.com/huggingface/datasets/issues/7693
 
 ---
 
@@ -561,9 +864,10 @@ answer, and which requires a detector considerably better than the one used here
 | Configuration (single source of truth) | `repo/configs/base.yaml`, `repo/configs/gift_keywords.yaml` |
 | Preprocessing funnel counts | `repo/reports/results/preprocess_funnel_*.json` |
 | Lexical proxy rates | `repo/reports/results/keyword_rates_*.json` |
-| Manual validation result | `repo/reports/results/keyword_precision.json` |
-| All tables (T1–T4) | `repo/reports/results/eda_tables.md` |
-| All figures (F1–F8) | `repo/reports/figures/` and `figures/` |
+| Corpus tables (T1–T3) | `repo/reports/results/eda_tables.md` |
+| Manual validation (T4) | `repo/reports/results/keyword_precision.json` |
+| Deep-analysis tables (T5–T14) | `repo/reports/results/deep_eda_tables.md` |
+| All figures (F1–F16) | `repo/reports/figures/` and `figures/` |
 | Interactive walkthrough | `repo/notebooks/01_data_research_eda.ipynb` |
 | Deviations from the project specification | `repo/docs/DECISIONS.md` |
 | Data-integrity tests | `repo/tests/` — `pytest tests -q` |

@@ -174,7 +174,9 @@
       "int/item (mean)": "15.50",
       "items ≥5": "37.1%",
       "item Gini": "0.805",
+      "top-10% items' share": "73.5%",
       "median words": "22",
+      ">768 words": "0.015%",
       "period": "2000-08 → 2023-09"
     },
     {
@@ -189,7 +191,9 @@
       "int/item (mean)": "26.89",
       "items ≥5": "42.3%",
       "item Gini": "0.850",
+      "top-10% items' share": "79.6%",
       "median words": "27",
+      ">768 words": "0.190%",
       "period": "1999-03 → 2023-09"
     },
     {
@@ -204,7 +208,9 @@
       "int/item (mean)": "19.89",
       "items ≥5": "40.2%",
       "item Gini": "0.826",
+      "top-10% items' share": "76.0%",
       "median words": "21",
+      ">768 words": "0.005%",
       "period": "2001-08 → 2023-09"
     },
     {
@@ -219,7 +225,9 @@
       "int/item (mean)": "5.41",
       "items ≥5": "21.6%",
       "item Gini": "0.684",
+      "top-10% items' share": "61.8%",
       "median words": "22",
+      ">768 words": "0.007%",
       "period": "2002-10 → 2023-09"
     }
   ],

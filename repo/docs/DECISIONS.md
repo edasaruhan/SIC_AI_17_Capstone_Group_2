@@ -126,3 +126,84 @@ dağılımı) kaç review'un 1024 token'ı aştığını ölçüyor; karar o say
 Hafta 5 öncesi verilmeli.
 **Etkilediği bölüm:** `configs/base.yaml`, `detection/distill.py` (henüz yazılmadı)
 **Kim:** Ekip
+
+---
+
+### 2026-08-25 — ÇÖZÜLDÜ: `distill.max_length` ve ModernBERT context gerekçesi
+**Karar:** `distill.max_length: 1024` **değiştirilmiyor**; ModernBERT'in 8192 token
+context'ine dayanan gerekçe ise **geçersiz sayılıyor** ve teknoloji gerekçesi
+"çıkarım verimliliği" üzerinden yeniden yazılmalı.
+**Gerekçe:** Ölçüldü (T5, `reports/results/deep_eda_tables.md`). Hediye kanıtının
+review gövdesindeki medyan göreli konumu **0.011–0.031** — yani ilk cümlede.
+**512 token'da kesmek** (yani düz BERT) kanıtı hediye review'larının yalnızca
+**%0.013–0.044'ünde** kaybettiriyor; 1024 token'da kayıp en fazla %0.008.
+Ayrıca review'ların yalnızca %0.03–0.45'i 768 kelimeyi aşıyor (T2).
+concept-note §4.2, technology-review §4.4 ve implementation-plan §1.3'te geçen
+"alıcı bilgisi review'un sonunda geçer, 512'de kesilir" ifadesi bu korpus için
+**yanlış** ve düzeltilmeli.
+**Uyarı:** Bu ölçüm sözcüksel desenin ilk eşleşme konumudur; desenler review
+açılışına yanlı olabilir. Ama fark üç büyüklük mertebesi, sonuç bu uyarıya bağlı değil.
+**Etkilediği bölüm:** `configs/base.yaml`, technology-review, concept-note, implementation-plan
+**Kim:** Ekip
+
+---
+
+### 2026-08-25 — Annotation şeması revize edilmeli (LLM koşusundan ÖNCE)
+**Karar:** `configs/annotation_schema.json` içindeki `recipient` enum'ı
+güncellenecek: **`grandchild` ve `sibling` eklenecek**, `colleague` ise `friend`
+içine katlanacak.
+**Gerekçe:** Ölçüldü (T6). Toys_and_Games'te alıcıların **%26.2'si torun**
+(grandson %14.7 + granddaughter %11.5) ve mevcut şemada `child`'a temiz eşlenmiyor.
+Kardeşler tutarlı biçimde görünüyor (Video_Games'te brother %3.6, Grocery'de
+sister %5.5) ama karşılığı yok. `colleague` ise hiçbir kategoride kayda değer
+görünmüyor. Şema sezgiyle tasarlanmıştı; bu onun veriyle ilk teması.
+**Etkilediği bölüm:** `configs/annotation_schema.json`, `prompts/gift_detection_v1.md`,
+CLAUDE.md §4
+**Kim:** Ekip
+
+---
+
+### 2026-08-25 — RQ2'nin birincil kategorisi Toys_and_Games olacak
+**Karar:** Recsys deneyinin **birincil** kategorisi Toys_and_Games; Video_Games
+yalnızca hızlı iterasyon pilotu. `All_Beauty` deney dışı (5-core sonrası sıfır).
+**Gerekçe:** Ölçüldü (T8). 5-core filtresi hediye alıcılarını **sistematik olarak
+eliyor**: Video_Games'te hediye oranı %4.40 → %2.68 (**−%39.2**), Grocery'de
+%1.85 → %1.34 (**−%27.5**). Toys'ta ise korunuyor (%11.07 → %11.27, +%1.8).
+Mekanizma açık: hediye alımı çoğu kez tek seferliktir ve tek seferlik yorumcular
+tam da k-core'un sildiği kullanıcılardır. Video_Games ve Grocery'de deney,
+ölçtüğümüzden %27–39 daha temiz bir korpusta koşacak ve **null sonuca doğru
+yanlı** olacak. Bu, plandaki "yüksek/orta/düşük" seçiminden bağımsız yeni bir
+gerekçedir.
+**Etkilediği bölüm:** CLAUDE.md §5, §11 (MVP sırası), implementation-plan
+**Kim:** Ekip
+
+---
+
+### 2026-08-25 — Sonuç tablosuna "aynı gün" sağlamlık sütunu eklenecek
+**Karar:** RecBole sonuç tablosu, held-out item'ı bir önceki etkileşimden
+**gerçekten sonra** olan kullanıcı alt kümesinde hesaplanmış ikinci bir metrik
+sütunu taşıyacak.
+**Gerekçe:** Ölçüldü (T11). Ardışık etkileşimlerin **%34.8–43.0'ı aynı takvim
+gününde**; daha kritiği, kullanıcıların **%24.5–31.5'inde leave-one-out test
+item'ı bir önceki etkileşimle aynı gün**. Bu durumda model "sonraki alımı" değil
+"aynı review oturumundaki başka bir ürünü" tahmin ediyor — farklı ve daha kolay
+bir görev. İnsanlar birikmiş alımlarını tek oturumda yorumluyor; bu veri
+kümesinin yapısal bir özelliği. Raporlanmazsa RQ2'nin ölçtüğü şey yanlış anlaşılır.
+**Etkilediği bölüm:** `recsys/run_experiment.py` (henüz yazılmadı), sonuç raporlaması
+**Kim:** Ekip
+
+---
+
+### 2026-08-25 — `keyword_scan` genişletildi, `analysis/deep_eda.py` eklendi
+**Karar:** `keyword_scan` artık dört türetilmiş sinyal daha üretiyor:
+`kw_in_title`, `kw_pos_rel` (kanıtın göreli konumu), `kw_recipient`, `kw_occasion`.
+Bunların üzerine `analysis/deep_eda.py` modülü eklendi (T5–T14, F9–F16).
+**Gerekçe:** Data Research'ün "exploratory analysis" bölümünü betimsel
+istatistikten çıkarıp, projenin sonraki aşamalarının dayandığı varsayımları
+ölçen bir bölüme dönüştürmek. Üç varsayım bu sayede ölçüldü ve ikisi yanlış çıktı
+(yukarıdaki girdiler).
+**Gizlilik:** Türetilmiş kolonlar birebir metin taşımıyor; `kw_recipient` bir
+ilişki etiketi ("daughter"), kişisel veri değil. `title`/`text` yazımdan önce
+düşürülüyor.
+**Etkilediği bölüm:** Paket yapısı, CLAUDE.md §2
+**Kim:** Ekip

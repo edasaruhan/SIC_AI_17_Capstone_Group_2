@@ -79,6 +79,12 @@ src/gift_contamination/
 **Kaynak:** `McAuley-Lab/Amazon-Reviews-2023` (HuggingFace). Açık, ücretsiz.
 571.54M review, Mayıs 1996 – Eylül 2023, 33 kategori. Kategori bazlı indirilir.
 
+> ⚠️ **2026-08-25 güncellemesi.** Aşağıdaki tablo hâlâ geçerli ama iki noktada
+> ölçümle güncellendi — ayrıntı `docs/DECISIONS.md`:
+> `All_Beauty` 5-core sonrası **sıfır etkileşim** bırakıyor, deney pilotu olamaz
+> (detektör pilotu olarak kalıyor). RQ2'nin **birincil kategorisi Toys_and_Games**,
+> çünkü kontaminasyon yalnızca orada 5-core'dan sağ çıkıyor.
+
 **Kategoriler (üçlü tasarım — değiştirmeyin):**
 
 | Rol | Config anahtarı | HF config adı | Beklenti |
