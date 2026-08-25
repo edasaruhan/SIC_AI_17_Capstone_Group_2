@@ -53,7 +53,7 @@ src/gift_contamination/
   data/
     download.py          # HF'den kategori indirme
     preprocess.py        # filtreleme, 5-core, sekans kurma
-    sampling.py          # katmanlı örnekleme
+    sampling.py          # katmanlı örnekleme (main + boost çerçeveleri)
   detection/
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render
@@ -61,8 +61,12 @@ src/gift_contamination/
     distill.py           # ModernBERT fine-tune
     inference.py         # tam korpus inference
   analysis/
-    descriptive.py       # kategori/ay bazlı oranlar
-    validation.py        # kappa, F1, mevsimsellik, duyarlılık
+    keyword_scan.py      # sözcüksel vekil (ölçü çubuğu, detektör değil)
+    precision_check.py   # vekilin elle doğrulanması (T4)
+    eda.py               # betimsel analiz, T1-T4 / F1-F8
+    deep_eda.py          # varsayım sınama, T5-T14 / F9-F16
+    viz.py               # ortak grafik stili
+    validation.py        # kappa, F1, mevsimsellik, duyarlılık  (Hafta 4)
   recsys/
     atomic_files.py      # RecBole .inter/.item/.user üretimi
     conditions.py        # C0–C4 kurulumu

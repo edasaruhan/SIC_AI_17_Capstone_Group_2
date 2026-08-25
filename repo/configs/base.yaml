@@ -36,9 +36,17 @@ preprocess:
   timestamp_unit: auto            # auto | s | ms
 
 sampling:
-  n_annotate: 40000               # TBD: pilot sonrası netleşecek
+  # n_annotate TOPLAM; kategori başına eşit bölünür (40000/4 = 10000). Eşit
+  # tahsis, RQ1 kategorileri karşılaştırdığı için doğru seçim: her kategori eşit
+  # kesinlikte tahmin alır ve havuzlanmış bir oran raporlanmadığı için havuzlama
+  # ağırlığı gerekmez.
+  n_annotate: 40000
   strata: [month, rating, text_length_bucket]
-  keyword_boost_fraction: 0.15    # ayrı tutulur, ana orana KATILMAZ
+  text_length_buckets: [15, 40]   # kelime sayısı kesme noktaları -> 3 kova
+  # Vekil-işaretli havuzdan çekilen EK örnek. Distillation eğitim setine daha
+  # çok pozitif koymak için. `sample_frame == 'boost'` ile işaretlenir ve
+  # yaygınlık hesabına KATILMAZ - katılırsa kendi seçtiğimiz şeyi ölçmüş oluruz.
+  keyword_boost_fraction: 0.15
 
 detection:
   # Model seçimi VRAM'e değil GPU KUŞAĞINA bağlı. Elimizdeki her GPU pre-Ampere

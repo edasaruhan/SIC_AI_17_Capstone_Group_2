@@ -65,6 +65,21 @@ def cfg(tmp_path: Path) -> Config:
             "dedup": True,
             "timestamp_unit": "auto",
         },
+        # Desen dosyasi gercek olan; sentetik bir kopya semantigi kaydirir ve
+        # test_keyword_scan'in kilitledigi ayrimlari dogrulamaz hale getirir.
+        "keywords": {
+            "path": "configs/gift_keywords.yaml",
+            "precision_sample_n": 4,
+            "precision_seed": 42,
+        },
+        # Fixture 6 satirlik temiz korpus birakiyor; n_annotate onun USTUNDE
+        # secildi ki tahsis "havuzda olandan fazlasini isteme" yolunu da gecsin.
+        "sampling": {
+            "n_annotate": 8,
+            "strata": ["month", "rating", "text_length_bucket"],
+            "text_length_buckets": [15, 40],
+            "keyword_boost_fraction": 0.25,
+        },
     }
     conf = Config(data, tmp_path / "test.yaml")
 

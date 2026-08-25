@@ -313,3 +313,52 @@ canlı bir mesele. İkisi de bu veri hacminde dakikalar içinde eğitiliyor — 
 (LLM'e 5 puan yakınlık) kaçırılırsa ucuz bir sigorta.
 **Etkilediği bölüm:** `configs/base.yaml`, technology-review §4.4, PROJECT_SPEC, ROADMAP
 **Kim:** Ekip
+
+---
+
+### 2026-08-26 — Örneklem tasarımı: iki ayrı çerçeve
+**Karar:** `data/sampling.py` iki çerçeve üretir ve `sample_frame` kolonuyla işaretler.
+
+- **`main`** — `month` × `rating` × `text_length_bucket` (180 hücre) üzerinde **orantılı**
+  tahsisli katmanlı rastgele örnek. Orantılı olduğu için **kendinden ağırlıklı**:
+  yaygınlık düz ortalamayla hesaplanır, ağırlık gerekmez. Kategori başına 10.000
+  (`n_annotate: 40000` dörde bölünür).
+- **`boost`** — yalnızca `kw_gift_proxy` havuzundan 1.500 ek satır. Distillation eğitim
+  setine daha çok pozitif koymak ve hata analizi için. **Yaygınlık hesabına girmez.**
+  İki çerçeve **ayrıktır**; bir satır ikisinde birden geçmez.
+
+**Gerekçe — ölçülen bedel.** Config'teki "ana orana KATILMAZ" notu soyut bir uyarı değil.
+Pilot kategoride iki çerçeve havuzlanırsa oran **%2.13 yerine %15.01** görünüyor: yedi kat
+şişme. `tests/test_sampling.py::test_pooling_the_frames_inflates_the_rate` bunu sayıyla
+kilitliyor, ki `sample_frame` ayrımını kaldırmaya kalkan biri neyi kaybettiğini görsün.
+
+**Doğrulama.** Dört kategoride `main` çerçevesinin vekil oranı, `clean` korpusun gerçek
+oranına iki standart hata içinde yakınsıyor: All_Beauty %2.26 vs %2.13 · Toys %10.58 vs
+%11.07 · Video Games %4.24 vs %4.40 · Grocery %1.80 vs %1.85.
+
+**Kategori başına eşit tahsis** (orantılı değil): RQ1 kategorileri karşılaştırıyor, yani
+her kategori eşit kesinlikte tahmin almalı. Havuzlanmış tek bir oran raporlanmadığı için
+havuzlama ağırlığı da gerekmiyor.
+**Etkilediği bölüm:** `configs/base.yaml` (`sampling.text_length_buckets` eklendi),
+CLAUDE.md §2, README
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — Prompt deneme seti doğrulamadan dışlanacak
+**Karar:** `data/annotations/human/prompt_trial_200.csv` ile birlikte
+`prompt_trial_ids.json` yazılıyor; içinde çekilen 200 satırın `row_id`'leri ve
+`exclude_from_validation: true` bayrağı var. Hafta 4'ün 500'lük doğrulama seti bu
+satırları **dışlamak zorunda**.
+
+**Gerekçe:** Prompt v2 bu 200 satır okunarak yazılacak. Aynı satırlarla detektörü
+doğrulamak, prompt'u kendi test setine fit etmek olur ve raporlanan F1'i anlamsız kılar.
+Aynı hatadan bir kez daha kaçınıyoruz: T4 denetiminde `stocking stuffer` desen kusuru
+bulunduğunda da desen bilerek düzeltilmemişti (doğrulama etiketleri görüldükten sonra
+ayarlama yapmak precision'ı yapay olarak iyileştirirdi).
+
+**Deneme seti bir tahmin örneği DEĞİLDİR:** zor vakaları kasıtlı fazla temsil ediyor
+(%50 vekil-işaretli, %26 spekülatif, %24 işaretsiz), çünkü prompt'u kıranlar onlar.
+Buradan yaygınlık okunmaz.
+**Etkilediği bölüm:** Hafta 4 doğrulama akışı, `analysis/validation.py` (yazılmadı)
+**Kim:** Ekip

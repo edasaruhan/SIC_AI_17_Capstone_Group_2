@@ -141,7 +141,8 @@ gantt
 ### 2.3 Decision gates
 
 **🚦 Gate 1 — End of Week 3: Does the detector work?**
-*Criterion:* monthly gift rate shows a November–December elevation above the annual mean, and the naive-versus-LLM comparison shows the LLM capturing cases keywords miss.
+*Criterion:* monthly gift rate shows a **December–January** elevation above the annual mean, and the naive-versus-LLM comparison shows the LLM capturing cases keywords miss.
+*Why December–January and not November–December:* review timestamps lag purchase timestamps, and the lexical proxy run in Week 1 places the peak in December–January in all four categories (Data Research §4.5, T14). Holding the detector to a November peak would reject a working detector.
 *If failed:* revise prompt (open `prompts/gift_detection_v2.md`), switch primary model, or change category. **Do not proceed to full annotation.** Budget: one week to recover, then escalate to the fallback in §4.
 
 **🚦 Gate 2 — End of Week 6: Is the experiment valid?**

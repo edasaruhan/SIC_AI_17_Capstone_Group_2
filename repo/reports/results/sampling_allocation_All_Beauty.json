@@ -1,0 +1,919 @@
+{
+  "n_strata": 180,
+  "n_strata_allocated": 180,
+  "n_requested": 10000,
+  "n_drawn": 10000,
+  "population": 537261,
+  "cells": [
+    {
+      "stratum_id": "1|5|15-40",
+      "population": 11896,
+      "allocated": 221
+    },
+    {
+      "stratum_id": "3|5|15-40",
+      "population": 11048,
+      "allocated": 206
+    },
+    {
+      "stratum_id": "7|5|15-40",
+      "population": 11038,
+      "allocated": 205
+    },
+    {
+      "stratum_id": "1|5|<15",
+      "population": 11000,
+      "allocated": 205
+    },
+    {
+      "stratum_id": "8|5|15-40",
+      "population": 10664,
+      "allocated": 198
+    },
+    {
+      "stratum_id": "12|5|15-40",
+      "population": 10588,
+      "allocated": 197
+    },
+    {
+      "stratum_id": "3|5|<15",
+      "population": 10227,
+      "allocated": 190
+    },
+    {
+      "stratum_id": "5|5|15-40",
+      "population": 10197,
+      "allocated": 190
+    },
+    {
+      "stratum_id": "7|5|<15",
+      "population": 10047,
+      "allocated": 187
+    },
+    {
+      "stratum_id": "2|5|15-40",
+      "population": 9969,
+      "allocated": 186
+    },
+    {
+      "stratum_id": "6|5|15-40",
+      "population": 9949,
+      "allocated": 185
+    },
+    {
+      "stratum_id": "12|5|<15",
+      "population": 9875,
+      "allocated": 184
+    },
+    {
+      "stratum_id": "4|5|15-40",
+      "population": 9847,
+      "allocated": 183
+    },
+    {
+      "stratum_id": "10|5|15-40",
+      "population": 9678,
+      "allocated": 180
+    },
+    {
+      "stratum_id": "8|5|<15",
+      "population": 9563,
+      "allocated": 178
+    },
+    {
+      "stratum_id": "9|5|15-40",
+      "population": 9357,
+      "allocated": 174
+    },
+    {
+      "stratum_id": "2|5|<15",
+      "population": 9355,
+      "allocated": 174
+    },
+    {
+      "stratum_id": "6|5|<15",
+      "population": 9049,
+      "allocated": 168
+    },
+    {
+      "stratum_id": "5|5|<15",
+      "population": 9020,
+      "allocated": 168
+    },
+    {
+      "stratum_id": "4|5|<15",
+      "population": 8814,
+      "allocated": 164
+    },
+    {
+      "stratum_id": "11|5|15-40",
+      "population": 8753,
+      "allocated": 163
+    },
+    {
+      "stratum_id": "10|5|<15",
+      "population": 8658,
+      "allocated": 161
+    },
+    {
+      "stratum_id": "9|5|<15",
+      "population": 8178,
+      "allocated": 152
+    },
+    {
+      "stratum_id": "11|5|<15",
+      "population": 8065,
+      "allocated": 150
+    },
+    {
+      "stratum_id": "1|5|>=40",
+      "population": 7121,
+      "allocated": 133
+    },
+    {
+      "stratum_id": "7|5|>=40",
+      "population": 6849,
+      "allocated": 127
+    },
+    {
+      "stratum_id": "8|5|>=40",
+      "population": 6766,
+      "allocated": 126
+    },
+    {
+      "stratum_id": "3|5|>=40",
+      "population": 6723,
+      "allocated": 125
+    },
+    {
+      "stratum_id": "6|5|>=40",
+      "population": 6180,
+      "allocated": 115
+    },
+    {
+      "stratum_id": "5|5|>=40",
+      "population": 6172,
+      "allocated": 115
+    },
+    {
+      "stratum_id": "9|5|>=40",
+      "population": 5980,
+      "allocated": 111
+    },
+    {
+      "stratum_id": "2|5|>=40",
+      "population": 5965,
+      "allocated": 111
+    },
+    {
+      "stratum_id": "4|5|>=40",
+      "population": 5962,
+      "allocated": 111
+    },
+    {
+      "stratum_id": "10|5|>=40",
+      "population": 5947,
+      "allocated": 111
+    },
+    {
+      "stratum_id": "12|5|>=40",
+      "population": 5906,
+      "allocated": 110
+    },
+    {
+      "stratum_id": "11|5|>=40",
+      "population": 5421,
+      "allocated": 101
+    },
+    {
+      "stratum_id": "3|1|15-40",
+      "population": 3323,
+      "allocated": 62
+    },
+    {
+      "stratum_id": "1|1|15-40",
+      "population": 3230,
+      "allocated": 60
+    },
+    {
+      "stratum_id": "6|1|15-40",
+      "population": 3107,
+      "allocated": 58
+    },
+    {
+      "stratum_id": "12|1|15-40",
+      "population": 3083,
+      "allocated": 57
+    },
+    {
+      "stratum_id": "7|1|15-40",
+      "population": 3068,
+      "allocated": 57
+    },
+    {
+      "stratum_id": "5|1|15-40",
+      "population": 3041,
+      "allocated": 57
+    },
+    {
+      "stratum_id": "8|1|15-40",
+      "population": 3039,
+      "allocated": 57
+    },
+    {
+      "stratum_id": "4|1|15-40",
+      "population": 3024,
+      "allocated": 56
+    },
+    {
+      "stratum_id": "2|1|15-40",
+      "population": 2994,
+      "allocated": 56
+    },
+    {
+      "stratum_id": "10|1|15-40",
+      "population": 2873,
+      "allocated": 53
+    },
+    {
+      "stratum_id": "9|1|15-40",
+      "population": 2690,
+      "allocated": 50
+    },
+    {
+      "stratum_id": "3|1|<15",
+      "population": 2526,
+      "allocated": 47
+    },
+    {
+      "stratum_id": "11|1|15-40",
+      "population": 2487,
+      "allocated": 46
+    },
+    {
+      "stratum_id": "1|1|<15",
+      "population": 2474,
+      "allocated": 46
+    },
+    {
+      "stratum_id": "7|1|<15",
+      "population": 2437,
+      "allocated": 45
+    },
+    {
+      "stratum_id": "1|4|15-40",
+      "population": 2381,
+      "allocated": 44
+    },
+    {
+      "stratum_id": "8|1|<15",
+      "population": 2309,
+      "allocated": 43
+    },
+    {
+      "stratum_id": "5|1|<15",
+      "population": 2298,
+      "allocated": 43
+    },
+    {
+      "stratum_id": "6|1|<15",
+      "population": 2290,
+      "allocated": 43
+    },
+    {
+      "stratum_id": "4|1|<15",
+      "population": 2288,
+      "allocated": 43
+    },
+    {
+      "stratum_id": "12|1|<15",
+      "population": 2218,
+      "allocated": 41
+    },
+    {
+      "stratum_id": "3|4|15-40",
+      "population": 2204,
+      "allocated": 41
+    },
+    {
+      "stratum_id": "2|1|<15",
+      "population": 2196,
+      "allocated": 41
+    },
+    {
+      "stratum_id": "10|1|<15",
+      "population": 2160,
+      "allocated": 40
+    },
+    {
+      "stratum_id": "7|4|15-40",
+      "population": 2150,
+      "allocated": 40
+    },
+    {
+      "stratum_id": "12|4|15-40",
+      "population": 2132,
+      "allocated": 40
+    },
+    {
+      "stratum_id": "8|4|15-40",
+      "population": 2090,
+      "allocated": 39
+    },
+    {
+      "stratum_id": "9|1|<15",
+      "population": 2087,
+      "allocated": 39
+    },
+    {
+      "stratum_id": "5|4|15-40",
+      "population": 2064,
+      "allocated": 38
+    },
+    {
+      "stratum_id": "2|4|15-40",
+      "population": 2046,
+      "allocated": 38
+    },
+    {
+      "stratum_id": "11|1|<15",
+      "population": 2029,
+      "allocated": 38
+    },
+    {
+      "stratum_id": "1|4|>=40",
+      "population": 1994,
+      "allocated": 37
+    },
+    {
+      "stratum_id": "4|4|15-40",
+      "population": 1947,
+      "allocated": 36
+    },
+    {
+      "stratum_id": "1|1|>=40",
+      "population": 1946,
+      "allocated": 36
+    },
+    {
+      "stratum_id": "1|3|15-40",
+      "population": 1889,
+      "allocated": 35
+    },
+    {
+      "stratum_id": "3|3|15-40",
+      "population": 1881,
+      "allocated": 35
+    },
+    {
+      "stratum_id": "6|4|15-40",
+      "population": 1875,
+      "allocated": 35
+    },
+    {
+      "stratum_id": "10|4|15-40",
+      "population": 1872,
+      "allocated": 35
+    },
+    {
+      "stratum_id": "8|1|>=40",
+      "population": 1865,
+      "allocated": 35
+    },
+    {
+      "stratum_id": "3|1|>=40",
+      "population": 1839,
+      "allocated": 34
+    },
+    {
+      "stratum_id": "7|1|>=40",
+      "population": 1794,
+      "allocated": 33
+    },
+    {
+      "stratum_id": "7|3|15-40",
+      "population": 1787,
+      "allocated": 33
+    },
+    {
+      "stratum_id": "11|4|15-40",
+      "population": 1771,
+      "allocated": 33
+    },
+    {
+      "stratum_id": "3|4|>=40",
+      "population": 1763,
+      "allocated": 33
+    },
+    {
+      "stratum_id": "10|1|>=40",
+      "population": 1753,
+      "allocated": 33
+    },
+    {
+      "stratum_id": "9|4|15-40",
+      "population": 1750,
+      "allocated": 33
+    },
+    {
+      "stratum_id": "7|4|>=40",
+      "population": 1738,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "2|1|>=40",
+      "population": 1731,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "9|1|>=40",
+      "population": 1730,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "4|1|>=40",
+      "population": 1725,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "5|1|>=40",
+      "population": 1710,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "8|3|15-40",
+      "population": 1710,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "12|1|>=40",
+      "population": 1707,
+      "allocated": 32
+    },
+    {
+      "stratum_id": "12|3|15-40",
+      "population": 1673,
+      "allocated": 31
+    },
+    {
+      "stratum_id": "8|4|>=40",
+      "population": 1667,
+      "allocated": 31
+    },
+    {
+      "stratum_id": "5|3|15-40",
+      "population": 1652,
+      "allocated": 31
+    },
+    {
+      "stratum_id": "2|3|15-40",
+      "population": 1645,
+      "allocated": 31
+    },
+    {
+      "stratum_id": "12|4|>=40",
+      "population": 1625,
+      "allocated": 30
+    },
+    {
+      "stratum_id": "4|3|15-40",
+      "population": 1616,
+      "allocated": 30
+    },
+    {
+      "stratum_id": "5|4|>=40",
+      "population": 1610,
+      "allocated": 30
+    },
+    {
+      "stratum_id": "10|4|>=40",
+      "population": 1609,
+      "allocated": 30
+    },
+    {
+      "stratum_id": "6|1|>=40",
+      "population": 1596,
+      "allocated": 30
+    },
+    {
+      "stratum_id": "10|3|15-40",
+      "population": 1584,
+      "allocated": 29
+    },
+    {
+      "stratum_id": "2|4|>=40",
+      "population": 1578,
+      "allocated": 29
+    },
+    {
+      "stratum_id": "6|4|>=40",
+      "population": 1570,
+      "allocated": 29
+    },
+    {
+      "stratum_id": "3|4|<15",
+      "population": 1554,
+      "allocated": 29
+    },
+    {
+      "stratum_id": "4|4|>=40",
+      "population": 1545,
+      "allocated": 29
+    },
+    {
+      "stratum_id": "1|4|<15",
+      "population": 1535,
+      "allocated": 29
+    },
+    {
+      "stratum_id": "11|1|>=40",
+      "population": 1524,
+      "allocated": 28
+    },
+    {
+      "stratum_id": "9|4|>=40",
+      "population": 1512,
+      "allocated": 28
+    },
+    {
+      "stratum_id": "6|3|15-40",
+      "population": 1483,
+      "allocated": 28
+    },
+    {
+      "stratum_id": "1|3|>=40",
+      "population": 1431,
+      "allocated": 27
+    },
+    {
+      "stratum_id": "1|2|15-40",
+      "population": 1430,
+      "allocated": 27
+    },
+    {
+      "stratum_id": "12|4|<15",
+      "population": 1423,
+      "allocated": 26
+    },
+    {
+      "stratum_id": "7|4|<15",
+      "population": 1421,
+      "allocated": 26
+    },
+    {
+      "stratum_id": "9|3|15-40",
+      "population": 1419,
+      "allocated": 26
+    },
+    {
+      "stratum_id": "11|4|>=40",
+      "population": 1414,
+      "allocated": 26
+    },
+    {
+      "stratum_id": "11|3|15-40",
+      "population": 1390,
+      "allocated": 26
+    },
+    {
+      "stratum_id": "8|4|<15",
+      "population": 1379,
+      "allocated": 26
+    },
+    {
+      "stratum_id": "2|4|<15",
+      "population": 1355,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "3|3|>=40",
+      "population": 1351,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "2|2|15-40",
+      "population": 1337,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "12|2|15-40",
+      "population": 1329,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "7|2|15-40",
+      "population": 1328,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "3|2|15-40",
+      "population": 1327,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "4|2|15-40",
+      "population": 1322,
+      "allocated": 25
+    },
+    {
+      "stratum_id": "4|4|<15",
+      "population": 1287,
+      "allocated": 24
+    },
+    {
+      "stratum_id": "10|4|<15",
+      "population": 1285,
+      "allocated": 24
+    },
+    {
+      "stratum_id": "8|3|>=40",
+      "population": 1277,
+      "allocated": 24
+    },
+    {
+      "stratum_id": "3|3|<15",
+      "population": 1271,
+      "allocated": 24
+    },
+    {
+      "stratum_id": "6|4|<15",
+      "population": 1268,
+      "allocated": 24
+    },
+    {
+      "stratum_id": "5|4|<15",
+      "population": 1264,
+      "allocated": 24
+    },
+    {
+      "stratum_id": "8|2|15-40",
+      "population": 1263,
+      "allocated": 23
+    },
+    {
+      "stratum_id": "5|2|15-40",
+      "population": 1257,
+      "allocated": 23
+    },
+    {
+      "stratum_id": "12|3|>=40",
+      "population": 1221,
+      "allocated": 23
+    },
+    {
+      "stratum_id": "7|3|>=40",
+      "population": 1212,
+      "allocated": 23
+    },
+    {
+      "stratum_id": "10|2|15-40",
+      "population": 1209,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "1|3|<15",
+      "population": 1200,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "11|4|<15",
+      "population": 1195,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "9|4|<15",
+      "population": 1190,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "6|2|15-40",
+      "population": 1189,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "2|3|>=40",
+      "population": 1177,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "5|3|>=40",
+      "population": 1175,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "10|3|>=40",
+      "population": 1165,
+      "allocated": 22
+    },
+    {
+      "stratum_id": "7|3|<15",
+      "population": 1134,
+      "allocated": 21
+    },
+    {
+      "stratum_id": "6|3|>=40",
+      "population": 1127,
+      "allocated": 21
+    },
+    {
+      "stratum_id": "11|2|15-40",
+      "population": 1119,
+      "allocated": 21
+    },
+    {
+      "stratum_id": "4|3|>=40",
+      "population": 1102,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "8|3|<15",
+      "population": 1089,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "11|3|>=40",
+      "population": 1081,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "9|2|15-40",
+      "population": 1079,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "2|3|<15",
+      "population": 1067,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "9|3|>=40",
+      "population": 1059,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "3|2|>=40",
+      "population": 1058,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "6|3|<15",
+      "population": 1053,
+      "allocated": 20
+    },
+    {
+      "stratum_id": "1|2|>=40",
+      "population": 1025,
+      "allocated": 19
+    },
+    {
+      "stratum_id": "12|3|<15",
+      "population": 1023,
+      "allocated": 19
+    },
+    {
+      "stratum_id": "10|3|<15",
+      "population": 999,
+      "allocated": 19
+    },
+    {
+      "stratum_id": "8|2|>=40",
+      "population": 982,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "4|3|<15",
+      "population": 967,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "1|2|<15",
+      "population": 958,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "3|2|<15",
+      "population": 954,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "7|2|>=40",
+      "population": 953,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "12|2|>=40",
+      "population": 950,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "5|3|<15",
+      "population": 946,
+      "allocated": 18
+    },
+    {
+      "stratum_id": "2|2|>=40",
+      "population": 941,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "5|2|>=40",
+      "population": 934,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "11|3|<15",
+      "population": 925,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "9|3|<15",
+      "population": 925,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "6|2|>=40",
+      "population": 906,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "4|2|>=40",
+      "population": 898,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "7|2|<15",
+      "population": 898,
+      "allocated": 17
+    },
+    {
+      "stratum_id": "12|2|<15",
+      "population": 879,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "5|2|<15",
+      "population": 867,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "9|2|>=40",
+      "population": 867,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "4|2|<15",
+      "population": 863,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "8|2|<15",
+      "population": 849,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "10|2|>=40",
+      "population": 848,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "2|2|<15",
+      "population": 846,
+      "allocated": 16
+    },
+    {
+      "stratum_id": "6|2|<15",
+      "population": 805,
+      "allocated": 15
+    },
+    {
+      "stratum_id": "10|2|<15",
+      "population": 783,
+      "allocated": 15
+    },
+    {
+      "stratum_id": "11|2|>=40",
+      "population": 776,
+      "allocated": 14
+    },
+    {
+      "stratum_id": "9|2|<15",
+      "population": 752,
+      "allocated": 14
+    },
+    {
+      "stratum_id": "11|2|<15",
+      "population": 693,
+      "allocated": 13
+    }
+  ],
+  "category": "All_Beauty",
+  "seed": 42,
+  "text_length_buckets": [
+    15,
+    40
+  ],
+  "n_boost_requested": 1500,
+  "n_boost_drawn": 1500,
+  "frames_disjoint": true,
+  "note": "Yaygınlık tahmini YALNIZCA sample_frame == 'main' uzerinden hesaplanir; 'boost' vekil-isaretli havuzdan cekildigi icin orani yukari cekerdi."
+}
