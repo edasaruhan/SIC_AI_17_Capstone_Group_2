@@ -1,0 +1,297 @@
+# CLAUDE.md — Hediye Kontaminasyonu Projesi
+
+> Claude Code bu dosyayı her oturumda otomatik okur. Buradaki kurallar bağlayıcıdır.
+> Detaylı gerekçeler için `docs/PROJECT_SPEC.md` ve `docs/ROADMAP.md`.
+
+---
+
+## 1. Proje Nedir
+
+Öneri sistemleri **implicit feedback** varsayımıyla çalışır: satın alma = tercih sinyali.
+Bu varsayım **hediye alımlarında yanlıştır** — kullanıcı ürünü kendisi için almamıştır.
+Model bunu tercih sanır ve sonraki önerileri kaydırır.
+
+**Yaptığımız:** Amazon review metninden hediye alımlarını LLM ile tespit ediyoruz, yaygınlığını
+ölçüyoruz, sonra öneri modelini bu etkileşimlerle ve onlarsız eğitip karşılaştırıyoruz.
+
+**Bu bir araştırma pipeline'ı, bir ürün değil.** Deploy edilmiyor, API'si yok, DB'si yok.
+Çıktı: reprodüksiyonu mümkün deney sonuçları + grafikler + capstone raporu.
+
+### Araştırma soruları
+- **RQ1** — Hediye alımlarının oranı nedir; kategoriye ve mevsime göre nasıl değişir?
+- **RQ2** — Hediye etkileşimlerini çıkarmak, kullanıcının **kendi** sonraki alımını tahmin etmeyi
+  iyileştirir mi? Etki, kategorinin hediye yoğunluğuyla orantılı mı?
+- **RQ3** — Silmek mi (C1/C2), modele sinyal olarak vermek mi (C3) daha iyi?
+- **RQ4** — Bir hediye alımından sonra öneri listesi ne kadar süre kirli kalıyor?
+
+> RQ2 bilinçli olarak "ne kadar iyileşir" değil "duyarlı mı" diye soruluyor.
+> **Null result geçerli bir sonuçtur.** Kod ve raporlama buna göre tasarlanmalı —
+> "iyileşme çıkmadı" diye parametre kurcalamayın.
+
+---
+
+## 2. Mimari
+
+```
+Amazon Reviews 2023 (HF, kategori bazlı)
+   │
+   ├─ [A] preprocess + 5-core + kronolojik sekans      → data/interim/
+   ├─ [B] katmanlı örnekleme (40-60K)                  → data/interim/
+   ├─ [C] LLM annotation (Qwen3.5-9B, vLLM, JSON)      → data/annotations/
+   ├─ [D] insan doğrulama (500, 3 annotator)           → data/annotations/human/
+   ├─ [E] ModernBERT distillation                      → models/
+   ├─ [F] tam korpus inference                         → data/processed/
+   │
+   ├─ [G] betimsel analiz + doğrulama (V1–V5)          → reports/figures/
+   └─ [H] RecBole deneyi (C0–C4) + pazarlama metrikleri→ reports/results/
+```
+
+### Paket yapısı
+```
+src/gift_contamination/
+  config.py              # YAML config yükleme, path çözümleme. Tek doğruluk kaynağı.
+  data/
+    download.py          # HF'den kategori indirme
+    preprocess.py        # filtreleme, 5-core, sekans kurma
+    sampling.py          # katmanlı örnekleme
+  detection/
+    schema.py            # Pydantic modelleri (etiket şeması)
+    prompting.py         # prompt yükleme/render
+    llm_annotate.py      # vLLM batch annotation
+    distill.py           # ModernBERT fine-tune
+    inference.py         # tam korpus inference
+  analysis/
+    descriptive.py       # kategori/ay bazlı oranlar
+    validation.py        # kappa, F1, mevsimsellik, duyarlılık
+  recsys/
+    atomic_files.py      # RecBole .inter/.item/.user üretimi
+    conditions.py        # C0–C4 kurulumu
+    run_experiment.py    # deney koşucusu
+    marketing_metrics.py # M1, M2, M3
+  utils/
+    seeding.py, io.py, logging.py
+```
+
+---
+
+## 3. Veri
+
+**Kaynak:** `McAuley-Lab/Amazon-Reviews-2023` (HuggingFace). Açık, ücretsiz.
+571.54M review, Mayıs 1996 – Eylül 2023, 33 kategori. Kategori bazlı indirilir.
+
+**Kategoriler (üçlü tasarım — değiştirmeyin):**
+
+| Rol | Config anahtarı | HF config adı | Beklenti |
+|---|---|---|---|
+| Pilot | `pilot` | `raw_review_All_Beauty` | Sadece pipeline testi |
+| Yüksek | `high` | `raw_review_Toys_and_Games` | Yüksek hediye oranı |
+| Orta | `mid` | `raw_review_Video_Games` | Orta |
+| Düşük (kontrol) | `low` | `raw_review_Grocery_and_Gourmet_Food` | Düşük — **kontrol grubu** |
+
+Kullanılan alanlar: `text`, `title`, `rating`, `timestamp`, `user_id`, `parent_asin`,
+`verified_purchase`. Metadata join anahtarı **`parent_asin`** — `asin` DEĞİL.
+
+**Depolama:** Ara çıktılar `.parquet`. Ham `.jsonl.gz` `data/raw/` altında, git'e girmez.
+
+---
+
+## 4. Etiket Şeması
+
+`configs/annotation_schema.json` içinde tanımlı, `detection/schema.py` içinde Pydantic karşılığı.
+
+```json
+{
+  "purchase_type": "self | gift_given | household | unclear",
+  "confidence":    "high | medium | low",
+  "recipient":     "child | spouse | parent | friend | colleague | unknown | null",
+  "occasion":      "birthday | christmas | wedding | graduation | none | unknown",
+  "evidence_span": "<review içinden birebir alıntı>"
+}
+```
+
+- `household` = ev halkı için alınmış (bebeğe bez). Hediye değil ama alıcının kendi tercihi de değil.
+- `evidence_span` **zorunlu** — halüsinasyonu kısar, insan doğrulamasını hızlandırır.
+  Modelden gelen span review metninde birebir geçmiyorsa kayıt `unclear`'a düşürülür ve loglanır.
+
+---
+
+## 5. Deneysel Tasarım — Sapma Yasak
+
+Sequential recommendation, leave-one-out.
+
+### Beş koşul
+| Kod | Ne yapar |
+|---|---|
+| C0 | Baseline — tüm etkileşimler |
+| C1 | `gift_given` etkileşimleri eğitimden çıkarılır |
+| C2 | Hediye etkileşimleri loss'ta w ∈ {0.25, 0.5, 0.75} ile ağırlıklandırılır |
+| C3 | Hediye bayrağı feature/token olarak eklenir (silinmez) |
+| C4 | **PLASEBO** — hediye sayısı kadar *rastgele* etkileşim çıkarılır |
+
+### Bu dört kural ihlal edilirse deney geçersizdir
+
+1. **C4 opsiyonel değildir.** C1 kazanıyorsa C4'ten de kazanmak zorunda. Yoksa bulgu gürültüdür.
+2. **Test item'ı hediye olamaz.** Değerlendirme yalnızca son etkileşimi `self` olan kullanıcılarda.
+3. **5-core filtreleme bir kez, C0 üzerinde uygulanır.** Kullanıcı/item evreni tüm koşullarda
+   AYNI kalır. Koşul başına yeniden 5-core uygularsanız koşullar kıyaslanamaz hale gelir.
+4. **Zaman bazlı split.** Rastgele split sızıntı üretir.
+
+### Modeller (RecBole)
+`Pop`, `ItemKNN`, `BPR`, `SASRec` (birincil), `GRU4Rec`.
+Öncelik sırası: SASRec + BPR önce, diğerleri zaman kalırsa.
+
+### Metrikler
+- Teknik: Recall@10, NDCG@10, HR@10 + bootstrap CI + 3–5 seed
+- Pazarlama: **M1** retargeting israf oranı, **M2** kontaminasyon yarı ömrü, **M3** segment analizi
+
+---
+
+## 6. Teknoloji Kararları (verilmiş — tartışmayın, uygulayın)
+
+| Katman | Seçim | Not |
+|---|---|---|
+| Büyük veri işleme | **polars** | pandas 10M+ satırda kullanılmayacak |
+| LLM servis | **vLLM** | offline batch; Ollama kullanılmayacak |
+| Annotator LLM | **Qwen/Qwen3.5-9B** birincil, **Gemma 4 12B** ikincil | model-arası uyum raporlanacak |
+| Structured output | vLLM guided decoding (JSON schema) | serbest metin parse edilmeyecek |
+| Distillation | **ModernBERT-base** | `AutoModelForSequenceClassification` |
+| Recsys | **RecBole** | kendi implementasyonumuzu yazmıyoruz |
+| Deney takibi | **Weights & Biases** | her run config + seed + metrik loglar |
+| Config | **YAML** (`configs/`) | kodda hardcode path/parametre yok |
+| Test | **pytest** | |
+
+**Bağımlılık uyarısı:** RecBole'un pin'leri vLLM/torch ile çakışabilir.
+`requirements-llm.txt` ve `requirements-recsys.txt` **ayrı venv'lerde** kurulur.
+Çakışma çözmeye çalışmayın, ayırın.
+
+---
+
+## 7. Komut Arayüzü (hedef sözleşme)
+
+Kod bu arayüze göre yazılmalı. Her adım tek başına yeniden çalıştırılabilir olmalı.
+
+```bash
+python -m gift_contamination.data.download      --config configs/base.yaml --category pilot
+python -m gift_contamination.data.preprocess    --config configs/base.yaml --category pilot
+python -m gift_contamination.data.sampling      --config configs/base.yaml --category pilot --n 10000
+python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --category pilot
+python -m gift_contamination.detection.distill  --config configs/base.yaml
+python -m gift_contamination.detection.inference --config configs/base.yaml --category high
+python -m gift_contamination.analysis.descriptive --config configs/base.yaml
+python -m gift_contamination.analysis.validation  --config configs/base.yaml
+python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
+       --category high --condition C0 --model SASRec --seed 42
+```
+
+Kurallar:
+- Her komut **idempotent** olmalı; çıktı varsa `--force` olmadan yeniden hesaplamamalı.
+- Her komut çıktı yolunu ve satır sayısını loglamalı.
+- Uzun süren her adım `tqdm` ile ilerleme göstermeli.
+
+---
+
+## 8. YAPILMAYACAKLAR
+
+1. **Veri dosyası commit etmeyin.** `data/`, `models/`, `*.parquet`, `*.jsonl.gz` gitignore'da.
+2. **Kendi recommender'ınızı yazmayın.** RecBole var.
+3. **LLM çıktısını regex ile parse etmeyin.** Guided decoding + Pydantic doğrulama.
+4. **9B modeli tüm korpusa koşturmayın.** 40–60K annotate → ModernBERT distill → tam inference.
+5. **Rastgele train/test split kullanmayın.** Zaman bazlı.
+6. **Test setinde hiperparametre tuning yapmayın.** Validation split ayrı.
+7. **C4'ü atlamayın.**
+8. **`asin` ile metadata join etmeyin.** `parent_asin`.
+9. **Sonuç beğenilmedi diye koşulları/filtreleri değiştirmeyin.** Değişiklik gerekiyorsa
+   `docs/DECISIONS.md`'ye tarih ve gerekçe yazılır.
+10. **pandas ile 10M+ satır okumayın.**
+11. **Hardcode path yazmayın.** Her şey config üzerinden.
+12. **Seed sabitlemeden deney koşmayın.**
+
+---
+
+## 9. Bilinen Edge Case'ler
+
+| Durum | Ne yapılacak |
+|---|---|
+| **C1'de item'ın tüm etkileşimleri silinir** | Hediye etkileşimleri çıkarılınca bazı item'lar eğitimden tamamen kaybolur ve eval'de cold item olur. Item evreni C0'da sabitlenir; kaybolan item'lar loglanır ve raporlanır. **Bu sessizce geçilecek bir detay değil — C1 vs C0 farkının bir kısmını açıklayabilir.** |
+| `timestamp` birimi | Saniye mi ms mi kontrol edilecek; normalize edilip UTC'ye çevrilecek |
+| Boş / çok kısa `text` | < 5 kelime → annotation dışı, `unclear` |
+| Aynı user+item birden çok review | Deduplicate; en erken timestamp tutulur |
+| Tüm sekansı hediye olan kullanıcı | Eval'den çıkarılır (test item'ı `self` olmalı kuralı gereği) |
+| `evidence_span` metinde yok | `unclear`'a düşür, sayacı artır, oranı raporla |
+| Review tarihi ≠ satın alma tarihi | Mevsimsellik tepeleri gecikmeli olacak. **Beklenen davranış, bug değil.** |
+| LLM JSON üretemedi | 1 kez retry, sonra `unclear` + logla. Sessiz atlamak yok. |
+
+---
+
+## 10. Testler (pytest)
+
+Ürün kodu testi değil, **veri bütünlüğü ve deney geçerliliği** testi yazıyoruz:
+
+- `test_schema.py` — Pydantic şeması geçerli/geçersiz JSON'ları doğru ayırıyor mu
+- `test_preprocess.py` — 5-core gerçekten 5-core mu; sekanslar kronolojik mi
+- `test_conditions.py` — **kritik**: C0–C4 arasında user/item evreni aynı mı;
+  C4 tam olarak C1 kadar etkileşim mi çıkarıyor
+- `test_no_leakage.py` — **kritik**: test item'ı eğitim setinde geçmiyor;
+  split zaman bazlı; test item'ları `self` etiketli
+- `test_atomic_files.py` — RecBole atomic file formatı doğru mu
+
+Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte kullanılmaz.
+
+---
+
+## 11. MVP Kapsamı
+
+**MVP (bu sırayla):**
+1. Pilot kategoride uçtan uca pipeline (indir → preprocess → örnekle → LLM annotate → oran + mevsimsellik grafiği)
+2. İnsan doğrulama akışı + kappa/F1 hesabı
+3. ModernBERT distillation + tam inference
+4. `high` ve `low` kategorilerde C0 + C1 + C4, SASRec + BPR
+5. M1 + M2 pazarlama metrikleri
+
+**MVP DIŞI (zaman kalırsa):**
+- `mid` kategori, C2 ve C3 koşulları, GRU4Rec/ItemKNN/Pop
+- Gemma 4 ile ikinci annotation ve model-arası uyum
+- İkinci plasebo (etiket shuffle)
+- Streamlit annotation arayüzü (başlangıçta CSV + Google Sheets yeterli)
+- M3 segment analizi
+
+---
+
+## 12. Başarı Kriterleri
+
+**Pipeline başarılı sayılır eğer:**
+- Pilot kategoride uçtan uca hatasız çalışıyorsa
+- Aylık hediye oranı grafiğinde Kasım–Aralık tepesi görünüyorsa (V2)
+- Kategori sıralaması Toys > Video Games > Grocery çıkıyorsa (V3)
+- LLM ile insan etiketi arasında sınıf bazlı F1 raporlanabiliyorsa (V1)
+- C0–C4 arası user/item evreni aynı olduğu testle doğrulanıyorsa
+
+**Araştırma sonucu başarılı sayılır eğer:** RQ1–RQ4 cevaplanmışsa.
+Cevabın yönü (pozitif/null) başarı kriteri **değildir**.
+
+---
+
+## 13. TBD — Karar Verilmesi Gerekenler
+
+Bunlar henüz kararlaştırılmadı. Claude Code bunları **kendi kafasına göre doldurmasın**,
+karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazsın.
+
+- [ ] **TBD** Örnekleme boyutu kesin sayı: 40K mı 60K mı (pilot sonucuna göre)
+- [ ] **TBD** C2'de kullanılacak nihai ağırlık(lar) — üçünü de mi koşacağız yoksa biri mi
+- [ ] **TBD** C3'ün RecBole'da nasıl implement edileceği (feature olarak mı, ayrı token mı)
+- [ ] **TBD** `household` sınıfının C1'de silinip silinmeyeceği (kappa sonucuna bağlı)
+- [ ] **TBD** Kaç seed (3 mü 5 mi) — koşu süresine göre
+- [ ] **TBD** GPU: yerel RTX mi Kaggle mı — ekip donanımına göre
+- [ ] **TBD** M2 "kontaminasyon yarı ömrü" için kesin operasyonel tanım
+- [ ] **TBD** Hangi ekip üyesi hangi kulvarda (bkz. `docs/PROJECT_SPEC.md` §11)
+
+---
+
+## 14. Çalışma Tarzı
+
+- **Küçük adım, çalışan kod.** Her adım kendi başına koşabilmeli ve çıktı üretmeli.
+- **Önce pilot.** `All_Beauty` üzerinde çalışmayan hiçbir şey büyük kategoriye taşınmaz.
+- **Config-driven.** Yeni parametre gerekiyorsa YAML'a ekle, koda gömme.
+- **Emin değilsen sor.** Özellikle §5'teki deneysel kurallarla ilgili bir tavizin gerekiyorsa
+  sessizce yapma — sor.
+- **Kararları yaz.** Spec'ten sapma varsa `docs/DECISIONS.md`'ye tarih + gerekçe.

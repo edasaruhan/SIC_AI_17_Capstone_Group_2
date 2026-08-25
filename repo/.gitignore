@@ -1,0 +1,40 @@
+# --- Veri: ASLA commit edilmez ---
+data/raw/
+data/interim/
+data/processed/
+data/annotations/*.parquet
+data/annotations/*.jsonl
+models/
+reports/results/*.csv
+*.parquet
+*.jsonl
+*.jsonl.gz
+*.arrow
+
+# İnsan etiketleme dosyaları birebir review metni taşır. concept-note ve
+# implementation-plan açıkça taahhüt ediyor: "No verbatim review text appears in
+# any published output." Ham etiket dosyaları YEREL kalır; git'e yalnızca
+# toplulaştırılmış sonuç (reports/results/keyword_precision.json) girer.
+data/annotations/human/
+
+# --- Sırlar ---
+.env
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+venv-llm/
+venv-recsys/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Araçlar ---
+wandb/
+saved/
+log/
+log_tensorboard/
+.DS_Store

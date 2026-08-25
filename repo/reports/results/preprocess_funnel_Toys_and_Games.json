@@ -1,0 +1,66 @@
+{
+  "01_raw": {
+    "rows": 16260406,
+    "users": 8116226,
+    "items": 890667
+  },
+  "02_verified_purchase": {
+    "rows": 14859195,
+    "users": 7678450,
+    "items": 855903
+  },
+  "03_min_words_5": {
+    "rows": 12574302,
+    "users": 6824523,
+    "items": 801297
+  },
+  "04_dedup": {
+    "rows": 12417784,
+    "users": 6824523,
+    "items": 801297,
+    "interactions_per_user": {
+      "mean": 1.82,
+      "median": 1.0,
+      "max": 617,
+      "share_ge_5": 0.057135
+    },
+    "interactions_per_item": {
+      "mean": 15.497,
+      "median": 3.0,
+      "max": 14334,
+      "share_ge_5": 0.370654
+    }
+  },
+  "05_k_core_5": {
+    "rows": 2164018,
+    "users": 268652,
+    "items": 103618,
+    "iterations": 20
+  },
+  "timestamp": {
+    "unit": "ms",
+    "min": "2000-08-04 06:46:55",
+    "max": "2023-09-13 02:18:35.517000",
+    "out_of_range": 0,
+    "valid_window": [
+      "1996-01-01",
+      "2023-12-31"
+    ]
+  },
+  "meta": {
+    "category_role": "high",
+    "category": "Toys_and_Games",
+    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Toys_and_Games_raw.parquet",
+    "outputs": {
+      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Toys_and_Games_clean.parquet",
+      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Toys_and_Games_kcore.parquet"
+    },
+    "params": {
+      "verified_only": true,
+      "min_words": 5,
+      "k_core": 5,
+      "dedup": true,
+      "timestamp_unit": "ms"
+    }
+  }
+}

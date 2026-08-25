@@ -1,0 +1,354 @@
+{
+  "T1_preprocessing_funnel": [
+    {
+      "category": "Toys and Games",
+      "stage": "01_raw",
+      "rows": "16,260,406",
+      "users": "8,116,226",
+      "items": "890,667",
+      "retained": "100.0%"
+    },
+    {
+      "category": "Toys and Games",
+      "stage": "02_verified_purchase",
+      "rows": "14,859,195",
+      "users": "7,678,450",
+      "items": "855,903",
+      "retained": "91.4%"
+    },
+    {
+      "category": "Toys and Games",
+      "stage": "03_min_words_5",
+      "rows": "12,574,302",
+      "users": "6,824,523",
+      "items": "801,297",
+      "retained": "77.3%"
+    },
+    {
+      "category": "Toys and Games",
+      "stage": "04_dedup",
+      "rows": "12,417,784",
+      "users": "6,824,523",
+      "items": "801,297",
+      "retained": "76.4%"
+    },
+    {
+      "category": "Toys and Games",
+      "stage": "05_k_core_5",
+      "rows": "2,164,018",
+      "users": "268,652",
+      "items": "103,618",
+      "retained": "13.3%"
+    },
+    {
+      "category": "Video Games",
+      "stage": "01_raw",
+      "rows": "4,624,615",
+      "users": "2,766,656",
+      "items": "137,249",
+      "retained": "100.0%"
+    },
+    {
+      "category": "Video Games",
+      "stage": "02_verified_purchase",
+      "rows": "3,982,807",
+      "users": "2,507,761",
+      "items": "129,039",
+      "retained": "86.1%"
+    },
+    {
+      "category": "Video Games",
+      "stage": "03_min_words_5",
+      "rows": "3,341,936",
+      "users": "2,185,291",
+      "items": "122,578",
+      "retained": "72.3%"
+    },
+    {
+      "category": "Video Games",
+      "stage": "04_dedup",
+      "rows": "3,296,440",
+      "users": "2,185,291",
+      "items": "122,578",
+      "retained": "71.3%"
+    },
+    {
+      "category": "Video Games",
+      "stage": "05_k_core_5",
+      "rows": "368,476",
+      "users": "47,663",
+      "items": "14,606",
+      "retained": "8.0%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "stage": "01_raw",
+      "rows": "14,318,520",
+      "users": "7,034,393",
+      "items": "603,182",
+      "retained": "100.0%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "stage": "02_verified_purchase",
+      "rows": "13,176,519",
+      "users": "6,645,166",
+      "items": "572,844",
+      "retained": "92.0%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "stage": "03_min_words_5",
+      "rows": "10,940,987",
+      "users": "5,801,858",
+      "items": "541,797",
+      "retained": "76.4%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "stage": "04_dedup",
+      "rows": "10,774,599",
+      "users": "5,801,858",
+      "items": "541,797",
+      "retained": "75.2%"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "stage": "05_k_core_5",
+      "rows": "2,434,594",
+      "users": "268,991",
+      "items": "94,863",
+      "retained": "17.0%"
+    },
+    {
+      "category": "All Beauty",
+      "stage": "01_raw",
+      "rows": "701,528",
+      "users": "631,986",
+      "items": "112,565",
+      "retained": "100.0%"
+    },
+    {
+      "category": "All Beauty",
+      "stage": "02_verified_purchase",
+      "rows": "634,969",
+      "users": "584,592",
+      "items": "106,811",
+      "retained": "90.5%"
+    },
+    {
+      "category": "All Beauty",
+      "stage": "03_min_words_5",
+      "rows": "543,045",
+      "users": "503,388",
+      "items": "99,296",
+      "retained": "77.4%"
+    },
+    {
+      "category": "All Beauty",
+      "stage": "04_dedup",
+      "rows": "537,261",
+      "users": "503,388",
+      "items": "99,296",
+      "retained": "76.6%"
+    },
+    {
+      "category": "All Beauty",
+      "stage": "05_k_core_5",
+      "rows": "0",
+      "users": "0",
+      "items": "0",
+      "retained": "0.0%"
+    }
+  ],
+  "T2_corpus_profile": [
+    {
+      "category": "Toys and Games",
+      "interactions": "12,417,784",
+      "users": "6,824,523",
+      "items": "801,297",
+      "density": "2.27e-06",
+      "int/user (mean)": "1.82",
+      "int/user (median)": "1",
+      "users ≥5": "5.71%",
+      "int/item (mean)": "15.50",
+      "items ≥5": "37.1%",
+      "item Gini": "0.805",
+      "median words": "22",
+      "period": "2000-08 → 2023-09"
+    },
+    {
+      "category": "Video Games",
+      "interactions": "3,296,440",
+      "users": "2,185,291",
+      "items": "122,578",
+      "density": "1.23e-05",
+      "int/user (mean)": "1.51",
+      "int/user (median)": "1",
+      "users ≥5": "3.03%",
+      "int/item (mean)": "26.89",
+      "items ≥5": "42.3%",
+      "item Gini": "0.850",
+      "median words": "27",
+      "period": "1999-03 → 2023-09"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "interactions": "10,774,599",
+      "users": "5,801,858",
+      "items": "541,797",
+      "density": "3.43e-06",
+      "int/user (mean)": "1.86",
+      "int/user (median)": "1",
+      "users ≥5": "5.85%",
+      "int/item (mean)": "19.89",
+      "items ≥5": "40.2%",
+      "item Gini": "0.826",
+      "median words": "21",
+      "period": "2001-08 → 2023-09"
+    },
+    {
+      "category": "All Beauty",
+      "interactions": "537,261",
+      "users": "503,388",
+      "items": "99,296",
+      "density": "1.07e-05",
+      "int/user (mean)": "1.07",
+      "int/user (median)": "1",
+      "users ≥5": "0.08%",
+      "int/item (mean)": "5.41",
+      "items ≥5": "21.6%",
+      "item Gini": "0.684",
+      "median words": "22",
+      "period": "2002-10 → 2023-09"
+    }
+  ],
+  "T3_keyword_proxy_rates": [
+    {
+      "category": "Toys and Games",
+      "reviews": "12,417,784",
+      "gift evidence": "11.30%",
+      "speculative": "0.92%",
+      "received": "0.28%",
+      "**proxy rate**": "**11.07%**",
+      "naive single-regex": "11.91%",
+      "inflation": "1.07×"
+    },
+    {
+      "category": "Video Games",
+      "reviews": "3,296,440",
+      "gift evidence": "4.50%",
+      "speculative": "0.14%",
+      "received": "0.13%",
+      "**proxy rate**": "**4.40%**",
+      "naive single-regex": "4.61%",
+      "inflation": "1.05×"
+    },
+    {
+      "category": "Grocery and Gourmet Food",
+      "reviews": "10,774,599",
+      "gift evidence": "1.89%",
+      "speculative": "0.19%",
+      "received": "0.08%",
+      "**proxy rate**": "**1.85%**",
+      "naive single-regex": "2.08%",
+      "inflation": "1.12×"
+    },
+    {
+      "category": "All Beauty",
+      "reviews": "537,261",
+      "gift evidence": "2.18%",
+      "speculative": "0.15%",
+      "received": "0.08%",
+      "**proxy rate**": "**2.13%**",
+      "naive single-regex": "2.32%",
+      "inflation": "1.09×"
+    }
+  ],
+  "T4_manual_precision": {
+    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\annotations\\human\\keyword_precision_sample.csv",
+    "n_sampled": 100,
+    "n_labelled": 100,
+    "label_vocabulary": [
+      "gift_given",
+      "self",
+      "household",
+      "unclear"
+    ],
+    "strata": {
+      "proxy": {
+        "n": 60,
+        "gift_given": 35,
+        "share_gift_given": 0.5833,
+        "ci95": [
+          0.4573,
+          0.6994
+        ],
+        "not_self": 49,
+        "share_not_self": 0.8167,
+        "ci95_not_self": [
+          0.7008,
+          0.8944
+        ],
+        "label_counts": {
+          "gift_given": 35,
+          "self": 10,
+          "household": 14,
+          "unclear": 1
+        }
+      },
+      "speculative": {
+        "n": 20,
+        "gift_given": 5,
+        "share_gift_given": 0.25,
+        "ci95": [
+          0.1119,
+          0.4687
+        ],
+        "not_self": 6,
+        "share_not_self": 0.3,
+        "ci95_not_self": [
+          0.1455,
+          0.519
+        ],
+        "label_counts": {
+          "gift_given": 5,
+          "self": 12,
+          "household": 1,
+          "unclear": 2
+        }
+      },
+      "unflagged": {
+        "n": 20,
+        "gift_given": 1,
+        "share_gift_given": 0.05,
+        "ci95": [
+          0.0089,
+          0.2361
+        ],
+        "not_self": 1,
+        "share_not_self": 0.05,
+        "ci95_not_self": [
+          0.0089,
+          0.2361
+        ],
+        "label_counts": {
+          "gift_given": 1,
+          "self": 19,
+          "household": 0,
+          "unclear": 0
+        }
+      }
+    },
+    "proxy_precision": 0.5833,
+    "proxy_precision_ci95": [
+      0.4573,
+      0.6994
+    ],
+    "proxy_precision_not_self": 0.8167,
+    "proxy_precision_not_self_ci95": [
+      0.7008,
+      0.8944
+    ]
+  }
+}

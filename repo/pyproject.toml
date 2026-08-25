@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gift-contamination"
+version = "0.1.0"
+description = "Hediye kontaminasyonu arastirma pipeline'i (AI in Marketing Capstone)"
+requires-python = ">=3.10"
+# Bagimliliklar requirements*.txt uzerinden kurulur; iki ayri venv gerektigi icin
+# (vLLM ile RecBole cakisiyor) burada pinlenmez. Bkz README.md.
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

@@ -1,0 +1,66 @@
+{
+  "01_raw": {
+    "rows": 4624615,
+    "users": 2766656,
+    "items": 137249
+  },
+  "02_verified_purchase": {
+    "rows": 3982807,
+    "users": 2507761,
+    "items": 129039
+  },
+  "03_min_words_5": {
+    "rows": 3341936,
+    "users": 2185291,
+    "items": 122578
+  },
+  "04_dedup": {
+    "rows": 3296440,
+    "users": 2185291,
+    "items": 122578,
+    "interactions_per_user": {
+      "mean": 1.508,
+      "median": 1.0,
+      "max": 257,
+      "share_ge_5": 0.030269
+    },
+    "interactions_per_item": {
+      "mean": 26.893,
+      "median": 3.0,
+      "max": 15424,
+      "share_ge_5": 0.422539
+    }
+  },
+  "05_k_core_5": {
+    "rows": 368476,
+    "users": 47663,
+    "items": 14606,
+    "iterations": 17
+  },
+  "timestamp": {
+    "unit": "ms",
+    "min": "1999-03-17 19:55:11",
+    "max": "2023-09-12 09:02:35.529000",
+    "out_of_range": 0,
+    "valid_window": [
+      "1996-01-01",
+      "2023-12-31"
+    ]
+  },
+  "meta": {
+    "category_role": "mid",
+    "category": "Video_Games",
+    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Video_Games_raw.parquet",
+    "outputs": {
+      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Video_Games_clean.parquet",
+      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Video_Games_kcore.parquet"
+    },
+    "params": {
+      "verified_only": true,
+      "min_words": 5,
+      "k_core": 5,
+      "dedup": true,
+      "timestamp_unit": "ms"
+    }
+  }
+}

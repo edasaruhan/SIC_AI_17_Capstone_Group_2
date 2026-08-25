@@ -1,0 +1,7 @@
+# AYRI VENV: venv-llm
+# vLLM + transformers. RecBole ile aynı ortama KURMAYIN.
+-r requirements.txt
+torch>=2.3
+transformers>=4.48
+accelerate>=0.30
+vllm>=0.6

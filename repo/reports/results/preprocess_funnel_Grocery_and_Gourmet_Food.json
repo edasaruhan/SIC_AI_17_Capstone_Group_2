@@ -1,0 +1,66 @@
+{
+  "01_raw": {
+    "rows": 14318520,
+    "users": 7034393,
+    "items": 603182
+  },
+  "02_verified_purchase": {
+    "rows": 13176519,
+    "users": 6645166,
+    "items": 572844
+  },
+  "03_min_words_5": {
+    "rows": 10940987,
+    "users": 5801858,
+    "items": 541797
+  },
+  "04_dedup": {
+    "rows": 10774599,
+    "users": 5801858,
+    "items": 541797,
+    "interactions_per_user": {
+      "mean": 1.857,
+      "median": 1.0,
+      "max": 770,
+      "share_ge_5": 0.058546
+    },
+    "interactions_per_item": {
+      "mean": 19.887,
+      "median": 3.0,
+      "max": 28060,
+      "share_ge_5": 0.401662
+    }
+  },
+  "05_k_core_5": {
+    "rows": 2434594,
+    "users": 268991,
+    "items": 94863,
+    "iterations": 11
+  },
+  "timestamp": {
+    "unit": "ms",
+    "min": "2001-08-17 16:48:25",
+    "max": "2023-09-12 20:20:38.851000",
+    "out_of_range": 0,
+    "valid_window": [
+      "1996-01-01",
+      "2023-12-31"
+    ]
+  },
+  "meta": {
+    "category_role": "low",
+    "category": "Grocery_and_Gourmet_Food",
+    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Grocery_and_Gourmet_Food_raw.parquet",
+    "outputs": {
+      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Grocery_and_Gourmet_Food_clean.parquet",
+      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Grocery_and_Gourmet_Food_kcore.parquet"
+    },
+    "params": {
+      "verified_only": true,
+      "min_words": 5,
+      "k_core": 5,
+      "dedup": true,
+      "timestamp_unit": "ms"
+    }
+  }
+}

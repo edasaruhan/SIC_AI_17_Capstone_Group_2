@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GiftAnnotation",
+  "type": "object",
+  "properties": {
+    "purchase_type": {
+      "type": "string",
+      "enum": ["self", "gift_given", "household", "unclear"],
+      "description": "self=kendisi icin, gift_given=baskasina hediye, household=ev halki icin, unclear=belirsiz"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "recipient": {
+      "type": ["string", "null"],
+      "enum": ["child", "spouse", "parent", "friend", "colleague", "unknown", null]
+    },
+    "occasion": {
+      "type": "string",
+      "enum": ["birthday", "christmas", "wedding", "graduation", "none", "unknown"]
+    },
+    "evidence_span": {
+      "type": "string",
+      "description": "Review metninden BIREBIR alinti. Metinde gecmiyorsa kayit unclear'a dusurulur."
+    }
+  },
+  "required": ["purchase_type", "confidence", "recipient", "occasion", "evidence_span"],
+  "additionalProperties": false
+}

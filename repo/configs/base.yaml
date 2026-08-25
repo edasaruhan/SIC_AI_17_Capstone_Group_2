@@ -1,0 +1,88 @@
+# Tek doğruluk kaynağı. Kodda hardcode parametre YOK.
+
+seed: 42
+seeds: [42, 1337, 2024]        # TBD: 3 mü 5 mi
+
+paths:
+  raw:         data/raw
+  interim:     data/interim
+  processed:   data/processed
+  annotations: data/annotations
+  human:       data/annotations/human
+  models:      models
+  figures:     reports/figures
+  results:     reports/results
+
+dataset:
+  hf_repo: McAuley-Lab/Amazon-Reviews-2023
+  categories:
+    pilot: raw_review_All_Beauty
+    high:  raw_review_Toys_and_Games
+    mid:   raw_review_Video_Games
+    low:   raw_review_Grocery_and_Gourmet_Food
+  meta_prefix: raw_meta_          # örn. raw_meta_Toys_and_Games
+  join_key: parent_asin           # asin DEĞİL
+  # Ham dosya HF reposundaki yolu. datasets.load_dataset(trust_remote_code=True)
+  # artık çalışmıyor (datasets 4.x); dosyayı doğrudan çekiyoruz. Bkz docs/DECISIONS.md.
+  review_file_template: raw/review_categories/{slug}.jsonl
+  required_fields: [text, title, rating, timestamp, user_id, parent_asin, verified_purchase]
+  schema_probe_lines: 1000
+
+preprocess:
+  verified_only: true
+  min_words: 5
+  k_core: 5
+  dedup: true                     # aynı user+item -> en erken timestamp
+  timestamp_unit: auto            # auto | s | ms
+
+sampling:
+  n_annotate: 40000               # TBD: pilot sonrası netleşecek
+  strata: [month, rating, text_length_bucket]
+  keyword_boost_fraction: 0.15    # ayrı tutulur, ana orana KATILMAZ
+
+detection:
+  primary_model:   Qwen/Qwen3.5-9B
+  secondary_model: google/gemma-4-12b-it     # MVP dışı
+  quantization: awq
+  max_new_tokens: 220
+  temperature: 0.0
+  guided_json: true
+  retry_on_parse_fail: 1
+  schema_path: configs/annotation_schema.json
+  prompt_path: prompts/gift_detection_v1.md
+
+distill:
+  base_model: answerdotai/ModernBERT-base
+  max_length: 1024
+  epochs: 3
+  batch_size: 32
+  lr: 3.0e-5
+  val_fraction: 0.1
+
+experiment:
+  conditions: [C0, C1, C4]                   # MVP. C2/C3 sonra.
+  soft_weights: [0.25, 0.5, 0.75]            # C2 için, TBD
+  models: [SASRec, BPR]                      # MVP. Pop/ItemKNN/GRU4Rec sonra.
+  topk: [10, 20]
+  metrics: [Recall, NDCG, HitRate]
+  split: temporal_leave_one_out
+  eval_rule:
+    test_item_must_be: self                  # DEĞİŞTİRİLEMEZ
+    freeze_universe_on: C0                   # DEĞİŞTİRİLEMEZ
+  bootstrap_iters: 1000
+
+analysis:
+  seasonality_months: 12
+  expected_peaks: [11, 12, 2, 5]             # Noel, Sevgililer, Anneler Günü
+
+keywords:
+  path: configs/gift_keywords.yaml
+  precision_sample_n: 100         # elle dogrulanacak eslesme sayisi (T4)
+  precision_seed: 42
+
+eda:
+  categories: [pilot, high, mid, low]
+  min_year: 2000                  # oncesi hacim ihmal edilebilir; grafikleri bozuyor
+  figure_dpi: 150
+  figure_format: png
+  publish_figures_to: ../data-research/figures   # teslim kendi icinde kapali olsun

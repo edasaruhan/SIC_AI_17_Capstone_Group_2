@@ -1,0 +1,86 @@
+{
+  "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\annotations\\human\\keyword_precision_sample.csv",
+  "n_sampled": 100,
+  "n_labelled": 100,
+  "label_vocabulary": [
+    "gift_given",
+    "self",
+    "household",
+    "unclear"
+  ],
+  "strata": {
+    "proxy": {
+      "n": 60,
+      "gift_given": 35,
+      "share_gift_given": 0.5833,
+      "ci95": [
+        0.4573,
+        0.6994
+      ],
+      "not_self": 49,
+      "share_not_self": 0.8167,
+      "ci95_not_self": [
+        0.7008,
+        0.8944
+      ],
+      "label_counts": {
+        "gift_given": 35,
+        "self": 10,
+        "household": 14,
+        "unclear": 1
+      }
+    },
+    "speculative": {
+      "n": 20,
+      "gift_given": 5,
+      "share_gift_given": 0.25,
+      "ci95": [
+        0.1119,
+        0.4687
+      ],
+      "not_self": 6,
+      "share_not_self": 0.3,
+      "ci95_not_self": [
+        0.1455,
+        0.519
+      ],
+      "label_counts": {
+        "gift_given": 5,
+        "self": 12,
+        "household": 1,
+        "unclear": 2
+      }
+    },
+    "unflagged": {
+      "n": 20,
+      "gift_given": 1,
+      "share_gift_given": 0.05,
+      "ci95": [
+        0.0089,
+        0.2361
+      ],
+      "not_self": 1,
+      "share_not_self": 0.05,
+      "ci95_not_self": [
+        0.0089,
+        0.2361
+      ],
+      "label_counts": {
+        "gift_given": 1,
+        "self": 19,
+        "household": 0,
+        "unclear": 0
+      }
+    }
+  },
+  "proxy_precision": 0.5833,
+  "proxy_precision_ci95": [
+    0.4573,
+    0.6994
+  ],
+  "proxy_precision_not_self": 0.8167,
+  "proxy_precision_not_self_ci95": [
+    0.7008,
+    0.8944
+  ]
+}

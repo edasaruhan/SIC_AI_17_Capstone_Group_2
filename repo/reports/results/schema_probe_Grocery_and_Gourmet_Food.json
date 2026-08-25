@@ -1,0 +1,37 @@
+{
+  "file": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\raw\\raw\\review_categories\\Grocery_and_Gourmet_Food.jsonl",
+  "lines_probed": 1000,
+  "fields": [
+    "asin",
+    "helpful_vote",
+    "images",
+    "parent_asin",
+    "rating",
+    "text",
+    "timestamp",
+    "title",
+    "user_id",
+    "verified_purchase"
+  ],
+  "field_types": {
+    "asin": "str",
+    "helpful_vote": "int",
+    "images": "list",
+    "parent_asin": "str",
+    "rating": "float",
+    "text": "str",
+    "timestamp": "int",
+    "title": "str",
+    "user_id": "str",
+    "verified_purchase": "bool"
+  },
+  "required_present": [
+    "text",
+    "title",
+    "rating",
+    "timestamp",
+    "user_id",
+    "parent_asin",
+    "verified_purchase"
+  ]
+}

@@ -1,0 +1,110 @@
+# Naif sozcuksel hediye vekili (proxy).
+#
+# Bu bir DETEKTOR DEGIL, bir OLCU CUBUGUDUR. Amaci hediye oranini kesin olarak
+# saptamak degil; anahtar kelimenin neden yetmedigini SAYIYLA gostermek ve LLM'e
+# gecis gerekcesini kanitlamak. Nihai etiketleme Qwen3.5-9B ile yapilacak
+# (bkz. CLAUDE.md bolum 6).
+#
+# Desenler Rust regex sozdizimidir (polars `str.contains`): lookahead/lookbehind
+# ve backreference YOK. Eslesme buyuk/kucuk harf duyarsizdir.
+#
+# `{rel}` yer tutucusu asagidaki `relations` listesinin alternasyonuyla degistirilir.
+
+relations:
+  - "son"
+  - "daughter"
+  - "kids?"
+  - "child"
+  - "children"
+  - "grand(?:son|daughter|child|kids?)"
+  - "wife"
+  - "husband"
+  - "spouse"
+  - "girlfriend"
+  - "boyfriend"
+  - "fiancee?"
+  - "mom"
+  - "mother"
+  - "dad"
+  - "father"
+  - "parents?"
+  - "sister"
+  - "brother"
+  - "niece"
+  - "nephew"
+  - "aunt"
+  - "uncle"
+  - "cousin"
+  - "grandma"
+  - "grandmother"
+  - "grandpa"
+  - "grandfather"
+  - "friend"
+  - "co-?worker"
+  - "colleague"
+  - "boss"
+  - "teacher"
+  - "neighbou?r"
+  - "roommate"
+
+occasions:
+  - "birthday"
+  - "christmas"
+  - "xmas"
+  - "hanukkah"
+  - "wedding"
+  - "graduation"
+  - "anniversary"
+  - "valentine'?s?(?: day)?"
+  - "mother'?s day"
+  - "father'?s day"
+  - "baby shower"
+  - "housewarming"
+  - "retirement"
+
+families:
+
+  gift_evidence:
+    description: >
+      Metin gercek bir hediye alimina isaret ediyor. Ucuncu ve dorduncu desen
+      onemli: "bought it and my daughter loved it" cumlesinde hediye sozcugu hic
+      gecmez ama net bir hediyedir - anahtar kelime taramasinin YANLIS NEGATIF
+      sinifi tam olarak budur.
+    patterns:
+      - "(?:bought|purchased|got|ordered|picked (?:this|it|them) up)[^.!?]{0,30}\\bfor (?:my|our|her|his|their) (?:{rel})"
+      - "\\b(?:gave|giving|gifted|sent|handed) (?:this|it|them|these)[^.!?]{0,20}\\bto (?:my|our|her|his|their) (?:{rel})"
+      - "\\bmy (?:{rel})(?:'s)? (?:absolutely |really |just )?(?:loved|loves|adored|adores|enjoyed|enjoys) (?:it|this|them|these)"
+      - "\\bfor (?:my|our|her|his|their) (?:{rel})'?s? (?:{occ})"
+      - "\\b(?:as|for) a (?:{occ}) (?:gift|present)"
+      - "\\b(?:bought|purchased|ordered|got) (?:this|it|them|these) as a (?:gift|present)"
+      - "\\b(?:gift|present) for (?:my|our|her|his|their|a) "
+      - "\\bstocking stuffer"
+      - "\\bsecret santa"
+      - "\\bgift(?:ed|ing) (?:this|it|them)"
+      - "\\bwrapped (?:it|this|them) (?:up )?(?:as|for)"
+
+  gift_speculative:
+    description: >
+      Hediye sozcugu var ama alim buyuk olasilikla kendisi icin. Anahtar kelime
+      taramasinin YANLIS POZITIF sinifi. Projenin tum gerekcesi bu ayrimda:
+      bu satirlari hediye saymak, hediye almamis gercek bir musteriye ait
+      kisisellestirmeyi bastirmak demektir.
+    patterns:
+      - "\\b(?:would|will|'d|could) (?:make|be) (?:a |an )?(?:great|good|perfect|excellent|nice|wonderful|lovely|ideal|awesome|fantastic)?\\s*(?:gift|present)"
+      - "\\b(?:makes?) (?:a |an )(?:great|good|perfect|excellent|nice|wonderful|lovely|ideal) (?:gift|present)"
+      - "\\b(?:great|good|perfect|nice|excellent|wonderful|cute|fun) (?:gift|present) idea"
+      - "\\bperfect (?:as )?(?:a )?(?:gift|present)"
+      - "\\b(?:looking|shopping) for a (?:gift|present)"
+      - "\\bgift[- ](?:worthy|able)"
+      - "\\bany(?:one|body) would (?:love|enjoy|like)"
+
+  gift_received:
+    description: >
+      Yorumcu hediyeyi ALMIS, VERMEMIS. Prompt spesifikasyonuna gore bu "self"
+      sayilir (CLAUDE.md bolum 4). Ucuncu bir yanlis pozitif sinifi; ayri
+      sayilmasi hem oranin dogrulugunu artirir hem de sema tasarimini gerekcelendirir.
+    patterns:
+      - "\\b(?:received|got|was given|been given) (?:this|it|them|these)[^.!?]{0,20}\\bas a (?:gift|present)"
+      - "\\b(?:this|it) was a (?:gift|present) (?:from|to me)"
+      - "\\bmy (?:{rel}) (?:gave|got|bought|sent) (?:me|it to me|this to me)"
+      - "\\b(?:i )?(?:got|received) (?:this|it|these) (?:for|as) (?:my|a) (?:{occ})"

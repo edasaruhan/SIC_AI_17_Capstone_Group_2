@@ -1,0 +1,66 @@
+{
+  "01_raw": {
+    "rows": 701528,
+    "users": 631986,
+    "items": 112565
+  },
+  "02_verified_purchase": {
+    "rows": 634969,
+    "users": 584592,
+    "items": 106811
+  },
+  "03_min_words_5": {
+    "rows": 543045,
+    "users": 503388,
+    "items": 99296
+  },
+  "04_dedup": {
+    "rows": 537261,
+    "users": 503388,
+    "items": 99296,
+    "interactions_per_user": {
+      "mean": 1.067,
+      "median": 1.0,
+      "max": 27,
+      "share_ge_5": 0.000759
+    },
+    "interactions_per_item": {
+      "mean": 5.411,
+      "median": 2.0,
+      "max": 1661,
+      "share_ge_5": 0.215578
+    }
+  },
+  "05_k_core_5": {
+    "rows": 0,
+    "users": 0,
+    "items": 0,
+    "iterations": 3
+  },
+  "timestamp": {
+    "unit": "ms",
+    "min": "2002-10-21 20:23:44",
+    "max": "2023-09-09 00:39:36.666000",
+    "out_of_range": 0,
+    "valid_window": [
+      "1996-01-01",
+      "2023-12-31"
+    ]
+  },
+  "meta": {
+    "category_role": "pilot",
+    "category": "All_Beauty",
+    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\All_Beauty_raw.parquet",
+    "outputs": {
+      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\All_Beauty_clean.parquet",
+      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\All_Beauty_kcore.parquet"
+    },
+    "params": {
+      "verified_only": true,
+      "min_words": 5,
+      "k_core": 5,
+      "dedup": true,
+      "timestamp_unit": "ms"
+    }
+  }
+}
