@@ -1,6 +1,6 @@
 # gift_detection_v1
 
-**Versiyon:** v1 · **Model:** Qwen3.5-9B · **Durum:** taslak — hafta 2'de 200 review üzerinde revize edilecek
+**Versiyon:** v1 · **Model:** Qwen3-4B-Instruct-2507 · **Durum:** taslak — hafta 2'de 200 review üzerinde revize edilecek
 
 > Bu dosya bir kod artefaktıdır. Prompt değişirse yeni dosya açılır (`v2`), üzerine yazılmaz.
 > Annotation çıktısı hangi prompt versiyonuyla üretildiyse kayıtta `prompt_version` alanında tutulur.
@@ -32,6 +32,19 @@ Critical distinctions:
 - Receiving a gift is not giving one. If the reviewer received the item, label "self".
 - Absence of gift language is not evidence of "self" if the text is uninformative —
   use "unclear".
+
+Recipient guidance (derived from measured data, not intuition):
+- A GRANDCHILD is not a household member. "Bought this for my grandson" is
+  "gift_given" with recipient "grandchild", never "household". This is the single
+  most common recipient confusion in this corpus: grandchildren are 26% of named
+  recipients in Toys and Games.
+- The reviewer's OWN child living at home is the ambiguous case. Prefer "household"
+  when the item is for daily shared use, "gift_given" when an occasion is named.
+- "partner" covers spouse, husband, wife, boyfriend, girlfriend, fiance.
+- "extended_family" covers niece, nephew, cousin, aunt, uncle.
+- Coworkers and neighbours map to "friend".
+- Occasion is usually NOT stated. "unknown" is the expected answer for most reviews;
+  do not infer an occasion from the product type or from the season.
 
 You must output ONLY a JSON object matching the schema. No prose, no markdown fences.
 
@@ -70,5 +83,7 @@ Hafta 2'de manuel denemeden sonra buraya 6–8 örnek eklenecek. Şu an sıfır-
 - [ ] Hediye aldığını söylüyor (alıcı değil, alan) → `self`
 - [ ] Kendi çocuğuna almış → `household` mu `gift_given` mı (**kappa sonucuna göre karar**)
 - [ ] Eşine almış, ikisi de kullanıyor → `household`
-- [ ] İş yeri hediyesi → `gift_given` + `colleague`
+- [ ] İş yeri hediyesi → `gift_given` + `friend` (colleague enum'dan kaldırıldı)
+- [ ] Toruna almış → `gift_given` + `grandchild` (**`household` DEĞİL** — en sık karışan vaka)
+- [ ] Yeğene almış → `gift_given` + `extended_family`
 - [ ] Bilgi vermeyen kısa review ("Great product!") → `unclear`

@@ -1,5 +1,5 @@
 {
-  "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\annotations\\human\\keyword_precision_sample.csv",
+  "source": "data/annotations/human/keyword_precision_sample.csv",
   "n_sampled": 100,
   "n_labelled": 100,
   "label_vocabulary": [

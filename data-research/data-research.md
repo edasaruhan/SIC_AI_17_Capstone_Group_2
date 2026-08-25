@@ -502,9 +502,11 @@ stars — in all four categories.
 Reviewers disclose the recipient **at the very start**. The median gift evidence sits 1–3%
 of the way into the review body; 90% of it appears within the first 60%.
 
-**Three project documents justify the choice of ModernBERT partly on its 8,192-token
+**Three project documents justified the choice of ModernBERT partly on its 8,192-token
 context, on the stated grounds that "the sentence disclosing the recipient frequently
 appears late in a review, after the product discussion." On this corpus that is false.**
+(All three have since been corrected; the model choice stands on inference efficiency and
+footprint instead. See §5.2.)
 Truncating at **512 tokens — plain BERT, the model the argument was made against — would
 lose the evidence in fewer than 1 gift review in 2,000.** At the 1,024 tokens our config
 actually specifies, the loss is at most 8 in 100,000. Combined with T2 — where only **0.005%–0.19%**
@@ -773,26 +775,44 @@ pilot category as an experimental site.**
 
 ### 5.2 What this changes in the project plan
 
-Six concrete revisions, in descending order of importance:
+Six concrete revisions, in descending order of importance. All six have been applied to
+the project's other deliverables and to the repository configuration; each is recorded with
+its rationale in `repo/docs/DECISIONS.md`.
 
 1. **`All_Beauty` is retired as the experimental pilot** and retained as the
    detector-development pilot, where its 537K reviews and 32-second download remain ideal.
-   The recommender experiment should pilot on **Video Games** — at 368K interactions after
+   The recommender experiment pilots on **Video Games** — at 368K interactions after
    5-core it is the smallest viable category and the fastest to iterate on.
 2. **Toys and Games becomes the primary category for RQ2**, not merely the most gift-dense
    one. It is the only category where contamination survives 5-core intact (§4.11); in the
    other two the experiment would run on a corpus 27–39% cleaner than reality, biased toward
    a null result.
-3. **The annotation schema should be revised before the LLM run** (§4.6): add `grandchild`
-   (26% of Toys recipients) and `sibling`; fold the near-empty `colleague` into `friend`.
-4. **The results table needs a same-day robustness column** (§4.12). A quarter to a third of
+3. **The annotation schema is revised before the LLM run** (§4.6). `recipient` gains
+   `grandchild` — 26.2% of named Toys recipients, and the distinction that carries the
+   `household` / `gift_given` boundary, since a grandchild lives in a different household
+   while one's own child does not — plus `sibling` and `extended_family`; `spouse` widens to
+   `partner` (5.5% of Video Games recipients are a boyfriend or girlfriend); the near-empty
+   `colleague` folds into `friend`. `occasion` gains the five occasions the data actually
+   contains. The prompt now states that `unknown` is the expected occasion for most reviews,
+   since occasion is lexically recoverable only 20–29% of the time.
+4. **The results table gains a same-day robustness column** (§4.12). A quarter to a third of
    the evaluation is same-session prediction rather than next-purchase prediction.
-5. **The distillation context-length argument must be restated** (§4.8). ModernBERT remains
-   defensible on inference efficiency; it is not defensible on truncation, and
-   `distill.max_length: 1024` is more than sufficient.
+5. **The distillation context-length argument is restated** (§4.8). ModernBERT remains
+   defensible on inference efficiency and on a 149M-parameter footprint that fits the
+   available GPU; it is not defensible on truncation, and `distill.max_length: 1024` is more
+   than sufficient. DeBERTaV3-base is added as a robustness check, since sample efficiency
+   matters more than training speed at 40–60K labels.
 6. **Two corpora per category are now standard**: `clean` for detection and descriptive
    analysis, `kcore` for the experiment. The rule that the user/item universe freezes once,
    on the baseline condition, applies to `kcore` and is unaffected.
+
+**A seventh revision came from outside this analysis but belongs with them.** Selecting the
+annotator LLM against measured hardware — every GPU available to the team is pre-Ampere —
+replaced the previously specified 9B hybrid-attention model, which cannot in practice be
+served on that hardware, with **Qwen3-4B-Instruct-2507**. This analysis supplies the evidence
+that 4B is adequate: the evidence sits early in the text (§4.8) and a naive lexical proxy
+already reaches 58.3% precision (§4.9), so the model's task is to correct a characterised
+error pattern rather than to find a signal from nothing.
 
 ### 5.3 What the data already supports
 

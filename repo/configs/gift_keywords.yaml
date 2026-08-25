@@ -2,7 +2,7 @@
 #
 # Bu bir DETEKTOR DEGIL, bir OLCU CUBUGUDUR. Amaci hediye oranini kesin olarak
 # saptamak degil; anahtar kelimenin neden yetmedigini SAYIYLA gostermek ve LLM'e
-# gecis gerekcesini kanitlamak. Nihai etiketleme Qwen3.5-9B ile yapilacak
+# gecis gerekcesini kanitlamak. Nihai etiketleme Qwen3-4B-Instruct-2507 ile yapilacak
 # (bkz. CLAUDE.md bolum 6).
 #
 # Desenler Rust regex sozdizimidir (polars `str.contains`): lookahead/lookbehind

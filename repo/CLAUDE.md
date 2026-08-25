@@ -37,7 +37,7 @@ Amazon Reviews 2023 (HF, kategori bazlı)
    │
    ├─ [A] preprocess + 5-core + kronolojik sekans      → data/interim/
    ├─ [B] katmanlı örnekleme (40-60K)                  → data/interim/
-   ├─ [C] LLM annotation (Qwen3.5-9B, vLLM, JSON)      → data/annotations/
+   ├─ [C] LLM annotation (Qwen3-4B-Instruct, vLLM)      → data/annotations/
    ├─ [D] insan doğrulama (500, 3 annotator)           → data/annotations/human/
    ├─ [E] ModernBERT distillation                      → models/
    ├─ [F] tam korpus inference                         → data/processed/
@@ -105,17 +105,29 @@ Kullanılan alanlar: `text`, `title`, `rating`, `timestamp`, `user_id`, `parent_
 
 `configs/annotation_schema.json` içinde tanımlı, `detection/schema.py` içinde Pydantic karşılığı.
 
+> **v2 — 2026-08-26.** Enum'lar deep EDA (T6/T6b) ölçümüyle revize edildi. Eski şema
+> sezgiyle tasarlanmıştı; veriyle ilk teması bu oldu. Gerekçe `docs/DECISIONS.md`.
+
 ```json
 {
   "purchase_type": "self | gift_given | household | unclear",
   "confidence":    "high | medium | low",
-  "recipient":     "child | spouse | parent | friend | colleague | unknown | null",
-  "occasion":      "birthday | christmas | wedding | graduation | none | unknown",
+  "recipient":     "child | grandchild | partner | parent | sibling | extended_family | friend | other | unknown | null",
+  "occasion":      "birthday | christmas | wedding | graduation | anniversary | baby_shower | valentines_day | mothers_day | fathers_day | other | none | unknown",
   "evidence_span": "<review içinden birebir alıntı>"
 }
 ```
 
 - `household` = ev halkı için alınmış (bebeğe bez). Hediye değil ama alıcının kendi tercihi de değil.
+- **`grandchild` ayrı bir sınıf ve şemadaki en kritik ayrım.** Torun ayrı hanede yaşar →
+  torununa alan kişi **hediye** alır. Kendi çocuğuna alan `household` olabilir. Eski şemada
+  ikisi de `child`'a düşüyordu, yani şemanın en zor sınırı için en bilgilendirici ipucu
+  kayboluyordu. Toys_and_Games'te adı geçen alıcıların **%26.2'si torun** — bu kozmetik
+  bir eksik değil, birincil deney kategorisinin dörtte biri.
+- `colleague` kaldırıldı (veride görünmüyor), `friend`'e katıldı. `spouse` → `partner`
+  (sevgili/nişanlı da kapsıyor; Video Games'te alıcıların %5.5'i sevgili).
+- **`occasion` çoğunlukla `unknown` çıkacak ve bu beklenen davranış.** Vesile metinden
+  yalnızca %20–29 oranında çıkarılabiliyor. Modeli vesile uydurmaya zorlamayın.
 - `evidence_span` **zorunlu** — halüsinasyonu kısar, insan doğrulamasını hızlandırır.
   Modelden gelen span review metninde birebir geçmiyorsa kayıt `unclear`'a düşürülür ve loglanır.
 
@@ -157,8 +169,8 @@ Sequential recommendation, leave-one-out.
 | Katman | Seçim | Not |
 |---|---|---|
 | Büyük veri işleme | **polars** | pandas 10M+ satırda kullanılmayacak |
-| LLM servis | **vLLM** | offline batch; Ollama kullanılmayacak |
-| Annotator LLM | **Qwen/Qwen3.5-9B** birincil, **Gemma 4 12B** ikincil | model-arası uyum raporlanacak |
+| LLM servis | **vLLM** (`--dtype float16`) | offline batch, Kaggle Linux notebook'ta. Yerelde sadece smoke test için llama.cpp/GGUF — Windows'ta vLLM yok, 4 GB'a model sığmıyor |
+| Annotator LLM | **Qwen/Qwen3-4B-Instruct-2507** birincil, **google/gemma-4-E4B** ikincil (5K alt örneklem) | Seçim VRAM'e değil **GPU kuşağına** bağlı: elimizdeki her GPU pre-Ampere (Turing sm75), bfloat16 ve FlashAttention yok. Qwen3.5 ailesi hibrit GDN + VL, Turing'de pratikte koşmuyor. Gerekçe: technology-review §4.2 |
 | Structured output | vLLM guided decoding (JSON schema) | serbest metin parse edilmeyecek |
 | Distillation | **ModernBERT-base** | `AutoModelForSequenceClassification` |
 | Recsys | **RecBole** | kendi implementasyonumuzu yazmıyoruz |
@@ -201,7 +213,7 @@ Kurallar:
 1. **Veri dosyası commit etmeyin.** `data/`, `models/`, `*.parquet`, `*.jsonl.gz` gitignore'da.
 2. **Kendi recommender'ınızı yazmayın.** RecBole var.
 3. **LLM çıktısını regex ile parse etmeyin.** Guided decoding + Pydantic doğrulama.
-4. **9B modeli tüm korpusa koşturmayın.** 40–60K annotate → ModernBERT distill → tam inference.
+4. **LLM'i tüm korpusa koşturmayın.** 40–60K annotate → ModernBERT distill → tam inference.
 5. **Rastgele train/test split kullanmayın.** Zaman bazlı.
 6. **Test setinde hiperparametre tuning yapmayın.** Validation split ayrı.
 7. **C4'ü atlamayın.**
@@ -256,7 +268,7 @@ Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte ku
 
 **MVP DIŞI (zaman kalırsa):**
 - `mid` kategori, C2 ve C3 koşulları, GRU4Rec/ItemKNN/Pop
-- Gemma 4 ile ikinci annotation ve model-arası uyum
+- Gemma 4 E4B ile ikinci annotation ve model-arası uyum (5K alt örneklem)
 - İkinci plasebo (etiket shuffle)
 - Streamlit annotation arayüzü (başlangıçta CSV + Google Sheets yeterli)
 - M3 segment analizi
@@ -267,7 +279,7 @@ Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte ku
 
 **Pipeline başarılı sayılır eğer:**
 - Pilot kategoride uçtan uca hatasız çalışıyorsa
-- Aylık hediye oranı grafiğinde Kasım–Aralık tepesi görünüyorsa (V2)
+- Aylık hediye oranı grafiğinde **Aralık–Ocak** tepesi görünüyorsa (V2 — sözcüksel vekille ölçüldü, dört kategoride de var; review tarihi satın alma tarihinin gerisinde kaldığı için tepe Kasım değil Aralık–Ocak)
 - Kategori sıralaması Toys > Video Games > Grocery çıkıyorsa (V3)
 - LLM ile insan etiketi arasında sınıf bazlı F1 raporlanabiliyorsa (V1)
 - C0–C4 arası user/item evreni aynı olduğu testle doğrulanıyorsa
@@ -287,7 +299,10 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
 - [ ] **TBD** C3'ün RecBole'da nasıl implement edileceği (feature olarak mı, ayrı token mı)
 - [ ] **TBD** `household` sınıfının C1'de silinip silinmeyeceği (kappa sonucuna bağlı)
 - [ ] **TBD** Kaç seed (3 mü 5 mi) — koşu süresine göre
-- [ ] **TBD** GPU: yerel RTX mi Kaggle mı — ekip donanımına göre
+- [x] ~~**TBD** GPU: yerel RTX mi Kaggle mı~~ → **KARARLAŞTI 2026-08-26.** Yerel kart
+  GTX 1650 Ti (4 GB, Turing). LLM annotation **Kaggle**'da (2× T4, ~30 sa/hafta);
+  preprocess, distillation, RecBole deneyleri **yerelde**. Altı aşamadan yalnızca
+  biri kotaya bağlı. Ayrıntı: implementation-plan §1.6
 - [ ] **TBD** M2 "kontaminasyon yarı ömrü" için kesin operasyonel tanım
 - [ ] **TBD** Hangi ekip üyesi hangi kulvarda (bkz. `docs/PROJECT_SPEC.md` §11)
 
@@ -297,6 +312,8 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
 
 - **Küçük adım, çalışan kod.** Her adım kendi başına koşabilmeli ve çıktı üretmeli.
 - **Önce pilot.** `All_Beauty` üzerinde çalışmayan hiçbir şey büyük kategoriye taşınmaz.
+  Ama dikkat: `All_Beauty` **sadece pipeline pilotu**. 5-core sonrası sıfır satır bıraktığı
+  için üzerinde recsys deneyi koşulamaz — deney pilotu `Toys_and_Games`.
 - **Config-driven.** Yeni parametre gerekiyorsa YAML'a ekle, koda gömme.
 - **Emin değilsen sor.** Özellikle §5'teki deneysel kurallarla ilgili bir tavizin gerekiyorsa
   sessizce yapma — sor.

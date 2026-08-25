@@ -1,30 +1,75 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "GiftAnnotation",
+  "description": "v2 (2026-08-26). Enum'lar deep EDA T6/T6b olcumlerine gore revize edildi; gerekce docs/DECISIONS.md.",
   "type": "object",
   "properties": {
     "purchase_type": {
       "type": "string",
-      "enum": ["self", "gift_given", "household", "unclear"],
+      "enum": [
+        "self",
+        "gift_given",
+        "household",
+        "unclear"
+      ],
       "description": "self=kendisi icin, gift_given=baskasina hediye, household=ev halki icin, unclear=belirsiz"
     },
     "confidence": {
       "type": "string",
-      "enum": ["high", "medium", "low"]
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
     },
     "recipient": {
-      "type": ["string", "null"],
-      "enum": ["child", "spouse", "parent", "friend", "colleague", "unknown", null]
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "child",
+        "grandchild",
+        "partner",
+        "parent",
+        "sibling",
+        "extended_family",
+        "friend",
+        "other",
+        "unknown",
+        null
+      ],
+      "description": "grandchild AYRI tutulur: torun ayri hanede yasar, yani hediye; kendi cocugu household olabilir. Toys kategorisinde alicilarin %26.2'si torun. extended_family = yegen/kuzen/hala/amca. partner = es/sevgili/nisanli."
     },
     "occasion": {
       "type": "string",
-      "enum": ["birthday", "christmas", "wedding", "graduation", "none", "unknown"]
+      "enum": [
+        "birthday",
+        "christmas",
+        "wedding",
+        "graduation",
+        "anniversary",
+        "baby_shower",
+        "valentines_day",
+        "mothers_day",
+        "fathers_day",
+        "other",
+        "none",
+        "unknown"
+      ],
+      "description": "Vesile metinden nadiren cikarilabiliyor (lexical olarak yalnizca %20-29); 'unknown' yaygin ve BEKLENEN bir cevap, zorlamayin."
     },
     "evidence_span": {
       "type": "string",
       "description": "Review metninden BIREBIR alinti. Metinde gecmiyorsa kayit unclear'a dusurulur."
     }
   },
-  "required": ["purchase_type", "confidence", "recipient", "occasion", "evidence_span"],
+  "required": [
+    "purchase_type",
+    "confidence",
+    "recipient",
+    "occasion",
+    "evidence_span"
+  ],
   "additionalProperties": false
 }

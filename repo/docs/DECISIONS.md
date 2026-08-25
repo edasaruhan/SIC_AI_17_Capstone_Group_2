@@ -207,3 +207,109 @@ ilişki etiketi ("daughter"), kişisel veri değil. `title`/`text` yazımdan ön
 düşürülüyor.
 **Etkilediği bölüm:** Paket yapısı, CLAUDE.md §2
 **Kim:** Ekip
+
+---
+
+### 2026-08-26 — Annotator LLM değişti: Qwen3.5-9B → Qwen3-4B-Instruct-2507
+**Karar:** Birincil annotator `Qwen/Qwen3-4B-Instruct-2507`, ikincil `google/gemma-4-E4B`
+(yalnızca ~5K uyum alt örneklemi). `quantization: awq` → `none`, `dtype: float16` eklendi.
+
+**Gerekçe — seçim kriteri yanlıştı.** Eski tablo modelleri **VRAM**'e göre sıralıyordu
+("Qwen3.5-9B ~6-7 GB 4-bit, 8 GB kartta rahat koşar"). Ekibin donanımı ölçüldü:
+
+| | Yerel | Kaggle | Colab |
+|---|---|---|---|
+| GPU | GTX 1650 Ti 4 GB | 2× T4 16 GB | T4 16 GB |
+| Mimari | Turing sm75 | Turing sm75 | Turing sm75 |
+
+Hepsi **pre-Ampere**. Bunun üç sonucu var ve hiçbiri VRAM tablosunda görünmüyor:
+bfloat16 compute capability 8.0 istiyor (yok), vLLM `FLASH_ATTN` sm80 istiyor (yok),
+ve yeni mimariler Turing backend'lerini düşürüyor. Qwen3.5 ailesi hibrit Gated-DeltaNet
++ vision-language; 9B üyesi fp16'da 20.5 GB, ve Turing'de belgelenmiş workaround
+(`--enforce-eager`) 10 token/s altında kalıyor. Yani eski seçim **hiçbir donanımımızda
+koşmuyordu** — 4 GB'lık kartta da, T4'te de.
+
+**Yerine seçilen:** dense, text-only, standart GQA — Turing kod yolu olgun olan mimari.
+Qwen3-4B-Instruct-2507: 4.0B, 36 katman, GQA 32Q/8KV, 262K context, Apache 2.0,
+**non-thinking** (40-60K sınıflandırmada muhakeme token'ı israf etmiyor). fp16 ~8 GB →
+T4'e kuantizasyonsuz sığıyor, yani AWQ/Marlin kernel riski de ortadan kalkıyor.
+
+**4B yeterli mi?** Varsayım değil, ölçüm: kanıt gövdenin medyan %1-3'ünde (T5) ve naif
+sözcüksel vekil zaten %58.3 precision veriyor (T4). Modelin işi sıfırdan sinyal bulmak
+değil, bilinen bir hata desenini düzeltmek. macro-F1 ≥ 0.75 kapısı yetmediği durumu
+yakalamak için zaten var; tırmanma yolu Qwen3-8B.
+
+**Ayrıca düzeltildi:** "Gemma 4 12B" diye bir model **yok**. Gemma 4 ailesi E2B / E4B /
+26B-MoE / 31B-dense olarak çıktı. Üç teslimde birden bu isimle geçiyordu.
+**Etkilediği bölüm:** `configs/base.yaml`, CLAUDE.md §6, PROJECT_SPEC §[B], ROADMAP,
+concept-note §4.2, technology-review §4.2/§4.3, implementation-plan §1.3/§1.6
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — GPU kararı: annotation Kaggle'da, geri kalan yerelde
+**Karar:** CLAUDE.md §13'teki "GPU: yerel RTX mi Kaggle mı" TBD'si kapandı.
+LLM annotation **Kaggle** (2× T4, ~30 sa/hafta, Linux); preprocess, distillation,
+RecBole deneyleri **yerel** makinede.
+**Gerekçe:** Yerel kart 4 GB — 4B modeli fp16'da tutamaz. Ayrıca vLLM Windows'ta
+native desteklenmiyor. Kaggle bir yedek plan değil, **tasarımın parçası**. Buna karşılık
+altı pipeline aşamasından yalnızca biri kotaya bağlı: ModernBERT-base 149M parametre,
+4 GB'a rahat sığıyor, yani distillation ve tam korpus inference yerelde koşuyor.
+Yerelde prompt denemesi için llama.cpp/GGUF (Windows'ta çalışıyor, 4 GB'a sığıyor) —
+ama veri setine giren etiketler yalnızca vLLM koşusundan gelir.
+**Etkilediği bölüm:** implementation-plan §1.6 (yeni), risk tablosu §4.4
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — Annotation şeması v2: `grandchild` eklendi
+**Karar:** `recipient` enum'u yeniden tasarlandı:
+`child | grandchild | partner | parent | sibling | extended_family | friend | other | unknown | null`.
+`occasion` enum'una `anniversary`, `baby_shower`, `valentines_day`, `mothers_day`,
+`fathers_day`, `other` eklendi.
+
+**Gerekçe:** Eski şema veri görülmeden sezgiyle tasarlanmıştı. T6/T6b onun veriyle ilk teması:
+
+- **`grandchild` en kritik eksikti.** Toys_and_Games'te adı geçen alıcıların **%26.2'si
+  torun** (grandson %14.7 + granddaughter %11.5). Eski şemada `child`'a düşüyordu — oysa
+  torun ayrı hanede yaşar, yani **tanım gereği hediye**, kendi çocuğu ise `household`
+  olabilir. Şemanın en zor sınırı (`household` vs `gift_given`) için en bilgilendirici
+  ipucu tam da bu ayrımdı ve kayboluyordu. Birincil deney kategorisinin dörtte biri.
+- `spouse` → `partner`: Video Games'te alıcıların %5.5'i sevgili, `spouse` kapsamıyordu.
+- `extended_family` eklendi: yeğen Toys'ta %12.4.
+- `sibling` eklendi: Video Games'te %3.6.
+- `colleague` **kaldırıldı** — sözcüksel taramada hiçbir kategoride görünmüyor; `friend`'e katıldı.
+- `occasion` için not: metinden yalnızca **%20-29** oranında çıkarılabiliyor, yani `unknown`
+  yaygın ve beklenen bir cevap. Prompt'a modeli vesile uydurmaya zorlamama talimatı eklendi.
+
+**Zamanlama:** LLM koşusundan ÖNCE yapıldı. Şema koşu başladıktan sonra değiştirilirse
+etiketler karşılaştırılamaz hale gelir.
+**Etkilediği bölüm:** `configs/annotation_schema.json`, `prompts/gift_detection_v1.md`,
+CLAUDE.md §4. `detection/schema.py` (Pydantic) yazıldığında buna uymalı.
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — `expected_peaks` ölçüme göre düzeltildi
+**Karar:** `analysis.expected_peaks: [11, 12, 2, 5]` → `[12, 1]`.
+**Gerekçe:** Eski liste Noel/Sevgililer/Anneler Günü varsayımıydı. Ölçüm (T14): tepe dört
+kategoride de **Aralık-Ocak**; Şubat ve Mayıs tepesi **yok**. Aralık-Ocak kayması beklenen
+davranış — review tarihi satın alma tarihinin gerisinde kalıyor ve bu gecikme concept-note'ta
+önceden not edilmişti. V2 doğrulama kapısı buna göre güncellendi (CLAUDE.md §12).
+**Etkilediği bölüm:** `configs/base.yaml`, CLAUDE.md §12, concept-note §2.2
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — DeBERTaV3 distillation sağlamlık kontrolü olarak eklendi
+**Karar:** `distill.fallback_model: microsoft/deberta-v3-base`. ModernBERT-base birincil
+kalıyor.
+**Gerekçe:** ModernBERT'in seçim gerekçesi 8192 context'ten verimlilik + 149M ayak izine
+kaydırıldı (bkz. 2026-08-25 girdisi). Kalan gerekçe geçerli ama tek taraflı değil: kontrollü
+karşılaştırmalar (arXiv 2504.08716) eşit veriyle DeBERTaV3'ün örneklem verimliliğinde ve
+nihai kalitede önde olabildiğini, ModernBERT'in avantajının eğitim hızında olduğunu
+buluyor. Elimizde yalnızca 40-60K etiket var, yani örneklem verimliliği akademik değil
+canlı bir mesele. İkisi de bu veri hacminde dakikalar içinde eğitiliyor — fidelity kapısı
+(LLM'e 5 puan yakınlık) kaçırılırsa ucuz bir sigorta.
+**Etkilediği bölüm:** `configs/base.yaml`, technology-review §4.4, PROJECT_SPEC, ROADMAP
+**Kim:** Ekip

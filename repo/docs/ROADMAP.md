@@ -108,7 +108,7 @@ Amazon Reviews 2023 (kategori bazlı .jsonl.gz)
         │
         ├─► [A] Stratified örnekleme: 40-60K review
         │        ↓
-        │   [B] LLM annotator (Qwen3.5-9B / Gemma 4 12B, vLLM, JSON çıktı)
+        │   [B] LLM annotator (Qwen3-4B-Instruct / Gemma 4 E4B, vLLM, JSON)
         │        ↓  etiket + gerekçe + alıcı ilişkisi + occasion
         │   [C] İnsan doğrulama seti (500 review, 3 annotator, kappa)
         │        ↓
@@ -146,18 +146,31 @@ Rastgele örnekleme yapmayın — hediye sınıfı azınlıkta ve zamana bağlı
 
 ### [B] LLM Annotator — model seçimi
 
-Ağustos 2026 itibarıyla tüketici GPU'sunda çalışan seçenekler:
+> ⚠️ **2026-08-26'da yeniden karara bağlandı.** Bu tablo başlangıçta modelleri
+> **VRAM**'e göre sıralıyordu. Ekibin donanımı ölçüldükten sonra doğru kriterin VRAM
+> değil **GPU kuşağı** olduğu ortaya çıktı: yerel kart GTX 1650 Ti (4 GB, Turing sm75),
+> ücretsiz bulut katmanları Kaggle 2× T4 ve Colab T4 — hepsi **pre-Ampere**. Sonuç:
+> bfloat16 yok, FlashAttention yok, ve yeni mimariler Turing'i düşürüyor.
+> Tam gerekçe: `technology-review/technology-review.md` §4.2.
 
-| Model | Q4 VRAM | Lisans | Bu iş için değerlendirme |
-|---|---|---|---|
-| **Qwen3.5-9B** | ~6-7 GB | Apache 2.0 | **Birincil tercih.** Structured output için eğitilmiş, güçlü çok dilli, temiz lisans |
-| **Gemma 4 12B** | ~8 GB | Apache 2.0 (Gemma 4'te lisans sadeleşti) | Güçlü alternatif, 12GB kartta rahat |
-| **Qwen3.5-4B** | ~3 GB | Apache 2.0 | Hız gerekiyorsa; sınıflandırma için muhtemelen yeterli |
-| **gpt-oss-20b** | ~16 GB | Apache 2.0 | Sadece 16GB+ kartınız varsa; muhakeme gücü fazla, bu iş için gereksiz |
+| Model | Mimari | fp16 VRAM | Lisans | Turing? | Değerlendirme |
+|---|---|---|---|---|---|
+| **Qwen/Qwen3-4B-Instruct-2507** | 4.0B dense, text-only, GQA, 262K context | ~8 GB | Apache 2.0 | **Evet** | **Birincil.** T4'e kuantizasyonsuz sığıyor, KV cache'e yer kalıyor. Non-thinking — 40-60K sınıflandırmada muhakeme token'ı harcamıyor |
+| **google/gemma-4-E4B** | 4.5B efektif, multimodal (PLE) | ~4-5 GB (4-bit) | Apache 2.0 | Alt örneklem | **İkincil.** ~5K uyum örneklemi için; farklı laboratuvar/veri = uyum istatistiği anlamlı olsun diye. Yüklenmezse: Gemma 3 4B-it |
+| Qwen3-8B | 8B dense, GQA | ~16 GB | Apache 2.0 | Evet | 4B macro-F1 kapısını geçemezse tırmanma yolu |
+| ~~Qwen3.5-9B / 4B~~ | Hibrit Gated-DeltaNet, VL | 9-20.5 GB | Apache 2.0 | **Hayır** (pratikte) | **Donanım nedeniyle elendi, kalite nedeniyle değil.** Ampere erişimi gelirse ilk tercih |
+| gpt-oss-20b | 20B MoE | ~16 GB (4-bit) | Apache 2.0 | Sınırda | Muhakeme gücü bu iş için fazla |
 
-**Öneri: Qwen3.5-9B birincil, Gemma 4 12B ikinci model olarak.** İkisini birden çalıştırıp **model arası uyum (agreement)** raporlamak, Technology Review bölümünüzün merkezine oturacak bir karşılaştırma verir.
+**Karar: Qwen3-4B-Instruct-2507 birincil, Gemma 4 E4B ikincil.** İkisini birden koşturup
+**model-arası uyum** raporlamak Technology Review'un merkezine oturur. 4B'nin yeterliliği
+varsayım değil: kanıt metnin medyan %1-3'ünde duruyor ve naif sözcüksel vekil zaten %58.3
+precision veriyor — modelin işi sıfırdan sinyal bulmak değil, bilinen bir hata desenini
+(spekülatif hediye dili + alınan hediye) düzeltmek.
 
-**Servis:** vLLM (yüksek throughput batch inference) veya Ollama (daha kolay kurulum, daha yavaş). Bu iş **offline batch** olduğu için vLLM açık ara doğru tercih — sürekli batching sayesinde 5-10× hızlanma.
+**Servis: vLLM, `--dtype float16`.** Bu iş offline batch olduğu için continuous batching şart.
+float16 tercih değil zorunluluk: bfloat16 compute capability 8.0 istiyor. Koşu **Kaggle Linux
+notebook'unda**; Windows'ta vLLM yok ve 4 GB'a model sığmıyor. Yerelde prompt denemesi için
+llama.cpp/GGUF — ama veri setine giren etiketler yalnızca vLLM koşusundan gelir.
 
 ### [B2] Etiket şeması — ikili değil, dörtlü
 
@@ -191,9 +204,13 @@ Bu detay projeyi sıradan olmaktan çıkarır:
 
 40-60K LLM etiketiyle bir **ModernBERT-base** sınıflandırıcı eğitin.
 
-**Neden distill etmek gerekli:** Toys_and_Games'te 5-core sonrası milyonlarca review var. 9B modelle hepsini işlemek günler sürer. ModernBERT saniyede binlerce örnek işler ve etiket kalitesi neredeyse aynı kalır.
+**Neden distill etmek gerekli:** Toys_and_Games'te 5-core sonrası 2.16M etkileşim var. Annotator LLM ile hepsini işlemek Kaggle'ın haftalık ~30 saatlik kotasını kat kat aşar. ModernBERT saniyede binlerce örnek işler ve etiket kalitesi neredeyse aynı kalır.
 
-**Neden ModernBERT (DeBERTa/RoBERTa değil):** 8192 token context (uzun review'lar kesilmiyor), modern eğitim, HuggingFace'te doğrudan `AutoModelForSequenceClassification` ile çalışıyor, tüketici GPU'sunda dakikalar içinde fine-tune ediliyor.
+**Neden ModernBERT (DeBERTa/RoBERTa değil):** hızlı inference (asıl bağlayıcı kısıt: milyonlarca satır), 149M parametre — 4 GB'lık yerel karta sığıyor, GLUE'da DeBERTaV3-base'i geçen ilk encoder, `AutoModelForSequenceClassification` ile doğrudan çalışıyor.
+
+> ⚠️ **8192 context gerekçesi ÇÜRÜTÜLDÜ (2026-08-26).** Eski gerekçe "alıcı bilgisi review'un sonunda geçer, 512'de kesilir" diyordu. Ölçtük: kanıt gövdenin medyan %1–3'ünde duruyor, 512 token'da kayıp yalnızca %0.013–0.044. Model seçimi değişmiyor, gerekçe değişiyor. Ayrıntı: `data-research/data-research.md` §4.8, T5.
+
+**Sağlamlık kontrolü:** ModernBERT fidelity kapısını (LLM'e 5 puan yakınlık) kaçırırsa `microsoft/deberta-v3-base` ile tekrar denenir — kontrollü karşılaştırmalar eşit veriyle DeBERTaV3'ün örneklem verimliliğinde önde olabildiğini gösteriyor ve elimizde yalnızca 40–60K etiket var.
 
 **Doğrulama:** ModernBERT'i insan etiketli 500'lük sette de test edin. LLM'e yakın mı? Yakınsa distillation başarılı.
 
@@ -295,9 +312,9 @@ Az etkileşimli kullanıcılarda etki daha büyük olmalı — Amazon patentinin
 |---|---|---|---|
 | Veri yükleme | `datasets` (HF) + `polars` | pandas | Polars 10M+ satırda pandas'tan çok hızlı ve bellek dostu |
 | LLM servis | **vLLM** | Ollama, llama.cpp, TGI | Offline batch için continuous batching şart; 5-10× hız |
-| Annotator LLM | **Qwen3.5-9B** (+ Gemma 4 12B) | Phi-4, Mistral Small | Apache 2.0, structured output, tüketici GPU |
+| Annotator LLM | **Qwen3-4B-Instruct-2507** (+ Gemma 4 E4B) | Qwen3.5 (Turing'de koşmuyor), gpt-oss-20b | Apache 2.0, structured output, **pre-Ampere GPU'da çalışan** dense/GQA mimari |
 | Structured output | vLLM guided decoding / `outlines` | regex parse | JSON şeması garantili; parse hatası sıfır |
-| Distillation hedefi | **ModernBERT-base** | DeBERTa-v3, RoBERTa | 8192 context, modern, hızlı fine-tune |
+| Distillation hedefi | **ModernBERT-base** | DeBERTa-v3 (sağlamlık kontrolü), RoBERTa | Hızlı inference + 149M ayak izi. **8192 context gerekçesi değil** — ölçümle çürütüldü |
 | Eğitim | HF `transformers` + `accelerate` | PyTorch Lightning | Standart, tüm ekip biliyor |
 | Recsys | **RecBole** | Cornac, implicit, RecPack | 100+ algoritma, tek protokol, literatürle kıyaslanabilir |
 | Deney takibi | **Weights & Biases** (free tier) | MLflow, TensorBoard | 75 run'ı takip etmenin tek makul yolu |
@@ -318,7 +335,7 @@ Az etkileşimli kullanıcılarda etki daha büyük olmalı — Amazon patentinin
 |---|---|---|
 | **1** | Literatür taraması (Wang et al., denoising, patentler). Pilot kategori (`All_Beauty`) indir, EDA. | Lit review taslağı, veri anlaşıldı |
 | **2** | Etiket şeması tasarımı. Prompt geliştirme. 200 review'da manuel deneme. Şemayı revize et. | Kararlı annotation şeması |
-| **3** | vLLM kurulum. Qwen3.5-9B ile pilot kategoride 10K annotation. İlk mevsimsellik grafiği. | **Karar noktası: detektör çalışıyor mu?** |
+| **3** | Kaggle'da vLLM kurulum. Qwen3-4B-Instruct ile pilot kategoride 10K annotation. İlk mevsimsellik grafiği. | **Karar noktası: detektör çalışıyor mu?** |
 | **4** | 500 review insan etiketleme (3 kişi). Kappa + F1. Prompt/model duyarlılık analizi. | Doğrulanmış detektör + hata analizi |
 | **5** | 3 kategoride tam annotation (40-60K). ModernBERT distillation. Tam korpus inference. | Etiketli tam veri seti |
 | **6** | RecBole kurulumu. C0 + C4 (baseline + placebo) tüm kategorilerde. | **Karar noktası: etki var mı?** |
@@ -358,8 +375,8 @@ Az etkileşimli kullanıcılarda etki daha büyük olmalı — Amazon patentinin
 Amazon Reviews 2023 üzerinde: source, access, format, size, time period (1996-2023), granularity (etkileşim seviyesi), variables (yukarıdaki tablo), quality (verified_purchase filtresi, boş metin), **imbalance** (hediye sınıfı azınlık), **bias** (seçim yanlılığı — review'lu alımlar), **privacy** (anonim user_id ama review metni serbest metin, isim geçebilir → anonimleştirme tartışması), limitations. Artı: 3 kategorinin karşılaştırmalı EDA'sı, mevsimsellik grafiği.
 
 ### Technology Review — dört karşılaştırma ekseni
-1. **Annotator LLM'leri:** Qwen3.5-9B vs Gemma 4 12B — uyum, hız, VRAM, lisans
-2. **LLM vs distilled encoder:** Qwen3.5-9B vs ModernBERT — doğruluk/hız/maliyet dengesi
+1. **Annotator LLM'leri:** Qwen3-4B-Instruct-2507 vs Gemma 4 E4B — uyum, hız, VRAM, lisans, GPU kuşağı uyumluluğu
+2. **LLM vs distilled encoder:** Qwen3-4B-Instruct-2507 vs ModernBERT — doğruluk/hız/maliyet dengesi
 3. **Recsys mimarileri:** ItemKNN vs BPR-MF vs SASRec vs GRU4Rec — gürültüye dayanıklılık farklı mı?
 4. **Müdahale stratejileri:** hard removal vs soft weighting vs feature-as-signal
 5. **Servis altyapısı:** vLLM vs Ollama throughput karşılaştırması

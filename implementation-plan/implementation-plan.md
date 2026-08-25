@@ -16,7 +16,7 @@ Every component is free and open-source. **Total project cost: $0.** No commerci
 | Component | Selection | Purpose |
 |---|---|---|
 | Language | Python 3.10+ | All pipeline code |
-| Development | VS Code, Jupyter, Google Colab (free), Kaggle Notebooks (free) | Local development; Colab/Kaggle as GPU fallback |
+| Development | VS Code, Jupyter (local); **Kaggle Notebooks** (free) for GPU work | Local machine handles data processing, distillation and all experiments. The LLM annotation run executes on Kaggle — see §1.6 |
 | Version control | Git + GitHub | Submission target; also the reproducibility record |
 | Environment isolation | `venv` — **two separate environments** | RecBole's pinned dependencies conflict with vLLM's; separation is cheaper than resolution |
 
@@ -24,7 +24,7 @@ Every component is free and open-source. **Total project cost: $0.** No commerci
 
 | Component | Selection | Purpose |
 |---|---|---|
-| Dataset access | HuggingFace `datasets` | Category-sharded download of Amazon Reviews 2023 |
+| Dataset access | `huggingface_hub.hf_hub_download` | Direct category-shard download of Amazon Reviews 2023. **Not** `datasets.load_dataset(..., trust_remote_code=True)`: `datasets` 4.0 removed that parameter and 4.5 removed loading-script support entirely, so the dataset's own documented quickstart no longer runs. Verified during Data Research |
 | Large-scale processing | **polars** | Chosen over pandas for multi-million-row operations — materially faster and more memory-efficient |
 | Storage format | Parquet (via `pyarrow`) | Columnar intermediate artefacts |
 | Schema validation | **Pydantic v2** | Enforces the annotation schema; malformed LLM output rejected at the boundary, not downstream |
@@ -33,10 +33,10 @@ Every component is free and open-source. **Total project cost: $0.** No commerci
 
 | Component | Selection | Purpose |
 |---|---|---|
-| **Annotator LLM (primary)** | Qwen3.5-9B, 4-bit quantised | Gift detection from review text |
-| **Annotator LLM (secondary)** | Gemma 4 12B | Cross-model agreement measurement — *not* redundancy |
-| **Serving** | **vLLM** with guided JSON decoding | PagedAttention delivers 2–4× throughput at equal latency (Kwon et al., 2023); schema-constrained decoding removes parse failure as an error class |
-| **Distillation target** | **ModernBERT-base** | 8,192-token native context prevents truncating late-appearing recipient disclosure |
+| **Annotator LLM (primary)** | **Qwen3-4B-Instruct-2507**, float16 (unquantised) | Gift detection from review text. Dense, text-only, standard grouped-query attention — the property that lets it run on pre-Ampere GPUs (§1.6). Non-thinking, so no token budget is spent deliberating a four-way label |
+| **Annotator LLM (secondary)** | **Gemma 4 E4B** on a ~5K subsample | Cross-model agreement measurement — *not* redundancy. Different laboratory and pretraining corpus, which is what makes the agreement statistic informative. Fallback: Gemma 3 4B-it |
+| **Serving** | **vLLM** with guided JSON decoding, `--dtype float16` | PagedAttention delivers 2–4× throughput at equal latency (Kwon et al., 2023); schema-constrained decoding removes parse failure as an error class. float16 is mandatory, not preference: bfloat16 requires compute capability 8.0 |
+| **Distillation target** | **ModernBERT-base** | Inference efficiency at corpus scale plus a 149M-parameter footprint that fits the local 4 GB GPU. Explicitly *not* selected for its 8,192-token context — measurement showed a 512-token limit would lose the evidence in only 0.013–0.044% of gift reviews (Data Research §4.8). DeBERTaV3-base retained as a robustness check if the fidelity gate is missed |
 | Training | HuggingFace `transformers` + `accelerate` | Encoder fine-tuning |
 | **Recommenders** | **RecBole** — SASRec, BPR, ItemKNN, GRU4Rec, Pop | Unified protocol; results comparable to published figures |
 | Classical ML / stats | scikit-learn, scipy, statsmodels | Agreement statistics, bootstrap intervals, significance tests |
@@ -50,6 +50,25 @@ Every component is free and open-source. **Total project cost: $0.** No commerci
 | Annotation interface | Streamlit (local) or shared spreadsheet | 500-item human validation; a spreadsheet is sufficient and is the fallback |
 | Configuration | YAML | Single source of truth; no hard-coded paths or parameters |
 | Documentation | Markdown, Mermaid diagrams | Renders natively on GitHub |
+
+### 1.6 Hardware reality and where each stage runs
+
+The stack above was originally specified against an assumed "consumer GPU." Measuring the hardware the team actually has changed which stages can run where, and this table now governs the schedule in §2.
+
+| | Local workstation | Kaggle free tier |
+|---|---|---|
+| GPU | GTX 1650 Ti, 4 GB, Turing (sm75) | 2× Tesla T4, 16 GB each, Turing (sm75) |
+| System RAM | 16 GB | 30 GB |
+| OS | Windows 11 | Linux |
+| Quota | Unlimited | ~30 GPU-hours/week, 12 h per session |
+
+Three consequences, each of which changes a plan item rather than merely describing a limitation:
+
+1. **The annotation run cannot execute locally.** 4 GB does not hold a 4B model in float16, and vLLM is not supported natively on Windows. Kaggle is therefore the annotation environment by design, not a contingency. Colab (T4) is the interchangeable substitute if Kaggle quota runs out mid-week.
+2. **Every available GPU is pre-Ampere.** No bfloat16, no FlashAttention kernels. This excludes the current flagship small-model families on kernel support rather than capability, and is the reason the annotator is Qwen3-4B-Instruct-2507 rather than a 2026-generation hybrid-attention model. Technology Review §4.2 documents the comparison.
+3. **Everything except annotation runs locally and comfortably.** Preprocessing is polars on CPU; ModernBERT-base fine-tunes and runs inference within 4 GB; RecBole experiments on the filtered corpus are CPU/small-GPU workloads. Only one of six stages depends on the metered quota, which is what keeps a ~30 h/week ceiling from becoming the schedule's critical path.
+
+**Local smoke testing.** Prompt iteration and schema debugging use a 4-bit GGUF build of the same model under llama.cpp, which runs on Windows within 4 GB. No label produced this way enters the dataset; it exists so that a broken prompt is discovered before it consumes Kaggle quota.
 
 ### 1.5 What is deliberately excluded
 
@@ -110,7 +129,7 @@ gantt
 
 | Week | Focus | Exit condition |
 |---|---|---|
-| **1** | Pilot category download, EDA, preprocessing pipeline, naive keyword scan | Pilot gift rate estimated; category choice confirmed or revised |
+| **1** | ✅ *Complete.* All four categories downloaded (16.3 GB), preprocessing pipeline, deep EDA (16 figures, 15 tables), naive keyword scan, 100-item precision check | Gift rates estimated per category; **category choice revised** — All Beauty dropped as experimental pilot (empty 5-core), Toys and Games promoted to primary. See §4.6 |
 | **2** | Annotation schema, prompt v1, manual trial on 200 reviews, schema revision | Stable schema; prompt guideline-heavy, few-shot-light |
 | **3** | vLLM setup, 10K pilot annotations, first monthly rate curve | 🚦 **GATE 1** — see §2.3 |
 | **4** | 500-item human annotation (all three members), κ and per-class F1, sensitivity analysis | Detector validated or returned to Week 2 |
@@ -198,7 +217,7 @@ Three lanes, balanced by effort. Each lane owns a capstone deliverable section, 
 |---|---|---|---|
 | **Selection bias — only reviewed purchases observed** | **Certain** | Medium | Stated explicitly as a scope limitation. The claim is bounded to *"gift purchases among reviewed transactions."* Internal validity of the experiment is unaffected, since the intervention applies to exactly the graph the recommender trains on |
 | **Review timestamp ≠ purchase timestamp** | Certain | Low | Stated in advance. Seasonality peaks will be lagged; the *existence* of the peak is the evidence, not its precise position |
-| **Gift prevalence too low for signal (<3%)** | Medium | High | Category choice is a lever — shift to Handmade Products (Etsy-like, gift-dense). A low rate is itself a reportable finding about review behaviour |
+| **Gift prevalence too low for signal (<3%)** | ~~Medium~~ **Retired for Toys; live for Grocery** | High | Measured in Week 1: Toys 11.07%, Video Games 4.40%, Grocery 1.85% (lexical lower bound, 58.3% precision — the semantic detector should exceed these). Toys clears any plausible threshold. Grocery is retained deliberately as the low-prevalence contrast, so its low rate is the design rather than a risk. Handmade Products is no longer needed as a lever |
 | **Class imbalance in detector training** | High | Medium | Stratified sampling with keyword-boosted subset held *separate* from the prevalence estimate; class weights in distillation |
 
 ### 4.3 Experimental validity
@@ -215,9 +234,10 @@ Three lanes, balanced by effort. Each lane owns a capstone deliverable section, 
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **vLLM installation fails on available CUDA** | Medium | Medium | Kaggle free tier (2× T4, ~30 h/week) as fallback; Ollama as a slower last resort |
-| **Insufficient GPU access** | Low–Medium | Medium | Pipeline designed for consumer hardware; Colab and Kaggle free tiers both viable |
-| **Scope creep — 3 categories × 5 models × 5 conditions** | **High** | Medium | Priority order fixed in advance: Toys + Grocery, SASRec + BPR, C0/C1/C4. Everything else is explicitly "nice to have" |
+| **vLLM cannot serve the chosen model on Turing** | Medium | **High** | Model selected specifically for a mature Turing code path — dense, text-only, standard GQA (§1.6). `--dtype float16` set from the first run. Verified on a 200-review smoke test before any full run. Last resort: llama.cpp with GBNF grammar constraints, slower but architecture-agnostic |
+| **Kaggle weekly quota exhausted mid-annotation** | Medium | Medium | Annotation is chunked and checkpointed per shard, so a run resumes rather than restarts. Colab (T4) is an interchangeable substitute. Only one of six pipeline stages needs the quota |
+| **4 GB local GPU insufficient for distillation** | Low | Medium | ModernBERT-base is 149M parameters; batch size and `max_length` are config-driven and can be lowered. Fallback is the same Kaggle notebook |
+| **Scope creep — 3 categories × 5 models × 5 conditions** | **High** | Medium | Priority order fixed in advance: **Toys and Games first**, then Grocery; SASRec + BPR; C0/C1/C4. Everything else is explicitly "nice to have". Toys is primary on measured grounds, not convenience — it carries the highest contamination rate (11.07%) and is the only category where 5-core filtering does not preferentially delete gift buyers (§4.6) |
 | **Dependency conflict (RecBole vs vLLM)** | High | Low | Two separate virtual environments from day one; no attempt at resolution |
 
 ### 4.5 The most likely outcome, and why it is not failure
@@ -227,6 +247,28 @@ Three lanes, balanced by effort. Each lane owns a capstone deliverable section, 
 The project is framed so that this is an answer rather than a failure. RQ2 asks whether recommenders are *sensitive* to the contamination — a robustness finding answers it completely, and is arguably the more interesting result given that industry patent filings implicitly assume the distortion is severe. The write-up will be structured around *"how prevalent is it, and how sensitive are recommenders to it"* from the outset, not retrofitted if the numbers disappoint.
 
 The detection pipeline also retains standalone value in that scenario: gift-intent labels remain useful for retargeting suppression and seasonal campaign triggering regardless of the denoising result.
+
+### 4.6 Design constraints discovered during Data Research
+
+Three findings from the exploratory analysis change the experimental plan rather than merely informing it. Each is recorded here because the change is not reversible later without invalidating results.
+
+**1. All Beauty cannot be the experimental pilot.** Applying the mandated iterative 5-core filter to All Beauty leaves **zero rows**: only 382 of its 503,388 users have five or more interactions, and the median user has exactly one. The category remains useful as a descriptive contrast and as a fast pipeline smoke test, but no sequential recommender can be trained on it. Toys and Games replaces it as the primary experimental category.
+
+**2. The 5-core filter preferentially deletes gift buyers.** Gift purchases are disproportionately one-off, and one-off reviewers are precisely who *k*-core removes. Measuring the contamination rate before and after the filter:
+
+| Category | Clean corpus | After 5-core | Shift |
+|---|---|---|---|
+| Toys and Games | 11.07% | 11.27% | **+1.8%** |
+| Video Games | 4.40% | 2.68% | **−39.2%** |
+| Grocery and Gourmet Food | 1.85% | 1.34% | **−27.5%** |
+
+The experiment therefore runs on a corpus that is materially *cleaner* than the population whose contamination we report — which biases RQ2 **towards a null result** in two of three categories. Two consequences follow. Prevalence (RQ1) is reported on the clean corpus and the experiment (RQ2) on the *k*-core corpus, with both numbers stated side by side and never interchanged. And Toys and Games becomes the primary category on evidence: it is the only one where the filter does not distort the quantity under study.
+
+**3. A third of held-out test items share a date with the previous interaction.** Under temporal leave-one-out, the item the model must predict occurs on the same calendar day as the preceding interaction for 31.2% of Toys users, 31.5% of Video Games users, and 24.5% of Grocery users; 35–43% of all consecutive pairs are same-day. The dataset's timestamps resolve purchases, and reviews of a single shopping session frequently share a timestamp, so in those cases the model is predicting *another item from the same basket* rather than a future purchase. This does not invalidate the design — it is a property of every published result on this dataset — but it does require a robustness column: the headline C0–C4 table is repeated on the subset of users whose held-out item falls on a strictly later day than its predecessor. If the conclusion flips between the two, the flip is the finding.
+
+**Feasibility that the same analysis confirms.** The evaluation rule "test items must be self-purchases" survives contact with the data: 88.7% of Toys users, 97.2% of Video Games users and 98.7% of Grocery users have a non-gift final item and are therefore evaluation-eligible. Fewer than 0.15% of users have sequences consisting entirely of gifts. The rule costs roughly a tenth of the Toys population and almost nothing elsewhere.
+
+---
 
 ---
 

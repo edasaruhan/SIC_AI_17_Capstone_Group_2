@@ -174,7 +174,7 @@ Amazon Reviews 2023 (kategori bazlı .jsonl.gz)
         │
         ├─► [A] Katmanlı örnekleme: 40-60K review
         │        ↓
-        │   [B] LLM annotator (Qwen3.5-9B, vLLM, JSON çıktı)
+        │   [B] LLM annotator (Qwen3-4B-Instruct, vLLM, JSON çıktı)
         │        ↓  etiket + gerekçe + alıcı ilişkisi + occasion
         │   [C] İnsan doğrulama seti (500 review, 3 annotator, kappa)
         │        ↓
@@ -214,18 +214,31 @@ Rastgele örnekleme yapmayın — hediye sınıfı azınlıkta ve zamana bağlı
 
 ### [B] LLM annotator — model seçimi
 
-Ağustos 2026 itibarıyla tüketici GPU'sunda çalışan seçenekler:
+> ⚠️ **2026-08-26'da yeniden karara bağlandı.** Bu tablo başlangıçta modelleri
+> **VRAM**'e göre sıralıyordu. Ekibin donanımı ölçüldükten sonra doğru kriterin VRAM
+> değil **GPU kuşağı** olduğu ortaya çıktı: yerel kart GTX 1650 Ti (4 GB, Turing sm75),
+> ücretsiz bulut katmanları Kaggle 2× T4 ve Colab T4 — hepsi **pre-Ampere**. Sonuç:
+> bfloat16 yok, FlashAttention yok, ve yeni mimariler Turing'i düşürüyor.
+> Tam gerekçe: `technology-review/technology-review.md` §4.2.
 
-| Model | Q4 VRAM | Lisans | Değerlendirme |
-|---|---|---|---|
-| **Qwen3.5-9B** | ~6-7 GB | Apache 2.0 | **Birincil.** Structured output için eğitilmiş, temiz lisans |
-| **Gemma 4 12B** | ~8 GB | Apache 2.0 | **İkincil.** 12GB kartta rahat; model-arası uyum için |
-| Qwen3.5-4B | ~3 GB | Apache 2.0 | Hız gerekiyorsa; sınıflandırma için muhtemelen yeterli |
-| gpt-oss-20b | ~16 GB | Apache 2.0 | 16GB+ kart varsa; muhakeme gücü bu iş için fazla |
+| Model | Mimari | fp16 VRAM | Lisans | Turing? | Değerlendirme |
+|---|---|---|---|---|---|
+| **Qwen/Qwen3-4B-Instruct-2507** | 4.0B dense, text-only, GQA, 262K context | ~8 GB | Apache 2.0 | **Evet** | **Birincil.** T4'e kuantizasyonsuz sığıyor, KV cache'e yer kalıyor. Non-thinking — 40-60K sınıflandırmada muhakeme token'ı harcamıyor |
+| **google/gemma-4-E4B** | 4.5B efektif, multimodal (PLE) | ~4-5 GB (4-bit) | Apache 2.0 | Alt örneklem | **İkincil.** ~5K uyum örneklemi için; farklı laboratuvar/veri = uyum istatistiği anlamlı olsun diye. Yüklenmezse: Gemma 3 4B-it |
+| Qwen3-8B | 8B dense, GQA | ~16 GB | Apache 2.0 | Evet | 4B macro-F1 kapısını geçemezse tırmanma yolu |
+| ~~Qwen3.5-9B / 4B~~ | Hibrit Gated-DeltaNet, VL | 9-20.5 GB | Apache 2.0 | **Hayır** (pratikte) | **Donanım nedeniyle elendi, kalite nedeniyle değil.** Ampere erişimi gelirse ilk tercih |
+| gpt-oss-20b | 20B MoE | ~16 GB (4-bit) | Apache 2.0 | Sınırda | Muhakeme gücü bu iş için fazla |
 
-**Karar: Qwen3.5-9B birincil, Gemma 4 12B ikincil.** İkisini birden koşturup **model-arası uyum** raporlamak Technology Review'un merkezine oturur.
+**Karar: Qwen3-4B-Instruct-2507 birincil, Gemma 4 E4B ikincil.** İkisini birden koşturup
+**model-arası uyum** raporlamak Technology Review'un merkezine oturur. 4B'nin yeterliliği
+varsayım değil: kanıt metnin medyan %1-3'ünde duruyor ve naif sözcüksel vekil zaten %58.3
+precision veriyor — modelin işi sıfırdan sinyal bulmak değil, bilinen bir hata desenini
+(spekülatif hediye dili + alınan hediye) düzeltmek.
 
-**Servis: vLLM.** Bu iş offline batch olduğu için continuous batching şart — Ollama'ya göre 5-10× hız.
+**Servis: vLLM, `--dtype float16`.** Bu iş offline batch olduğu için continuous batching şart.
+float16 tercih değil zorunluluk: bfloat16 compute capability 8.0 istiyor. Koşu **Kaggle Linux
+notebook'unda**; Windows'ta vLLM yok ve 4 GB'a model sığmıyor. Yerelde prompt denemesi için
+llama.cpp/GGUF — ama veri setine giren etiketler yalnızca vLLM koşusundan gelir.
 
 ### [B2] Etiket şeması — ikili değil, dörtlü
 
@@ -259,7 +272,11 @@ Ağustos 2026 itibarıyla tüketici GPU'sunda çalışan seçenekler:
 
 **Neden gerekli:** Toys_and_Games'te 5-core sonrası milyonlarca review var. 9B modelle hepsini işlemek günler sürer.
 
-**Neden ModernBERT (DeBERTa/RoBERTa değil):** 8192 token context (uzun review kesilmiyor), modern eğitim, `AutoModelForSequenceClassification` ile doğrudan çalışıyor, tüketici GPU'sunda dakikalar içinde fine-tune ediliyor.
+**Neden ModernBERT (DeBERTa/RoBERTa değil):** hızlı inference (asıl bağlayıcı kısıt: milyonlarca satır), 149M parametre — 4 GB'lık yerel karta sığıyor, GLUE'da DeBERTaV3-base'i geçen ilk encoder, `AutoModelForSequenceClassification` ile doğrudan çalışıyor.
+
+> ⚠️ **8192 context gerekçesi ÇÜRÜTÜLDÜ (2026-08-26).** Eski gerekçe "alıcı bilgisi review'un sonunda geçer, 512'de kesilir" diyordu. Ölçtük: kanıt gövdenin medyan %1–3'ünde duruyor, 512 token'da kayıp yalnızca %0.013–0.044. Model seçimi değişmiyor, gerekçe değişiyor. Ayrıntı: `data-research/data-research.md` §4.8, T5.
+
+**Sağlamlık kontrolü:** ModernBERT fidelity kapısını (LLM'e 5 puan yakınlık) kaçırırsa `microsoft/deberta-v3-base` ile tekrar denenir — kontrollü karşılaştırmalar eşit veriyle DeBERTaV3'ün örneklem verimliliğinde önde olabildiğini gösteriyor ve elimizde yalnızca 40–60K etiket var.
 
 **Doğrulama:** ModernBERT'i insan etiketli 500'lük sette de test et. LLM'e yakınsa distillation başarılı.
 
@@ -358,9 +375,9 @@ Capstone bizden pazarlamacının kullanabileceği bir karar istiyor. Teknik metr
 |---|---|---|---|
 | Veri yükleme | `datasets` (HF) + `polars` | pandas | Polars 10M+ satırda çok daha hızlı ve bellek dostu |
 | LLM servis | **vLLM** | Ollama, llama.cpp, TGI | Offline batch için continuous batching şart |
-| Annotator LLM | **Qwen3.5-9B** (+ Gemma 4 12B) | Phi-4, Mistral Small | Apache 2.0, structured output, tüketici GPU |
+| Annotator LLM | **Qwen3-4B-Instruct-2507** (+ Gemma 4 E4B) | Qwen3.5 (Turing'de koşmuyor), gpt-oss-20b | Apache 2.0, structured output, **pre-Ampere GPU'da çalışan** dense/GQA mimari |
 | Structured output | vLLM guided decoding / `outlines` | regex parse | JSON şeması garantili, parse hatası sıfır |
-| Distillation hedefi | **ModernBERT-base** | DeBERTa-v3, RoBERTa | 8192 context, hızlı fine-tune |
+| Distillation hedefi | **ModernBERT-base** | DeBERTa-v3 (sağlamlık kontrolü), RoBERTa | Hızlı inference + 149M ayak izi. **8192 context gerekçesi değil** — ölçümle çürütüldü |
 | Eğitim | HF `transformers` + `accelerate` | Lightning | Standart, ekip biliyor |
 | Recsys | **RecBole** | Cornac, implicit, RecPack | 100+ algoritma, tek protokol, literatürle kıyaslanabilir |
 | Deney takibi | **Weights & Biases** (free) | MLflow, TensorBoard | 75 run'ı takip etmenin tek makul yolu |
@@ -464,8 +481,8 @@ Bu bir başarısızlık değil. *"Kontaminasyon oranı %18, ama SASRec bu gürü
 Amazon Reviews 2023 üzerinde: source, access, format, size, time period (1996-2023), granularity (etkileşim seviyesi), variables (§4.2), quality (verified_purchase, boş metin), **imbalance** (hediye sınıfı azınlık), **bias** (seçim yanlılığı), **privacy** (anonim user_id ama serbest metinde isim geçebilir → anonimleştirme tartışması), limitations. Artı: 3 kategorinin karşılaştırmalı EDA'sı ve mevsimsellik grafiği.
 
 ### Technology Review — beş karşılaştırma ekseni
-1. **Annotator LLM'leri:** Qwen3.5-9B vs Gemma 4 12B — uyum, hız, VRAM, lisans
-2. **LLM vs distilled encoder:** Qwen3.5-9B vs ModernBERT — doğruluk/hız/maliyet
+1. **Annotator LLM'leri:** Qwen3-4B-Instruct-2507 vs Gemma 4 E4B — uyum, hız, VRAM, lisans, GPU kuşağı uyumluluğu
+2. **LLM vs distilled encoder:** Qwen3-4B-Instruct-2507 vs ModernBERT — doğruluk/hız/maliyet
 3. **Recsys mimarileri:** ItemKNN vs BPR-MF vs SASRec vs GRU4Rec — gürültü dayanıklılığı farklı mı?
 4. **Müdahale stratejileri:** hard removal vs soft weighting vs feature-as-signal
 5. **Servis altyapısı:** vLLM vs Ollama throughput

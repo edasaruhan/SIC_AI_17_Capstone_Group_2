@@ -28,7 +28,7 @@ from pathlib import Path
 
 import polars as pl
 
-from ..config import Config, DEFAULT_CONFIG, resolve_roles
+from ..config import Config, DEFAULT_CONFIG, REPO_ROOT, resolve_roles
 from ..data.preprocess import clean_parquet_path
 from ..utils.io import write_json
 from ..utils.logging import get_logger, log_output
@@ -37,6 +37,19 @@ from .keyword_scan import PROXY_COL, keyword_path
 log = get_logger("analysis.precision_check")
 
 SAMPLE_NAME = "keyword_precision_sample.csv"
+
+
+def _relative_to_repo(path: Path) -> str:
+    """Repo koku altindaki yolu goreli, disaridakini dosya adi olarak dondur.
+
+    Bu deger `keyword_precision.json` icine yazilir ve o dosya commit edilir;
+    mutlak yol isletim sistemi kullanici adini sizdirir.
+    """
+    try:
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.name
+
 
 # Katman -> toplam ornekteki pay. proxy agirlikli, cunku asil olculen precision.
 STRATA_SHARE = {"proxy": 0.6, "speculative": 0.2, "unflagged": 0.2}
@@ -157,7 +170,9 @@ def score(cfg: Config) -> dict:
         raise ValueError(f"{src} icinde hic etiket yok; `label` sutununu doldurun.")
 
     out: dict = {
-        "source": str(src),
+        # Repo-koku goreli: mutlak yol kullanici adini iceriyor ve bu dosya
+        # commit ediliyor. Projenin gizlilik taahhudu icin bkz. CLAUDE.md.
+        "source": _relative_to_repo(src),
         "n_sampled": df.height,
         "n_labelled": labelled.height,
         "label_vocabulary": list(LABELS),

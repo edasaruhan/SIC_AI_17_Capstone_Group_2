@@ -37,7 +37,7 @@ Technology choice in this project is not a matter of engineering taste; three of
 
 ### 2.1 Open-weight large language models as semantic classifiers
 
-Instruction-tuned LLMs can classify text against a specified schema without task-specific training. Recent open-weight families — Qwen and Gemma among them — are released under permissive licences and run on consumer hardware when quantised, placing corpus-scale semantic annotation within reach of a project with no cloud budget.
+Instruction-tuned LLMs can classify text against a specified schema without task-specific training. Recent open-weight families — Qwen and Gemma among them — are released under permissive licences and run on consumer hardware, placing corpus-scale semantic annotation within reach of a project with no cloud budget. That reach is narrower than it first appears, and the narrowing is architectural rather than financial: the newest families increasingly assume Ampere-generation GPU kernels, so "runs on consumer hardware" holds for a *recent* consumer card and not for the pre-Ampere hardware a student project typically has. §4.2 treats this as a first-class selection criterion.
 
 The capability relevant here is **structured extraction**: given a review, return a typed object specifying who the purchase was for, the confidence of that judgement, the relation of the recipient, the occasion, and a verbatim span of text supporting the decision. Modern serving stacks enforce the output schema through guided decoding, eliminating the parsing failures that made earlier LLM pipelines brittle.
 
@@ -53,7 +53,9 @@ For an interactive chatbot this is a quality-of-service improvement. For an **of
 
 ModernBERT (Warner et al., 2025) is a modernised encoder-only architecture trained on 2 trillion tokens with a native 8,192-token sequence length, incorporating rotary position embeddings, GeGLU layers, and alternating local–global attention. It is the first encoder to surpass DeBERTaV3-base on GLUE since that model's 2021 release, processes short-context inputs approximately twice as fast as DeBERTaV3, and is explicitly designed for inference on common GPUs.
 
-Two properties matter for this project specifically. The **8,192-token context** means long reviews are classified in full rather than truncated at 512 tokens — and the sentence disclosing the recipient frequently appears late in a review, after the product discussion. The **inference efficiency** is what makes full-corpus application viable.
+One property matters for this project specifically: **inference efficiency**, which is what makes full-corpus application viable across millions of interactions.
+
+The 8,192-token context is the more commonly cited advantage, and an earlier draft of this review made it the decisive one on the reasoning that recipient disclosure "frequently appears late in a review, after the product discussion." That reasoning was never tested. Measuring it on this project's corpus refuted it: the evidence sits at a median of 1–3% into the review body, and a 512-token limit would truncate it in well under a tenth of a percent of gift reviews. The context length is a convenience here, not a justification — see §4.4.
 
 ### 2.4 Recommendation frameworks
 
@@ -114,7 +116,7 @@ Evaluation criteria are chosen for the marketing task rather than for generic be
 |---|---|---|---|---|
 | Handles implicit phrasing<sup>a</sup> | ✗ | ✓ | ✓ | ✓ |
 | Rejects speculative gift language<sup>b</sup> | ✗ | ✓ | ✓ | ✓ |
-| Cost at 40–60K documents | ~0 | ~0 (own GPU) | Moderate | High |
+| Cost at 40–60K documents | ~0 | ~0 (free-tier GPU, §4.2) | Moderate | High |
 | Cost at full corpus (millions) | ~0 | Days of GPU time | Prohibitive | Impossible |
 | Data leaves the organisation | No | No | **Yes** | No |
 | Reproducible by third parties | ✓ | ✓ | ✗ (model versions deprecate) | ✗ |
@@ -134,14 +136,25 @@ Human annotation is retained, but as **validation** rather than production. The 
 
 ### 4.2 Axis 2 — Model selection within open weights
 
-| Model | ~VRAM (4-bit) | Licence | Assessment for this task |
-|---|---|---|---|
-| **Qwen3.5-9B** | ~6–7 GB | Apache 2.0 | **Primary.** Strong structured-output behaviour; runs comfortably on 8 GB consumer cards |
-| **Gemma 4 12B** | ~8 GB | Apache 2.0 | **Secondary.** Retained specifically to measure cross-model agreement |
-| Qwen3.5-4B | ~3 GB | Apache 2.0 | Fallback if throughput binds; likely adequate for four-way classification |
-| gpt-oss-20b | ~16 GB | Apache 2.0 | Reasoning capacity exceeds task requirements; poor cost/benefit here |
+**The binding constraint is GPU generation, not VRAM.** An earlier draft of this review selected models on quantised memory footprint alone. Measuring the hardware actually available to the team showed that criterion to be the wrong one. The local development card is an NVIDIA GTX 1650 Ti (4 GB, Turing, compute capability 7.5); the zero-cost cloud tiers are Kaggle (2× Tesla T4, 16 GB each, also Turing 7.5, ~30 GPU-h/week) and Colab (T4). Every GPU this project can reach is **pre-Ampere**, and that has three consequences a footprint table does not capture:
 
-**Why two models rather than one.** Running a second model is not redundancy. Recent work quantifies how substantially downstream conclusions can shift under defensible variations in model and prompt — a phenomenon sharp enough to have acquired a name in the methodological literature. Reporting agreement between two independent models converts an unexamined assumption into a measured quantity, and a divergence between them is a finding to report rather than a problem to conceal.
+1. **No bfloat16.** Compute capability 8.0 is the threshold; on Turing, inference must be forced to float16 (`--dtype float16`).
+2. **No FlashAttention.** vLLM's `FLASH_ATTN` backend requires sm80 or newer. Turing falls back to alternative backends, and any architecture that *only* registers FlashAttention-family kernels cannot be served at all.
+3. **Newer architectures are dropping Turing entirely.** vLLM's stated minimum is still compute capability 7.0, so Turing formally qualifies — but the maintainers' own issue tracker records recent multimodal and hybrid-attention model families as having no working Turing backend, with the documented workaround (`--enforce-eager`) reported at under 10 tokens per second.
+
+This reverses the model choice. **Qwen3.5**, the current small-model family, is a vision–language series built on a hybrid Gated-DeltaNet architecture whose kernels are a distinct and recent code path; its 9B member needs 20.5 GB merely to hold float16 weights. It is an excellent model for Ampere-or-newer hardware and a non-starter here. The correct selection is the most recent *dense, text-only, grouped-query-attention* model that clears the task — the architecture family for which Turing support is mature and unlikely to regress.
+
+| Model | Architecture | VRAM (fp16 weights) | Licence | Turing? | Assessment for this task |
+|---|---|---|---|---|---|
+| **Qwen3-4B-Instruct-2507** | 4.0B dense, text-only, GQA (32 Q / 8 KV), 36 layers, 262K context | ~8 GB | Apache 2.0 | **Yes** — standard attention path | **Primary.** Fits a 16 GB T4 unquantised, leaving headroom for KV cache. Instruction-tuned for structured output and **non-thinking by construction**, which matters at 40–60K documents: a reasoning-mode model would spend most of its token budget deliberating over a four-way classification |
+| **Gemma 4 E4B** | 4.5B effective (8B with per-layer embeddings), multimodal | ~4–5 GB at 4-bit | Apache 2.0 | Subsample only | **Secondary.** Chosen for *independence* — different laboratory, different pretraining corpus, different architecture. It annotates a ~5K agreement subsample rather than the full set, so throughput is irrelevant and plain Transformers suffices. Fallback if the per-layer-embedding path will not load on Turing: Gemma 3 4B-it |
+| Qwen3-8B | 8B dense, text-only, GQA | ~16 GB | Apache 2.0 | Yes | Escalation path if 4B fails the macro-F1 gate. Needs 8-bit weights to leave KV-cache room on one T4 |
+| Qwen3.5-4B / 9B | Hybrid Gated-DeltaNet, vision–language | 9–20.5 GB | Apache 2.0 | **No**, in practice | **Rejected on hardware, not on quality.** Documented upgrade path the moment Ampere-class access becomes available |
+| gpt-oss-20b | 20B mixture-of-experts | ~16 GB at 4-bit | Apache 2.0 | Marginal | Reasoning capacity exceeds task requirements; poor cost/benefit here |
+
+**Is a 4B model enough?** The task is four-way classification of short text against a fixed schema, not open-ended generation. Two measurements from this project's own exploratory analysis bound the difficulty. First, the label-bearing evidence sits early — median position 1–3% into the review body, with 8–11% of it in the title. Second, a naive lexical proxy already reaches 58.3% precision on the positive class, so the model's task is to correct a well-characterised error pattern — speculative gift language, and gifts *received* rather than given — rather than to find a signal from nothing. A 4B instruction-tuned model is a defensible fit for that, and the macro-F1 ≥ 0.75 gate exists precisely to catch the case where it is not.
+
+**Why two models rather than one.** Running a second model is not redundancy. Recent work quantifies how substantially downstream conclusions can shift under defensible variations in model and prompt — a phenomenon sharp enough to have acquired a name in the methodological literature. Reporting agreement between two independent models converts an unexamined assumption into a measured quantity, and a divergence between them is a finding to report rather than a problem to conceal. Drawing the second model from a *different* developer is what makes the agreement statistic informative; two members of one family would largely share their failure modes.
 
 ### 4.3 Axis 3 — Serving infrastructure
 
@@ -153,20 +166,34 @@ Human annotation is retained, but as **validation** rather than production. The 
 | Suited to interactive use | Adequate | **Excellent** | Good |
 | Suited to offline batch | **Excellent** | Poor | Moderate |
 
-**Decision: vLLM.** The workload is a single large offline batch, where throughput is the entire cost function and interactive convenience is worth nothing. The reported 2–4× throughput advantage translates directly into the difference between an overnight job and a multi-day one. Native guided decoding is a second, independent reason: it eliminates output-parsing failure as a category of error rather than mitigating it.
+**Decision: vLLM for the annotation run; llama.cpp retained for local development.** The workload is a single large offline batch, where throughput is the entire cost function and interactive convenience is worth nothing. The reported 2–4× throughput advantage translates directly into the difference between an overnight job and a multi-day one. Native guided decoding is a second, independent reason: it eliminates output-parsing failure as a category of error rather than mitigating it.
+
+Two qualifications follow from the hardware assessment in §4.2, and both are practical rather than theoretical. vLLM targets Linux and is not supported natively on Windows, which is the team's development platform, and it cannot use its fastest attention kernels on Turing. The annotation run therefore executes on Kaggle's Linux notebooks with `--dtype float16`, while local work — prompt iteration, schema debugging, smoke tests over a few hundred reviews — uses a 4-bit GGUF build of the same model under llama.cpp, which runs on Windows and fits the 4 GB card. This is a development convenience rather than a second production stack: every label that enters the dataset comes from the vLLM run.
 
 ### 4.4 Axis 4 — Distillation target
 
 | Criterion | ModernBERT-base | DeBERTaV3-base | RoBERTa-base | No distillation (LLM direct) |
 |---|---|---|---|---|
-| Max context | **8,192** | 512 | 512 | Model-dependent |
+| Max context | 8,192 | 512 | 512 | Model-dependent |
+| Evidence lost at this model's limit<sup>c</sup> | 0.000–0.001% | 0.013–0.044% | 0.013–0.044% | 0 |
 | Relative inference speed | **Fastest** | ~0.5× | ~0.6× | Orders of magnitude slower |
-| GLUE-class accuracy | State of the art among encoders | Strong | Good | Highest |
+| GLUE-class accuracy | State of the art among encoders | Strong; more sample-efficient on equal data | Good | Highest |
+| Parameters | 149M | 184M | 125M | 4B+ |
 | Full-corpus feasibility | ✓ | ✓ | ✓ | ✗ |
 
-**Decision: ModernBERT-base.**
+<sup>c</sup> Share of gift-flagged reviews whose label-bearing evidence falls beyond the model's context limit, measured on this project's corpus (Data Research §4.8, T5).
 
-The context-length argument is decisive and specific to this task. Reviews frequently open with product discussion and disclose the recipient only in a closing sentence. A 512-token model truncates exactly the region where the label-bearing evidence most often sits. ModernBERT removes the truncation decision entirely.
+**Decision: ModernBERT-base — on efficiency and footprint, explicitly *not* on context length.**
+
+An earlier draft of this review argued that the 8,192-token context was decisive because "the sentence disclosing the recipient frequently appears late in a review." That claim was plausible, was asserted without measurement, and is **false for this corpus**. Measuring the character offset of the gift evidence in all 1.73 million lexically flagged reviews puts it at a median of 1–3% into the review body, with 8–11% of it in the title. A 512-token encoder would lose the evidence in 0.013–0.044% of gift reviews; ModernBERT's context advantage is therefore worth roughly four parts in ten thousand, not the decisive margin previously claimed. Recording the correction matters more than the conclusion it revises: an architectural decision justified by an untested intuition about how people write reviews is exactly the kind of claim this project's own data was able to check.
+
+The decision survives on the reasons that remain, which are the ones the corpus actually constrains:
+
+- **Inference efficiency is the true binding constraint.** Full-corpus inference covers millions of interactions; ModernBERT is roughly twice as fast as DeBERTaV3-base at short context, and short context is what this corpus contains.
+- **Footprint.** At 149M parameters it fine-tunes and runs on the team's 4 GB Turing card, keeping the distillation stage entirely off the metered free-tier quota that the annotation stage consumes.
+- **Accuracy.** It is the first encoder to surpass DeBERTaV3-base on GLUE since 2021, and works directly with `AutoModelForSequenceClassification`.
+
+**Reported caveat.** Subsequent controlled comparison finds that DeBERTaV3, trained on identical data, can surpass ModernBERT in sample efficiency and final quality, with ModernBERT's advantage lying in training speed. With only 40–60K distillation labels, sample efficiency is a live concern rather than an academic one. DeBERTaV3-base is therefore retained as a documented robustness check at the distillation stage, run if ModernBERT misses the "within 5 pp of the LLM" fidelity gate — a cheap insurance policy given both models train in minutes on this data volume.
 
 The economic argument for distillation as a pattern is documented rather than assumed. Reported annotation costs for a 6.2-million-document corpus were approximately \$8,990 for direct frontier-model inference against roughly \$15 for a 1,000-document sample — with crowdworkers at \$124 and a trained research assistant at \$187 for the same sample. The distillation pattern — label a sample with the large model, train a small model on those labels, apply the small model to everything — converts an infeasible cost into a trivial one, and is now an established design in the automated-annotation literature.
 
@@ -315,9 +342,11 @@ The honest framing is that this bounds the *external* claim without invalidating
 
 The technology selection is driven by three constraints that a conventional stack would not satisfy.
 
-**The detection problem is semantic, so the technology must be semantic.** The two failure modes that matter — gift language in a self-purchase, and a gift purchase with no gift language — are precisely the cases a lexical method inverts. An open-weight instruction-tuned LLM handles both, keeps customer text in-house, and remains reproducible by third parties in a way a commercial API does not. Qwen3.5-9B is the primary annotator with Gemma 4 12B as an independent second opinion, because the methodological literature demonstrates that conclusions can shift under defensible variations in model and prompt, and a measured disagreement is worth more than an unexamined assumption.
+**The detection problem is semantic, so the technology must be semantic.** The two failure modes that matter — gift language in a self-purchase, and a gift purchase with no gift language — are precisely the cases a lexical method inverts. An open-weight instruction-tuned LLM handles both, keeps customer text in-house, and remains reproducible by third parties in a way a commercial API does not. Qwen3-4B-Instruct-2507 is the primary annotator with Gemma 4 E4B as an independent second opinion, because the methodological literature demonstrates that conclusions can shift under defensible variations in model and prompt, and a measured disagreement is worth more than an unexamined assumption.
 
-**Corpus scale forces distillation.** Direct large-model inference over millions of documents is neither affordable nor necessary. ModernBERT-base is the distillation target, chosen for inference efficiency and — decisively for this task — its 8,192-token context, which prevents truncation of the review regions where recipient disclosure most often appears.
+**Corpus scale forces distillation.** Direct large-model inference over millions of documents is neither affordable nor necessary. ModernBERT-base is the distillation target, chosen for inference efficiency and for a 149M-parameter footprint that fits the hardware actually available. It is explicitly *not* chosen for its 8,192-token context: measuring where the label-bearing evidence sits in this corpus showed a 512-token limit would lose it in 0.013–0.044% of gift reviews, refuting the context argument an earlier draft of this review had treated as decisive.
+
+**Hardware generation, not model quality, determined the annotator.** Every GPU available to this project is pre-Ampere, which excludes the current flagship small-model family on kernel support rather than on capability. Qwen3-4B-Instruct-2507 — dense, text-only, standard grouped-query attention, non-thinking, Apache 2.0 — is the most recent model that clears the task *and* runs on the hardware, with Gemma 4 E4B annotating an agreement subsample as an independent second opinion.
 
 **The claim is a between-condition difference, so measurement must be conservative.** The field's documented reproducibility problems mean a small measured difference is exactly the kind of result most likely to be an artefact. RecBole supplies a standard, comparable protocol; full-ranking evaluation avoids the sampled-metric inconsistency that can reverse conclusions; the placebo condition separates genuine denoising from mere data reduction; and repeated seeds with bootstrap intervals prevent a single fortunate split from being reported as a finding.
 
@@ -368,6 +397,17 @@ The technology selection is driven by three constraints that a conventional stac
 23. Amazon Technologies, Inc. US Patents 9,818,145; 10,445,809; 8,352,331; 11,367,117.
 24. vLLM documentation — PagedAttention design. https://docs.vllm.ai/en/latest/design/paged_attention/
 
+**Model cards and hardware compatibility** *(consulted August 2026 for the §4.2 / §4.4 revisions)*
+
+25. Qwen Team. Qwen3-4B-Instruct-2507 model card. https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507
+26. Qwen Team. (2026). Qwen3.5: Towards Native Multimodal Agents. https://qwen.ai/blog?id=qwen3.5
+27. Google DeepMind. (2026). Gemma 4 model card. https://ai.google.dev/gemma/docs/core/model_card_4
+28. vLLM documentation — GPU installation and supported hardware. https://docs.vllm.ai/en/stable/getting_started/installation/gpu/
+29. vLLM issue #29743 — Turing support in recent model backends. https://github.com/vllm-project/vllm/issues/29743
+30. ModernBERT or DeBERTaV3? Examining Architecture and Data Influence on Transformer Encoder Model Performance. (2025). arXiv:2504.08716
+
 ---
 
-*All technical claims verified against primary sources as of August 2026. Model VRAM figures are approximate and depend on quantisation method and sequence length. Patent filings describe intended mechanisms and are cited as evidence of problem recognition, not of deployed system behaviour or measured effect.*
+*All technical claims verified against primary sources as of August 2026. Model VRAM figures are approximate and depend on quantisation method and sequence length. GPU compatibility statements reflect vLLM's supported-hardware position as of that date and are subject to change with the serving stack. Patent filings describe intended mechanisms and are cited as evidence of problem recognition, not of deployed system behaviour or measured effect.*
+
+*Two claims in this review were revised after this project's own exploratory analysis contradicted them: the context-length justification for ModernBERT (§2.3, §4.4) and the model-selection criteria for the annotator LLM (§4.2). Both revisions, and the measurements that forced them, are recorded in `docs/DECISIONS.md` and in the Data Research deliverable §4.8.*
