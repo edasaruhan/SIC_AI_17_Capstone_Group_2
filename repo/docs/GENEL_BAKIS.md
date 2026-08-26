@@ -185,6 +185,13 @@ yazıldı: `gift`, `bought for my`, `present for` gibi kalıpları arayan basit 
 | All_Beauty | pilot · yalnızca pipeline testi | 537.261 | %2,13 |
 | Grocery_and_Gourmet_Food | düşük · **kontrol grubu** | 10.774.599 | %1,85 |
 
+> ⚠️ **Bu oranlar `clean` korpusuna ait. Deney `kcore` üzerinde koşuyor ve orada
+> oranlar farklı:** Toys %11,27 · Video Games **%2,68** · Grocery %1,34. 5-core filtresi
+> hediye alıcılarını sistematik olarak eliyor (hediye çoğu kez tek seferliktir; tek
+> seferlik yorumcular tam da k-core'un sildiği kullanıcılardır). Deney Video Games ve
+> Grocery'de **null sonuca doğru yanlı**; Toys'un birincil kategori olmasının gerçek
+> gerekçesi de bu. Ayrıntı: `data-research` §4.11 (T8).
+
 Beklenen sıralama çıktı: **Toys > Video Games > Grocery.** Aylık dağılımda da dört
 kategoride birden **Aralık–Ocak tepesi** var. Tepe Kasım'da değil çünkü *review tarihi
 satın alma tarihinin gerisinde kalıyor* — insanlar hediyeyi Kasım'da alıp Ocak'ta

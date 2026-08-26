@@ -195,7 +195,7 @@ Sequential recommendation, leave-one-out.
 | Katman | Seçim | Not |
 |---|---|---|
 | Büyük veri işleme | **polars** | pandas 10M+ satırda kullanılmayacak |
-| LLM servis | **vLLM** (`--dtype float16`) | offline batch, Kaggle Linux notebook'ta. Yerelde sadece smoke test için llama.cpp/GGUF — Windows'ta vLLM yok, 4 GB'a model sığmıyor |
+| LLM servis | **vLLM** (`--dtype float16`, **`enable_prefix_caching=True`**, `max_model_len=4096`) | offline batch, Kaggle Linux notebook'ta. Yerelde sadece smoke test için llama.cpp/GGUF — Windows'ta vLLM yok, 4 GB'a model sığmıyor. **Prefix caching pazarlık konusu değil** — aşağıya bakın |
 | Annotator LLM | **Qwen/Qwen3-4B-Instruct-2507** birincil, **google/gemma-4-E4B** ikincil (5K alt örneklem) | Seçim VRAM'e değil **GPU kuşağına** bağlı: elimizdeki her GPU pre-Ampere (Turing sm75), bfloat16 ve FlashAttention yok. Qwen3.5 ailesi hibrit GDN + VL, Turing'de pratikte koşmuyor. Gerekçe: technology-review §4.2 |
 | Structured output | vLLM guided decoding (JSON schema) | serbest metin parse edilmeyecek |
 | Distillation | **ModernBERT-base** | `AutoModelForSequenceClassification` |
@@ -203,6 +203,21 @@ Sequential recommendation, leave-one-out.
 | Deney takibi | **Weights & Biases** | her run config + seed + metrik loglar |
 | Config | **YAML** (`configs/`) | kodda hardcode path/parametre yok |
 | Test | **pytest** | |
+
+**Prefix caching neden zorunlu.** Ölçüldü (2026-08-27): SYSTEM prompt'u `v3`'te
+**~2.450 token**, review medyanı **~30 token**. Yani her satırın prefill'inin **%99'u
+aynı**. Caching kapalıysa 47.200 satırda ~**116M gereksiz prefill token** üretilir ve
+Kaggle kotası boşa gider. `detection/llm_annotate.py` yazılırken:
+
+- `LLM(..., enable_prefix_caching=True, max_model_len=4096)` — 4096 = 2.450 (system)
+  + review + 220 çıktı. Fazlası KV cache'i şişirir ve batch boyutunu düşürür.
+- Koşu başında **gerçekleşen throughput loglanmalı** (satır/sn ve token/sn). Elimizdeki
+  tek sayı şu an bir tahmin (1.000–2.000 token/sn); rapora tahmin değil ölçüm girmeli.
+
+**Inference kapsamı: önce `kcore`, sonra `clean`.** RQ2–RQ4 yalnızca k-core korpusuna
+etiket istiyor (**4,97M satır**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25 saat) RQ1'in
+betimsel eğrilerini keskinleştiriyor ama zorunlu değil — RQ1 `main` çerçevesinden güven
+aralığıyla zaten cevaplanabiliyor. Ters sırada deney 20 saat boşuna bekler.
 
 **Bağımlılık uyarısı:** RecBole'un pin'leri vLLM/torch ile çakışabilir.
 `requirements-llm.txt` ve `requirements-recsys.txt` **ayrı venv'lerde** kurulur.
@@ -324,6 +339,13 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
 - [ ] **TBD** C2'de kullanılacak nihai ağırlık(lar) — üçünü de mi koşacağız yoksa biri mi
 - [ ] **TBD** C3'ün RecBole'da nasıl implement edileceği (feature olarak mı, ayrı token mı)
 - [ ] **TBD** `household` sınıfının C1'de silinip silinmeyeceği (kappa sonucuna bağlı)
+- [ ] **TBD** **`received` sınıfının C1'de silinip silinmeyeceği.** Şema v3 (2026-08-27)
+  beşinci sınıfı ekledi ama C1'in tanımı hâlâ yalnızca `gift_given` diyor. Aynı soru,
+  aynı gerekçe: alan kişi ürünü kullanıyor ama seçmedi. `household` ile birlikte
+  karara bağlanmalı
+- [ ] **TBD** **κ eşiği 5 sınıfta hâlâ 0.60 mı?** Fleiss' κ sınıf sayısı arttıkça düşme
+  eğilimindedir — anlaşmazlık için daha çok yol var. Hafta 4 **öncesinde** gözden
+  geçirilmeli; düşürülecekse gerekçesi sonuç görülmeden yazılmalı
 - [ ] **TBD** Kaç seed (3 mü 5 mi) — koşu süresine göre
 - [x] ~~**TBD** GPU: yerel RTX mi Kaggle mı~~ → **KARARLAŞTI 2026-08-26.** Yerel kart
   GTX 1650 Ti (4 GB, Turing). LLM annotation **Kaggle**'da (2× T4, ~30 sa/hafta);

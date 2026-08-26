@@ -655,3 +655,49 @@ tutan kural aynen duruyor.
 **Etkilediği bölüm:** `.gitignore`, `tests/fixtures/mini_reviews.jsonl`,
 `tests/fixtures/mini_meta.jsonl`
 **Kim:** Ekip
+
+---
+
+### 2026-08-27 — Hafta 3 öncesi: prefix caching, inference kapsamı, açık kararlar
+
+Kararlar baştan sorgulandı. Çoğu sağlam çıktı; üç şey eklendi, bir de **kendi hatam
+düzeltildi**.
+
+**Düzeltme — `kcore` kayması zaten ölçülmüştü.** Denetim sırasında "k-core korpusunda
+hediye oranı farklı ve bu ölçülmemiş" diye bir bulgu bildirdim. **Yanlıştı.** T8
+(`table_corpus_comparison`) bunu ölçüyor, `data-research` §4.11 tam bir bölüm ayırıyor
+("deney null sonuca doğru yanlı olacak"), ve 2026-08-25 tarihli "RQ2'nin birincil
+kategorisi Toys" kararının gerekçesi doğrudan bu. Mevcut işi yeniden keşfetmişim.
+Yapılan tek gerçek ekleme: `GENEL_BAKIS`'a bir uyarı kutusu — o doküman "buradan
+başlayın" girişi ve `clean` oranlarını gösterip `kcore` farkından hiç söz etmiyordu.
+
+**1 — Prefix caching zorunlu hale getirildi.** Ölçüm: prompt v3'ün SYSTEM bloğu
+**~2.450 token**, review medyanı **~30 token**. Her satırın prefill'inin **%99'u aynı**.
+`enable_prefix_caching` kapalıysa 47.200 satırda ~**116M gereksiz prefill token**
+üretilir. vLLM ayarları hiçbir dokümanda geçmiyordu; CLAUDE.md §6'ya yazıldı
+(`enable_prefix_caching=True`, `max_model_len=4096`).
+
+> **Config'e anahtar EKLENMEDİ, bilinçli olarak.** `detection/llm_annotate.py` henüz
+> yazılmadı; anahtarı şimdi eklemek onu okuyansız bırakırdı — denetimin 6. bulgusu tam
+> olarak buydu (`sampling.strata`, `preprocess.dedup`, ve haftalarca ölü duran
+> `meta_prefix`). Anahtarlar onları okuyan kodla birlikte gelecek.
+
+**2 — Inference kapsamı: önce `kcore`, sonra `clean`.** Dokümanlar her yerde "tam korpus
+inference" diyordu ama sıra hiç kararlaştırılmamıştı. RQ2–RQ4 yalnızca k-core'a etiket
+istiyor: **4,97M satır** (~3–5 saat), 27M değil (~15–25 saat). RQ1 zaten `main`
+çerçevesinden güven aralığıyla cevaplanabiliyor; `clean` koşusu betimsel eğrileri
+keskinleştiriyor ama deneyi bloklamamalı.
+
+**3 — İki açık karar kaydedildi** (CLAUDE.md §13):
+- `received` sınıfı C1'de silinecek mi? Şema v3 beşinci sınıfı ekledi, C1'in tanımı hâlâ
+  yalnızca `gift_given` diyor. `household` ile aynı soru, aynı gerekçe.
+- κ eşiği 5 sınıfta hâlâ 0.60 mı? Fleiss' κ sınıf sayısı arttıkça düşer. Hafta 4
+  **öncesinde** karara bağlanmalı — sonuç görüldükten sonra eşik düşürmek olmaz.
+
+**4 — Hafta 5 için gereklilik: damıtmanın işe yaradığı ölçülecek.** ModernBERT'in gerekli
+olduğu şu an bir varsayım. Aynı 47.200 etiketle TF-IDF + lojistik regresyon eğitilip aynı
+doğrulama setinde karşılaştırılacak. Fark küçükse rapora girer ve CPU'da koşan bir
+yedeğimiz olur; büyükse damıtma gerekçesi sayıyla desteklenir. Şu an bu yalnızca bir
+gereklilik notu — kod Hafta 5'te.
+**Etkilediği bölüm:** `CLAUDE.md` §6 ve §13, `docs/GENEL_BAKIS.md` §5
+**Kim:** Ekip
