@@ -362,3 +362,31 @@ ayarlama yapmak precision'ı yapay olarak iyileştirirdi).
 Buradan yaygınlık okunmaz.
 **Etkilediği bölüm:** Hafta 4 doğrulama akışı, `analysis/validation.py` (yazılmadı)
 **Kim:** Ekip
+
+---
+
+### 2026-08-26 — Elle etiketleme CSV değil xlsx üzerinden yapılır
+**Karar:** `data/labelsheet.py` etiketleme CSV'sini xlsx'e çevirir (`--export`), doldurulmuş
+sayfayı doğrulayıp UTF-8 CSV'ye geri yazar (`--ingest`). Etiketleyen kişi xlsx'i doldurur,
+CSV'ye elle dokunmaz. Kurallar `docs/ETIKETLEME_REHBERI.md`.
+
+**Gerekçe — iki sessiz bozulma.** Türkçe Windows yerel ayarında Excel'in liste ayracı `;`
+olduğu için virgüllü CSV tek kolona düşer; ayrıca Excel BOM'suz UTF-8'i tanımayıp cp1254 ile
+geri yazar ve review metnindeki karakterler bozulur. İkisi de ancak 2-3 saatlik etiketleme
+bittikten sonra fark edilir. xlsx'te ayraç ve kodlama diye bir kavram yok.
+
+**Önyargı kontrolü:** `trial_stratum`, `sample_frame` ve `kw_gift_proxy` kolonları sayfaya
+**yazılmaz**. Etiketleyen, sözcüksel vekilin kararını görmeden etiketler; görseydi etiketler
+vekilin hatalarını tekrarlar ve Hafta 4'teki insan-vekil karşılaştırması kendi kendini
+doğrulayan bir ölçüme dönerdi. Kolonlar `--ingest` sırasında `trial_id` üzerinden geri eklenir.
+`tests/test_labelsheet.py::test_export_hides_the_bias_columns` bunu kilitliyor.
+
+**`--ingest` doğrulaması:** satır silinmiş/eklenmiş mi (`trial_id` kümesi), satır kopyalanmış
+mı, sözlük dışı etiket var mı. Üçü de hata verir; yarım doldurulmuş dosya hata değil, ilerleme
+raporu üretir. Rapor ayrıca insan etiketini `kw_gift_proxy` ile karşılaştırır - prompt v2'nin
+asıl girdisi bu tablo.
+
+**Hafta 4'te aynı modül kullanılacak:** 500 öğe, 2-3 annotator, aynı önyargı kontrolü.
+**Etkilediği bölüm:** `requirements.txt` (xlsxwriter, openpyxl), CLAUDE.md §2,
+`docs/ETIKETLEME_REHBERI.md` (yeni)
+**Kim:** Ekip

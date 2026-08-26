@@ -54,6 +54,7 @@ src/gift_contamination/
     download.py          # HF'den kategori indirme
     preprocess.py        # filtreleme, 5-core, sekans kurma
     sampling.py          # katmanlı örnekleme (main + boost çerçeveleri)
+    labelsheet.py        # elle etiketleme sayfası: CSV <-> xlsx gidiş dönüşü
   detection/
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render

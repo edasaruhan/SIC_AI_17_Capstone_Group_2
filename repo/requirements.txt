@@ -15,3 +15,8 @@ matplotlib>=3.8
 seaborn>=0.13
 wandb>=0.17
 pytest>=8.0
+
+# Elle etiketleme sayfasi (data/labelsheet.py). Excel gidis-donusunde
+# ayrac/kodlama kaybi olmasin diye CSV degil xlsx kullaniliyor.
+xlsxwriter>=3.2
+openpyxl>=3.1
