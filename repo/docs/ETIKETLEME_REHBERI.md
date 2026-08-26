@@ -1,7 +1,7 @@
 # Etiketleme Rehberi
 
 > Bu dosya iki yerde kullanılıyor: **Hafta 2**'de prompt geliştirme denemesinde (200 review,
-> tek kişi) ve **Hafta 4**'te doğrulama setinde (500 review, 2–3 kişi). Hafta 4'te herkes
+> tek kişi) ve **Hafta 4**'te doğrulama setinde (500 review, **3 kişi**). Hafta 4'te herkes
 > aynı kuralları uygulamak zorunda — yoksa ölçtüğümüz κ, gerçek belirsizliği değil
 > rehbersizliği ölçer.
 >
@@ -79,16 +79,36 @@ Kolay satırlar zaten kolay. Bu 200 satır kasıtlı olarak zor vakalarla doldur
 (%50'si anahtar kelime ile işaretlenmiş, %26'sı "hediye olur" gibi spekülatif ifade
 içeriyor). Aşağıdakiler prompt'un kırıldığı yerler.
 
-### 3.1 "Harika bir hediye olur" → `self`
+### 3.1 "Hediye olur" — üç ayrı durum, üç ayrı etiket
 
-> *"Ürün çok kaliteli, kesinlikle güzel bir hediye olur."*
+Hediye sözcüğü üç tamamen farklı bağlamda geçiyor ve üçü farklı etiket alıyor.
+Deneme geçişinin en önemli bulgusu bu: eski kural (hepsine `self`) iki durumu
+birbirine karıştırıyordu.
 
-Bu kişi **hediye almamış**, hediye olabileceğini söylüyor. Bu bir **tavsiye**, bir işlem
-değil. Bu tuzak korpusta çok yaygın ve sözcüksel vekilin en büyük hata kaynağı.
+**(1) Gerçekleşmiş.** Ürün el değiştirmiş. Genelde geçmiş zaman.
+> *"Torunuma harika bir hediye oldu."* · *"Yeğenlerime yolladım."*
 
-Ayırt edici soru: **fiil geçmiş zamanda ve gerçekleşmiş mi?**
-- "hediye ettim", "aldım ona" → gerçekleşmiş → `gift_given`
-- "hediye olur", "hediye alınabilir", "düşünüyorum" → gerçekleşmemiş → `self`
+→ **`gift_given`**. **Satın alma fiili aranmaz** — *"harika bir hediye oldu"* içinde
+"aldım" geçmese de gerçekleşmiş bir hediyedir.
+
+**(2) Önerilmiş + kendi kullanımı da anlatılıyor.**
+> *"Yirmi yıldır alıyorum, hiç pişman olmadım. Hediye olarak da çok iyi gider."*
+
+→ **`self`**. Kişi ürünü kendisi kullanıyor, ayrıca hediye fikri veriyor.
+
+**(3) Önerilmiş + başka hiçbir kanıt yok.**
+> *"Bu ürün harika bir hediye olur."* · *"Üniversite öğrencilerine ideal hediye."*
+
+→ **`unclear`**. Kimin aldığı, kullandığı, verdiği belli değil.
+
+> **Neden (3) `self` değil?** Hediye kanıtının yokluğu, kendine aldığının kanıtı
+> değildir. Buna `self` demek, metinde olmayan bir şeyi uydurmaktır — ve yaygınlık
+> tahminini `self` yönünde şişirir. §3.7 ile birlikte okuyun: ikisi aynı kuralın
+> iki yüzü.
+
+Ayırt edici soru sırası: **(a)** ürün el değiştirmiş mi? → `gift_given`.
+**(b)** Değilse, kişinin kendi kullanımına dair bir şey var mı? → `self`.
+**(c)** İkisi de yoksa → `unclear`.
 
 ### 3.2 Hediye **almak** ≠ hediye **vermek** → `self`
 
@@ -122,7 +142,7 @@ derecesi değil, **aynı evde yaşanıp yaşanmadığı**:
 | "my baby", "our baby" | "my friend's daughter" |
 | "my wife/husband" (ortak kullanım) | "my mom", "my dad", "my sister" (ayrı yaşıyorsa) |
 
-Yaşla ifade edilen çocuk ("my 2 and 5 year old") kendi çocuğudur — torun neredeyse her
+Yaşla ifade edilen çocuk ("my 3 and 6 year old" gibi) kendi çocuğudur — torun neredeyse her
 zaman açıkça "grand-" ile yazılır.
 
 **Sonra kuralı uygulayın.** Burada net bir doğru yok, o yüzden **tutarlılık** doğruluktan
@@ -161,10 +181,11 @@ Başkası cümlede geçiyor ama **ürünü alan ve kullanan değerlendiren kişi
 > *"Harika."* · *"Beş yıldız."* · *"Beklediğim gibi."*
 
 Hediye ifadesinin **yokluğu, `self` kanıtı değildir.** Metin hiçbir şey söylemiyorsa
-`unclear` doğru cevaptır; `self` demek uydurmaktır.
+`unclear` doğru cevaptır; `self` demek uydurmaktır. Bu, §3.1'deki (3) durumunun
+aynısıdır — orada hediye sözcüğü var ama kanıt yok, burada ikisi de yok.
 
 Ama: *"Üç haftadır kullanıyorum, memnunum"* kısa olsa da `self` — birinci ağızdan
-kullanım var.
+kullanım var. Uzunluk değil **kanıt** belirliyor.
 
 ### 3.8 İş yeri / komşu → `gift_given`
 

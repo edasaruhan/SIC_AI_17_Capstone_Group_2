@@ -9,10 +9,12 @@ ediyor, yaygınlığını ölçüyor ve öneri modelini bu etkileşimlerle/onlar
 ## Dokümanlar
 | Dosya | İçerik |
 |---|---|
+| **`docs/GENEL_BAKIS.md`** | **Buradan başlayın** — problem, araştırma soruları, pipeline diyagramı, nerede olduğumuz |
 | `CLAUDE.md` | Claude Code için ana context ve bağlayıcı kurallar |
 | `docs/PROJECT_SPEC.md` | Tam proje dokümanı — problem, gap analizi, iş bölümü |
 | `docs/ROADMAP.md` | Teknik roadmap — aşama detayları, hafta planı |
 | `docs/DECISIONS.md` | Spec'ten sapmalar ve gerekçeleri (tarihli) |
+| `docs/ETIKETLEME_REHBERI.md` | Elle etiketleme kuralları — Hafta 4'te 3 annotator da bunu okur |
 
 ## Kurulum
 

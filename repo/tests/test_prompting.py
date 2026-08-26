@@ -8,6 +8,7 @@ kotasi harcanmis olur.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -47,26 +48,50 @@ def _write(tmp_path: Path, body: str) -> Path:
 
 # ------------------------------------------------------------ gercek dosya
 def test_real_prompt_file_loads():
-    """Repodaki v1 dosyasi sozlesmeye uyuyor mu."""
+    """Config'in gosterdigi prompt sozlesmeye uyuyor mu.
+
+    Versiyon numarasi sabitlenmiyor: prompt bumplendiginde bu testin degismesi
+    gerekseydi test, degisimi yakalamak yerine degisime ayak uydururdu. Sabit
+    olan sey SOZLESME - versiyon satiri var, SYSTEM dolu, kaynak config'ten geliyor.
+    """
     prompt = load_prompt()
 
-    assert prompt.version == "v1"
+    assert re.fullmatch(r"v\d+", prompt.version), f"beklenmeyen versiyon: {prompt.version}"
     assert "gift" in prompt.system.lower()
     assert prompt.source == prompt_path()
+    assert prompt.source.exists()
 
 
 def test_real_prompt_documents_the_critical_distinctions():
     """Projenin tum gerekcesi bu ayrimlarda; prompt'tan dusurulurse yakala.
 
-    `prompts/gift_detection_v1.md` ve `tests/test_keyword_scan.py` ayni uc
-    ayrimi kilitliyor: spekulasyon hediye degil, alinan hediye verilen degil,
-    hediye sozcugu olmadan da hediye olabilir.
+    `tests/test_keyword_scan.py` ayni uc ayrimi kilitliyor: spekulasyon hediye
+    degil, alinan hediye verilen degil, hediye sozcugu olmadan da hediye olabilir.
     """
     system = load_prompt().system.lower()
 
-    assert "would make a great gift" in system
+    # Ornek CUMLELERE degil KURALLARA bakiliyor: ornekler gercek review metniyle
+    # ortusmemek icin degistirilebiliyor, kurallar degismemeli.
+    assert "realized" in system and "suggested" in system, "gerceklesmis/onerilmis ayrimi yok"
     assert "receiving a gift is not giving one" in system
-    assert "grandchild" in system, "v2 sema revizyonu prompt'a yansimamis"
+    assert "grandchild" in system, "sema revizyonu prompt'a yansimamis"
+
+
+def test_prompt_keeps_the_rules_learned_from_the_trial_pass():
+    """200 satirlik deneme gecisinin urettigi uc kural prompt'ta durmali.
+
+    Ucu de vekilin olculen hatalarindan cikti (kesinlik 0,610 / duyarlilik 0,762).
+    Biri dusurulurse LLM ayni hatayi 40.000 satirda tekrarlar ve bunu ancak Hafta
+    4'un dogrulamasinda fark ederiz.
+    """
+    system = load_prompt().system.lower()
+
+    # 1. Satin alma fiili olmadan da gerceklesmis hediye olabilir
+    assert "no purchase verb is required" in system
+    # 2. Alicinin tepkisi tek basina kanittir (vekilin en buyuk kor noktasi)
+    assert "reaction" in system
+    # 3. Kanitsiz spekulasyon self degil unclear
+    assert "is not evidence of a" in system, "spekulatif -> unclear kurali dusmus"
 
 
 def test_render_fills_every_placeholder():
@@ -129,6 +154,18 @@ def test_required_fields_match_the_renderer_signature():
     params = set(inspect.signature(Prompt.render).parameters) - {"self"}
 
     assert params == set(REQUIRED_FIELDS)
+
+
+def test_default_path_comes_from_the_config_not_a_literal():
+    """cfg verilmeden cagrildiginda da config'in gosterdigi dosya donmeli.
+
+    Eskiden dosya adi burada ikinci kez yaziliydi: config v2'ye gectiginde
+    `load_prompt()` v1'i okumaya devam ediyordu ve fark yalnizca annotation
+    ciktisindaki `prompt_version` alanina bakilinca anlasilabilirdi.
+    """
+    from gift_contamination.config import Config
+
+    assert prompt_path() == prompt_path(Config.load())
 
 
 def test_nonexistent_file_raises(tmp_path: Path):

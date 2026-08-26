@@ -59,6 +59,14 @@ def test_enum_parity_with_json_schema(field: str, enum_cls):
     )
 
 
+def test_default_schema_path_comes_from_the_config_not_a_literal():
+    """Bkz. test_prompting.py'deki esi - ayni surukleme hatasi sinifi."""
+    from gift_contamination.config import Config
+    from gift_contamination.detection.schema import schema_json_path
+
+    assert schema_json_path() == schema_json_path(Config.load())
+
+
 def test_schema_file_requires_evidence_span():
     """evidence_span zorunlu kalmali: halusinasyonu kisan tek mekanizma."""
     schema = load_json_schema()

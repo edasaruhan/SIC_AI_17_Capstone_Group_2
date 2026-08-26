@@ -64,7 +64,9 @@ detection:
   guided_json: true
   retry_on_parse_fail: 1
   schema_path: configs/annotation_schema.json
-  prompt_path: prompts/gift_detection_v1.md
+  # v1 -> v2: 200 review'luk deneme gecisinden sonra revize edildi. v1 dosyasi
+  # silinmedi - hangi annotation hangi prompt'la uretildigi izlenebilsin diye.
+  prompt_path: prompts/gift_detection_v2.md
 
 distill:
   # ModernBERT verimlilik ve 149M'lik ayak izi için seçildi, 8192 context için

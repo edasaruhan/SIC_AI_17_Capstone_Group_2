@@ -126,10 +126,12 @@ def downgrade_if_span_missing(
 
 # ------------------------------------------------------------------ JSON semasi
 def schema_json_path(cfg: Config | None = None) -> Path:
-    """Guided decoding'e verilecek JSON semasinin yolu."""
-    raw = Path(
-        cfg.get("detection.schema_path") if cfg else "configs/annotation_schema.json"
-    )
+    """Guided decoding'e verilecek JSON semasinin yolu.
+
+    cfg verilmezse varsayilan config okunur; yol burada tekrarlanmaz.
+    Gerekce icin bkz. `prompting.prompt_path`.
+    """
+    raw = Path((cfg or Config.load()).get("detection.schema_path"))
     return raw if raw.is_absolute() else REPO_ROOT / raw
 
 

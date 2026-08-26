@@ -386,7 +386,88 @@ mı, sözlük dışı etiket var mı. Üçü de hata verir; yarım doldurulmuş 
 raporu üretir. Rapor ayrıca insan etiketini `kw_gift_proxy` ile karşılaştırır - prompt v2'nin
 asıl girdisi bu tablo.
 
-**Hafta 4'te aynı modül kullanılacak:** 500 öğe, 2-3 annotator, aynı önyargı kontrolü.
+**Hafta 4'te aynı modül kullanılacak:** 500 öğe, 3 annotator, aynı önyargı kontrolü.
 **Etkilediği bölüm:** `requirements.txt` (xlsxwriter, openpyxl), CLAUDE.md §2,
 `docs/ETIKETLEME_REHBERI.md` (yeni)
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — Deneme setinin kaynağı: yazar destekli ön geçiş
+**Karar:** `prompt_trial_200_labeled.csv` teslimlerde **"yazar destekli ön geçiş"**
+olarak anılacak, "insan doğrulaması" olarak değil. Hafta 1'deki T4 keyword precision
+örneklemiyle aynı konvansiyon (`data-research.md` §4.9).
+
+**Gerekçe.** 200 satırın etiketleri elle verildi ama `notes` alanı bir dil modeli
+yardımıyla dolduruldu: 130 notun 116'sı tek tip resmi bir kalıpta ("The reviewer…"),
+21'inde yapıştırma izi (kıvrık tırnak), hiçbirinde Türkçe karakter yok, ve rehberin
+birebir istediği `KENDI_COCUGU` / `EMIN_DEGIL` işaretleri hiç geçmiyor.
+
+**Etiketlerin kalitesi bu kararın gerekçesi değil — kalite iyi.** Otomatik denetimde
+200 satırda yalnızca 2-3 tartışmalı etiket bulundu, torun kuralı (`grandchild` →
+`gift_given`) sıfır hatayla uygulanmış, ve §3.1/§3.7 çelişkisi rehberde yazandan daha
+doğru çözülmüş. Sorun doğrulukta değil **bağımsızlıkta**.
+
+**Bu sette etkisi sınırlı, Hafta 4'te ölümcül olurdu.** Deneme setinin işi prompt
+yazmak; etiketler doğru olduğu sürece prompt doğru yöne ayarlanır. Hafta 4'ün 500'ü
+ise detektörün F1'ini ölçüyor — referans da bir dil modelinden gelirse ölçülen şey iki
+modelin birbirine benzerliği olur, doğruluk değil, ve rapordaki "insan doğrulaması"
+ifadesi yanlış olur.
+
+**Sayısını bilemediğimiz kayıp:** insan geçişinin asıl değeri LLM'in *kendi* kör
+noktalarını yakalamaktır. Model kendi kör noktasını işaretlemez.
+
+**Sonuç:** Hafta 4 doğrulaması model yardımı olmadan yapılacak; bu kural
+`docs/GENEL_BAKIS.md` §7'de bozulmaz kurallar listesine eklendi.
+**Etkilediği bölüm:** `docs/GENEL_BAKIS.md`, Hafta 4 doğrulama akışı
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — Prompt v2: deneme geçişinden çıkan üç kural
+**Karar:** `prompts/gift_detection_v2.md` açıldı, `configs/base.yaml`'daki
+`detection.prompt_path` oraya çevrildi. v1 **silinmedi** — hangi annotation hangi
+prompt'la üretildiği izlenebilir kalmalı.
+
+**Ölçüm.** Sözcüksel vekilin 200 satırdaki başarısı: kesinlik **0,610**, duyarlılık
+**0,762**, F1 **0,678** (39 yanlış pozitif, 19 kaçırma). İki hata kümesi incelendi.
+
+**Üç ekleme:**
+1. **Gerçekleşmiş / önerilmiş hediye üçlü ayrımı.** v1 spekülatif ifadeye tek cevap
+   veriyordu (`self`). Deneme geçişi iki ayrı durum olduğunu gösterdi: kullanım kanıtı
+   varsa `self`, hiçbir kanıt yoksa `unclear`. v1'in kuralı ikincisini `self` sayıp
+   yaygınlığı `self` yönünde şişiriyordu.
+2. **Alıcının tepkisi tek başına kanıttır.** Kaçırılan 19 satırın 6'sında "hediye"
+   sözcüğü hiç geçmiyor; tek kanıt hane dışı birinin tepkisi. Dil modelinin sözcük
+   listesinden üstün olması gereken yer burası.
+3. **Satın alma fiili gerekmez.** "Torunumuza harika bir hediye oldu" biçimindeki bir
+   cümlede `bought/purchased` yok ama gerçekleşmiş bir hediye. Kaçırmaların en büyük
+   tek kalıbı buydu.
+
+**Few-shot örnekleri uydurma.** Gerçek review metni depoya girmiyor (CLAUDE.md §8.1);
+örnekler ölçülen kalıplara göre yazıldı, kopyalanmadı.
+**Etkilediği bölüm:** `configs/base.yaml`, `tests/test_prompting.py` (+2 test),
+`docs/ETIKETLEME_REHBERI.md` §3.1
+**Kim:** Ekip
+
+---
+
+### 2026-08-26 — İnsan doğrulaması 3 annotator ile yapılacak
+**Karar:** Hafta 4'ün 500 öğelik doğrulama seti **3 kişi** tarafından bağımsız
+etiketlenecek; uyum **Fleiss' κ** ile raporlanacak, eşik κ ≥ 0.60.
+
+**Gerekçe:** Bu, spec'in başından beri varsaydığı tasarım (`PROJECT_SPEC.md` §6[C],
+`concept-note` başarı kriterleri). Belirsiz olan tek şey kaç kişinin gerçekten
+etiketleyeceğiydi; karara bağlandı, yedek senaryolara (2 kişi → Cohen's κ, tek kişi →
+intra-annotator agreement) gerek kalmadı.
+
+**Sonucu:** Hafta 4 örneklemi 500'de kalıyor (tek kişilik senaryoda 250'ye inecekti),
+κ bir kapı olarak korunuyor, ve `household` sınıfının C1'de silinip silinmeyeceği
+kararı κ sonucuna bağlı olmaya devam ediyor (CLAUDE.md §13).
+
+**Şart:** üçü de `docs/ETIKETLEME_REHBERI.md`'yi okumuş olmalı ve **model yardımı
+almadan** etiketlemeli — aksi halde ölçülen κ, insanlar arası gerçek belirsizliği
+değil aynı modelin kendisiyle tutarlılığını gösterir.
+**Etkilediği bölüm:** `docs/ETIKETLEME_REHBERI.md` başlığı, `docs/DECISIONS.md`
+etiketleme sayfası kaydı
 **Kim:** Ekip

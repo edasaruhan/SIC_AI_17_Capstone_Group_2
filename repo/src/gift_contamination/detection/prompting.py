@@ -55,9 +55,14 @@ class Prompt(NamedTuple):
 
 
 def prompt_path(cfg: Config | None = None) -> Path:
-    raw = Path(
-        cfg.get("detection.prompt_path") if cfg else "prompts/gift_detection_v1.md"
-    )
+    """Config'in gosterdigi prompt dosyasi.
+
+    cfg verilmezse varsayilan config OKUNUR, dosya adi burada tekrarlanmaz.
+    Tekrarlansaydi prompt versiyonu bumplendiginde config degisir ama bu
+    fonksiyon eski dosyayi dondurmeye devam ederdi - ve fark ancak annotation
+    ciktisindaki `prompt_version` alanina bakildiginda anlasilirdi.
+    """
+    raw = Path((cfg or Config.load()).get("detection.prompt_path"))
     return raw if raw.is_absolute() else REPO_ROOT / raw
 
 
