@@ -28,8 +28,7 @@ cd repo
 sonra fark edilir. xlsx'te bu kavramlar yok.
 
 Sayfada `label` ve `notes` kolonları sarı. `label` açılır menülü — dördü dışında bir şey
-yazamazsınız. Kararsız kaldığınız satırda `notes`'a bir cümle yazın; prompt v2 tam olarak
-o cümlelerden yazılacak.
+yazamazsınız. `notes` çoğu satırda boş kalır; ne zaman doldurulacağı §4'te.
 
 **Satır silmeyin, sıralamayı değiştirmeyin, filtrelemek serbest.** `--ingest` satır
 kaybını yakalar ve hata verir.
@@ -113,12 +112,34 @@ kategorisinin dörtte biri bu tek karara bağlı.
 
 ### 3.4 Kendi çocuğu — en zor vaka
 
-Burada net bir doğru yok, o yüzden **tutarlılık** doğruluktan önemli. Kural:
+**Önce hane sınırını çizin.** `household` ile `gift_given` arasındaki fark akrabalık
+derecesi değil, **aynı evde yaşanıp yaşanmadığı**:
+
+| Aynı evde (→ `household` adayı) | Ayrı evde (→ her zaman `gift_given`) |
+|---|---|
+| "my son", "my daughter", "my kids" | "my grandson", "my granddaughter" |
+| "my 5 year old", "my little one", "my toddler" | "my niece", "my nephew", "my cousin" |
+| "my baby", "our baby" | "my friend's daughter" |
+| "my wife/husband" (ortak kullanım) | "my mom", "my dad", "my sister" (ayrı yaşıyorsa) |
+
+Yaşla ifade edilen çocuk ("my 2 and 5 year old") kendi çocuğudur — torun neredeyse her
+zaman açıkça "grand-" ile yazılır.
+
+**Sonra kuralı uygulayın.** Burada net bir doğru yok, o yüzden **tutarlılık** doğruluktan
+önemli:
 
 - **Vesile adı geçiyorsa** ("doğum günü", "yılbaşı", "karne hediyesi") → **`gift_given`**
 - **Günlük/ortak kullanımsa** ("okul çantası", "bebeğin maması", "çocuk odasına aldık")
   → **`household`**
 - İkisi de yoksa → **`household`**
+
+**Güçlü bir ipucu: değerlendiren ürünü kendi eline almış mı?** Kurulumu anlatıyorsa, pil
+taktıysa, çalışmadığını kendi test ettiyse, "biz/we" diye yazıyorsa — ürün evden çıkmamış
+demektir ve puan gerçekten onun yargısıdır. Bu `household` lehine güçlü kanıttır.
+
+> **Örnek.** *"2 yaşındaki ve 5 yaşındaki çocuğum için iki tane aldım... pilleri taktım,
+> ikisi de çalışmadı... paranın sayılmasını istiyorduk ama SAYMIYOR."*
+> → `household`. Kendi çocukları (hane içi), vesile yok, ve ürünü kendisi test etmiş.
 
 Bu vakaya `notes`'a `KENDI_COCUGU` yazın. Sayısı yüksek çıkarsa kuralı Hafta 4'te
 κ sonucuna göre yeniden tanımlayacağız — ama ancak işaretlerseniz sayabiliriz.
@@ -151,7 +172,27 @@ Meslektaş, komşu, öğretmen — hepsi hane dışı → `gift_given`.
 
 ---
 
-## 4. Sık sorulanlar
+## 4. `notes` kolonuna ne yazılır
+
+**Satırların çoğunda boş kalacak, bu normal.** 200 satırın 30-40'ında bir şey yazarsınız.
+
+Ama yazdıklarınız prompt v2'nin yazıldığı yer. Mekanizma şu: etiketleyenin kafasındaki
+tereddüdün LLM'e talimat olarak geçmesinin tek kanalı bu kolon. Bir tuzak 15 satırda
+tekrarlanıyor ama not düşülmediyse, prompt'a girmez ve LLM aynı hatayı **40.000 satırda**
+yapar.
+
+| Ne zaman | Ne yazılır |
+|---|---|
+| §3.4 kendi çocuğu vakası | `KENDI_COCUGU` |
+| Etiket verildi ama içe sinmedi | `EMIN_DEGIL` |
+| Rehberde olmayan bir durum | Bir cümle, serbest |
+
+Uzun yazmayın; etiket başına birkaç kelime yeterli. `KENDI_COCUGU` ve `EMIN_DEGIL`
+etiketleri birebir bu şekilde yazılmalı - sayılabilmeleri için.
+
+---
+
+## 5. Sık sorulanlar
 
 **Ürünün ne olduğunu bilmiyorum, karar veremiyorum.**
 `category` kolonu var. Yetmiyorsa `unclear` + `notes`'a nedenini yazın.
@@ -181,7 +222,7 @@ doğrulayan bir ölçüme dönerdi. `--ingest` o kolonları geri ekliyor.
 
 ---
 
-## 5. Bittikten sonra ne oluyor
+## 6. Bittikten sonra ne oluyor
 
 `--ingest` şunu yazdırır:
 
