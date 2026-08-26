@@ -325,7 +325,12 @@ canlı bir mesele. İkisi de bu veri hacminde dakikalar içinde eğitiliyor — 
   (`n_annotate: 40000` dörde bölünür).
 - **`boost`** — yalnızca `kw_gift_proxy` havuzundan 1.500 ek satır. Distillation eğitim
   setine daha çok pozitif koymak ve hata analizi için. **Yaygınlık hesabına girmez.**
-  İki çerçeve **ayrıktır**; bir satır ikisinde birden geçmez.
+- **`boost_received`** — `kw_gift_received` havuzundan 300 ek satır (2026-08-27
+  denetiminde eklendi). Vekilin tanım gereği dışladığı ama LLM'in ayırması gereken en
+  zor negatif sınıf. **Yaygınlık hesabına girmez.**
+
+Üç çerçeve **ayrıktır**; bir satır birden fazlasında geçmez ve bu artık tahsis
+raporunda *hesaplanarak* yazılıyor, sabit olarak iddia edilmiyor.
 
 **Gerekçe — ölçülen bedel.** Config'teki "ana orana KATILMAZ" notu soyut bir uyarı değil.
 Pilot kategoride iki çerçeve havuzlanırsa oran **%2.13 yerine %15.01** görünüyor: yedi kat
@@ -333,8 +338,12 @@ Pilot kategoride iki çerçeve havuzlanırsa oran **%2.13 yerine %15.01** görü
 kilitliyor, ki `sample_frame` ayrımını kaldırmaya kalkan biri neyi kaybettiğini görsün.
 
 **Doğrulama.** Dört kategoride `main` çerçevesinin vekil oranı, `clean` korpusun gerçek
-oranına iki standart hata içinde yakınsıyor: All_Beauty %2.26 vs %2.13 · Toys %10.58 vs
-%11.07 · Video Games %4.24 vs %4.40 · Grocery %1.80 vs %1.85.
+oranına iki standart hata içinde yakınsıyor: All_Beauty %2.02 vs %2.13 · Toys %11.27 vs
+%11.07 · Video Games %4.63 vs %4.40 · Grocery %1.87 vs %1.85.
+
+> Sayılar 2026-08-27 denetiminden sonra yeniden çekilen örnekleme aittir (katman başına
+> türetilmiş seed). Önceki çekimde de dördü 2 SE içindeydi; değişim örnekleme
+> hatası kadar.
 
 **Kategori başına eşit tahsis** (orantılı değil): RQ1 kategorileri karşılaştırıyor, yani
 her kategori eşit kesinlikte tahmin almalı. Havuzlanmış tek bir oran raporlanmadığı için
@@ -470,4 +479,79 @@ almadan** etiketlemeli — aksi halde ölçülen κ, insanlar arası gerçek bel
 değil aynı modelin kendisiyle tutarlılığını gösterir.
 **Etkilediği bölüm:** `docs/ETIKETLEME_REHBERI.md` başlığı, `docs/DECISIONS.md`
 etiketleme sayfası kaydı
+**Kim:** Ekip
+
+---
+
+### 2026-08-27 — Denetim: sekiz kusur bulundu ve düzeltildi
+Hafta 2 sonunda kod ve kararlar baştan gözden geçirildi. 16 sayısal iddianın hepsi
+üretilmiş çıktılara karşı doğrulandı (korpus boyutları, vekil oranları, yansızlık,
+havuzlama şişmesi, %26.2 torun payı). Sekiz kusur bulundu — sonuncusu ilk yedinin
+düzeltmesi doğrulanırken ortaya çıktı:
+
+**1 — Gizlilik: 9 commit edilmiş dosyada mutlak yol.** `preprocess.py` ve `download.py`
+JSON'lara `str(path)` yazıyordu; içinde işletim sistemi kullanıcı adı ve tam dizin ağacı
+vardı. Aynı hata `precision_check.py`'de daha önce düzeltilmişti ama yardımcı fonksiyon
+o modülün içinde özel kalmıştı, diğerleri kullanamamıştı. `utils/io.relative_to_repo`
+ortak hale getirildi; `tests/test_preprocess.py::test_funnel_json_carries_no_absolute_path`
+regresyonu kilitliyor. Mevcut 9 dosya düzeltildi ve düzeltmenin kodun ürettiğiyle
+**birebir aynı** olduğu Video_Games yeniden koşularak doğrulandı.
+
+**2 — Deneme/doğrulama katmanları bayrak uzayını kapsamıyordu.** `_trial_strata` üç havuz
+tanımlıyordu ve `kw_gift_received` satırları hiçbirine düşmüyordu: 200 satırlık deneme
+geçişinde "hediye ALMIŞ" vakasından **sıfır** örnek vardı. Oysa *"receiving a gift is not
+giving one"* prompt'un üç kritik ayrımından biri — yani hiç sınanmadan doğrulanmış
+sayılacaktı. Korpus genelinde 48.525 review bu sınıfta. Katman sayısı dörde çıkarıldı
+(`proxy .35 / speculative .25 / received .15 / unflagged .25`) ve örnekleme
+`boost_received` çerçevesiyle 300 satır/kategori takviye ediyor.
+`test_trial_strata_partition_the_frame` ayrıklık **ve** tüketicilik şartını kilitliyor.
+
+**3 — Tüm katmanlarda aynı seed.** `pool.sample(take, seed=seed)` her katmanda aynı
+seed'i kullanıyordu; aynı boyutlu iki havuz **birebir aynı konumları** seçiyordu
+(ölçüldü: iki farklı katman da `[275, 607, 687, 702, 851]`). Nokta tahmini yansız
+kalıyordu — ama katmanlar arası bağımsızlık yoktu ve `experiment.bootstrap_iters`
+bağımsız çekim varsayıyor. Pratik etki ölçüldü ve küçüktü (yıl dağılımında toplam
+varyasyon mesafesi 0.013–0.015). `_stratum_seed()` eklendi: `crc32` tabanlı, süreçler
+arası kararlı. `hash()` kullanılamaz — PYTHONHASHSEED ile değişir ve `seed: 42` ile
+yeniden üretilebilirlik iddiasını yalanlar.
+
+**4 — Hiçbir test `force=True` kullanmıyordu.** Üç test "idempotent" iddia ediyordu ama
+üçü de `should_skip` yoluna girip dosyayı kendisiyle karşılaştırıyordu. CLAUDE.md §7'nin
+iddiası iki parçalı ve asıl önemli yarısı — yeniden hesaplama aynı sonucu veriyor mu —
+hiç sınanmıyordu. İki determinizm testi eklendi; yeniden hesaplama deterministik çıktı.
+
+**5 — `eda_tables.json` bayattı.** T4 precision kaydını olduğu gibi gömüyor ve düzeltme
+öncesi kopyayı taşıyordu. EDA yeniden koşuldu.
+
+**6 — İki ölü config anahtarı.** `sampling.strata` ve `preprocess.dedup` config'te
+parametre gibi duruyordu ama hiç okunmuyordu; değiştirmek çıktıyı değiştirmezdi
+(CLAUDE.md §8.11 ihlali). `preprocess.dedup` artık okunuyor; `sampling.strata` için
+`_check_strata()` eklendi — kod ile ayrışırsa gürültülü hata verir.
+
+**7 — `frames_disjoint: True` doğrulanmadan yazılıyordu.** Tahsis raporuna hesaplanmamış
+bir iddia yazmak, kod değiştiğinde sessizce yalan söyleyen bir alan bırakır. Artık
+`out["row_id"].n_unique() == out.height` ile hesaplanıyor.
+
+**8 — Dışlama anahtarı belirsizdi.** Doğrulama sırasında ortaya çıktı: `row_id` her
+kategoride 0'dan başlıyor, yani kategoriler arasında **çakışıyor** (ölçüldü: dört
+kategorinin örnekleri arasında 78 ortak değer). `prompt_trial_ids.json` düz bir `row_ids`
+listesi tutuyordu ve Hafta 4'ün doğrulama seti tam olarak o listeyi kullanacaktı — başka
+kategorilerde masum satırları da dışlayarak. Kayıt `excluded: {kategori: [row_id...]}`
+biçimine çevrildi; anahtar artık `(category, row_id)` çifti.
+`test_exclusion_key_is_scoped_by_category` düz listenin geri gelmesini engelliyor.
+Mevcut 200 satırlık kayıt etiketli CSV'den yeniden kuruldu — satırlar değişmedi.
+
+**Örneklem yeniden çekildi.** Kategori başına 11.800 (10.000 main + 1.500 boost + 300
+received), toplam **47.200**. Yansızlık dört kategoride de korunuyor (hepsi 2 SE içinde).
+Hafta 3 henüz başlamadığı için maliyet sıfıra yakındı — 46.000 satır Kaggle'da
+etiketlendikten sonra aynı düzeltme o kotayı çöpe atardı.
+
+**Deneme setinin 200 satırı yeniden çekilmedi.** Görevi tamamlandı (prompt v2 yazıldı) ve
+yeniden etiketlemek 2-3 saat insan emeği demek. Yeni örneklemin alt kümesi değil artık
+(200'den yalnızca 5'i içinde), ama dışlama listesi `row_id` üzerinden çalıştığı için
+Hafta 4'te işlevini görmeye devam ediyor. **Açık kalan:** `received` kuralı hâlâ hiçbir
+insan etiketiyle sınanmadı.
+**Etkilediği bölüm:** `data/sampling.py`, `data/preprocess.py`, `data/download.py`,
+`utils/io.py`, `configs/base.yaml`, testler (117 → 127), `reports/results/` (9 dosya),
+`data/annotations/human/prompt_trial_ids.json`
 **Kim:** Ekip

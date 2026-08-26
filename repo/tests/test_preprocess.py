@@ -8,6 +8,8 @@ sessizce gecerse tum recsys sonuclari kirlenir.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import polars as pl
 import pytest
 
@@ -153,7 +155,7 @@ def test_timestamps_land_in_expected_decade(cfg: Config):
 
 # ---------------------------------------------------------------- idempotency
 def test_rerun_is_idempotent(cfg: Config):
-    """Ikinci kosu ayni ciktiyi vermeli (CLAUDE.md bolum 7)."""
+    """Cikti varsa yeniden hesaplanmamali (CLAUDE.md bolum 7, birinci yari)."""
     clean_path, _ = build_clean(cfg, "pilot")
     first = pl.read_parquet(clean_path)
 
@@ -162,3 +164,42 @@ def test_rerun_is_idempotent(cfg: Config):
 
     assert clean_path == clean_path_again
     assert first.equals(second)
+
+
+def test_recompute_is_deterministic(cfg: Config):
+    """`--force` ile yeniden hesaplama AYNI sonucu vermeli.
+
+    Idempotency iddiasinin asil onemli yarisi. Ustteki test `should_skip`
+    yoluna girdigi icin yeniden hesaplamayi hic sinamiyor - sort kararliligi
+    ya da seed yonetimi bozulsa oradan gecerdi (2026-08-27 denetimi).
+    """
+    c1, k1 = build_clean(cfg, "pilot", force=True)
+    clean_a, kcore_a = pl.read_parquet(c1), pl.read_parquet(k1)
+
+    c2, k2 = build_clean(cfg, "pilot", force=True)
+
+    assert clean_a.equals(pl.read_parquet(c2)), "clean yeniden hesaplamada farkli"
+    assert kcore_a.equals(pl.read_parquet(k2)), "kcore yeniden hesaplamada farkli"
+
+
+# --------------------------------------------------------------------- gizlilik
+def test_funnel_json_carries_no_absolute_path(cfg: Config):
+    """Huni JSON'i commit ediliyor; mutlak yol kullanici adini sizdirir.
+
+    2026-08-27 denetimi: dokuz commit edilmis dosyada
+    `C:\\Users\\<ad>\\...` yaziyordu. Duzeltme `utils.io.relative_to_repo`.
+    """
+    import json
+
+    build_clean(cfg, "pilot", force=True)
+    raw = (cfg.path("results") / "preprocess_funnel_Test_Cat.json").read_text(
+        encoding="utf-8"
+    )
+    funnel = json.loads(raw)
+
+    # Fixture repo kokunun DISINDA (pytest tmpdir) oldugu icin yardimci dogru
+    # sekilde cıplak dosya adina dusuyor. Gercek kosuda `data/interim/...` olur.
+    assert "Users" not in raw, "kullanici adi sizmis"
+    for value in [funnel["meta"]["source"], *funnel["meta"]["outputs"].values()]:
+        assert not Path(value).is_absolute(), f"mutlak yol yazilmis: {value}"
+        assert ":" not in value, f"surucu harfi yazilmis: {value}"

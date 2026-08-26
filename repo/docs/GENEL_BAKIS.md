@@ -78,7 +78,7 @@ elimizdeki donanımla **haftalar** sürer.
 ```mermaid
 flowchart TD
     A["Temiz korpus<br/>12.417.784 review · Toys_and_Games"]
-    B["Etiketlenecek örnek<br/>46.000 satır · 4 kategori"]
+    B["Etiketlenecek örnek<br/>47.200 satır · 4 kategori"]
     C["LLM etiketleri<br/>self · gift_given · household · unclear"]
     H["İnsan etiketi<br/>500 satır · 3 annotator · Hafta 4"]
     G1{"KAPI 1<br/>Aralık–Ocak tepesi var mı?"}
@@ -138,8 +138,8 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 | Temiz review (4 kategori) | **27,0M** |
 | Hediye vekil oranı — Toys_and_Games | **%11,07** |
 | Hediye vekil oranı — Grocery (kontrol) | **%1,85** |
-| Çekilmiş örnek | **46.000** (180 katman) |
-| Geçen test | **117** |
+| Çekilmiş örnek | **47.200** (180 katman) |
+| Geçen test | **127** |
 
 ### Hafta 1 — veriyi tanımak
 
@@ -168,10 +168,11 @@ yorumluyor. Bu bir hata değil, beklenen davranış; başarı kriteri buna göre
 
 ### Hafta 2 — örnekleme ve altyapı
 
-LLM'in etiketleyeceği örnek çekildi. Buradaki tek kritik tasarım kararı **iki ayrı
-çerçeve**: `main` orantılı katmanlı örnek (yaygınlık oranı **yalnızca** buradan
-hesaplanır), `boost` ise anahtar kelimeyle işaretlenmiş havuzdan çekilmiş ek pozitifler
-(eğitim verisini zenginleştirir, orana **girmez**).
+LLM'in etiketleyeceği örnek çekildi. Buradaki tek kritik tasarım kararı **çerçeve
+ayrımı**: `main` orantılı katmanlı örnek (yaygınlık oranı **yalnızca** buradan
+hesaplanır), `boost` anahtar kelimeyle işaretlenmiş havuzdan ek pozitifler, ve
+`boost_received` "hediye aldım" satırlarından ek zor negatifler. Son ikisi eğitim
+verisini zenginleştirir, **orana girmez**.
 
 > **Ölçülen bedel.** İki çerçeve karıştırılırsa hediye oranı **%2,13 yerine %15,01**
 > görünüyor — yedi kat şişme. Kod hatasız çalışır, sayı makul görünür, tahmin sessizce

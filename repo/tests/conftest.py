@@ -79,6 +79,7 @@ def cfg(tmp_path: Path) -> Config:
             "strata": ["month", "rating", "text_length_bucket"],
             "text_length_buckets": [15, 40],
             "keyword_boost_fraction": 0.25,
+            "received_boost_fraction": 0.25,
         },
     }
     conf = Config(data, tmp_path / "test.yaml")

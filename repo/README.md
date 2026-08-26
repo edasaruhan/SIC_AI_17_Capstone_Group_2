@@ -56,12 +56,12 @@ python -m gift_contamination.analysis.eda
 python -m gift_contamination.data.sampling          --category all
 ```
 
-Örneklem **iki ayrı çerçeve** üretir ve bu ayrım korunmak zorundadır:
+Örneklem **üç ayrı çerçeve** üretir ve bu ayrım korunmak zorundadır:
 `sample_frame == 'main'` orantılı katmanlı örnektir ve yaygınlık oranı **yalnızca**
-onun üzerinden hesaplanır; `sample_frame == 'boost'` anahtar kelimeyle işaretlenmiş
-havuzdan çekilmiş ek pozitiflerdir ve orana **katılmaz**. Pilot kategoride
-karıştırmanın bedeli ölçüldü: gerçek oran %2.13 iken havuzlanmış oran %15.01
-görünüyor.
+onun üzerinden hesaplanır. `boost` (anahtar kelimeyle işaretlenmiş havuzdan ek
+pozitifler) ve `boost_received` ("hediye aldım" satırları, zor negatifler) orana
+**katılmaz**. Pilot kategoride karıştırmanın bedeli ölçüldü: gerçek oran %2.13 iken
+havuzlanmış oran %14.42 görünüyor — yedi kat şişme.
 
 Elle doğrulama örneklemi (üretilen CSV birebir review metni taşır, git'e **girmez**):
 

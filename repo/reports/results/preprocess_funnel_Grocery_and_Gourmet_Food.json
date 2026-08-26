@@ -50,10 +50,10 @@
   "meta": {
     "category_role": "low",
     "category": "Grocery_and_Gourmet_Food",
-    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Grocery_and_Gourmet_Food_raw.parquet",
+    "source": "data/interim/Grocery_and_Gourmet_Food_raw.parquet",
     "outputs": {
-      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Grocery_and_Gourmet_Food_clean.parquet",
-      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Grocery_and_Gourmet_Food_kcore.parquet"
+      "clean": "data/interim/Grocery_and_Gourmet_Food_clean.parquet",
+      "kcore": "data/interim/Grocery_and_Gourmet_Food_kcore.parquet"
     },
     "params": {
       "verified_only": true,

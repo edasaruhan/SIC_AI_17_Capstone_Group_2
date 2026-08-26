@@ -50,10 +50,10 @@
   "meta": {
     "category_role": "pilot",
     "category": "All_Beauty",
-    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\All_Beauty_raw.parquet",
+    "source": "data/interim/All_Beauty_raw.parquet",
     "outputs": {
-      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\All_Beauty_clean.parquet",
-      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\All_Beauty_kcore.parquet"
+      "clean": "data/interim/All_Beauty_clean.parquet",
+      "kcore": "data/interim/All_Beauty_kcore.parquet"
     },
     "params": {
       "verified_only": true,

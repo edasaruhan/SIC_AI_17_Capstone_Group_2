@@ -17,6 +17,12 @@ from gift_contamination.config import Config
 from gift_contamination.data.sampling import (
     FRAME_BOOST,
     FRAME_MAIN,
+    FRAME_RECEIVED,
+    SUPPORTED_STRATA,
+    TRIAL_STRATA,
+    _check_strata,
+    _stratum_seed,
+    _trial_strata,
     _draw_boost,
     _draw_main,
     _length_bucket,
@@ -162,15 +168,18 @@ def _synthetic(n: int = 4000, rng_seed: int = 0) -> pl.DataFrame:
     for i in range(n):
         rating = rng.randint(1, 5)
         is_proxy = rng.random() < (0.20 if rating == 5 else 0.06)
+        # Hediye ALMIS satirlar seyrek ama sifir degil - korpusta %0.08-0.28.
+        is_received = (not is_proxy) and rng.random() < 0.04
         rows.append(
             {
                 "row_id": i,
                 "rating": float(rating),
                 "month": rng.randint(1, 12),
                 "n_words": rng.randint(5, 80),
-                "kw_gift_evidence": is_proxy,
+                "kw_gift_evidence": is_proxy or is_received,
                 "kw_gift_speculative": rng.random() < 0.03,
-                "kw_gift_received": False,
+                "kw_gift_received": is_received,
+                # Vekilin TANIMI: kanit var VE alinmis degil.
                 PROXY_COL: is_proxy,
             }
         )
@@ -278,6 +287,82 @@ def test_different_seed_draws_different_rows():
     assert first["row_id"].to_list() != other["row_id"].to_list()
 
 
+# ---------------------------------------------------- katman kapsamı (Bulgu 2)
+def test_trial_strata_partition_the_frame():
+    """Dort katman AYRIK ve TUKETICI olmali: her satir tam olarak birinde.
+
+    2026-08-27 denetiminin buldugu hata: uc katmanli eski halde
+    `kw_gift_received` satirlari HICBIRINE dusmuyordu. 200 satirlik deneme
+    gecisinde "hediye ALMIS" vakasindan sifir ornek cikti - oysa
+    "receiving a gift is not giving one" prompt'un uc kritik ayrimindan biri.
+    """
+    thin = _synthetic()
+
+    pools = _trial_strata(thin)
+
+    ids = [set(p["row_id"].to_list()) for p in pools.values()]
+    union = set().union(*ids)
+    assert len(union) == sum(len(s) for s in ids), "katmanlar cakisiyor"
+    assert union == set(thin["row_id"].to_list()), "kapsanmayan satir var"
+
+
+def test_received_rows_are_reachable_by_the_trial_set():
+    """Regresyon kalkani: 'received' katmani bos donerse deneme seti o
+    vakayi hic gormez ve prompt kurali sinanmadan dogrulanmis sayilir."""
+    thin = _synthetic()
+
+    received = _trial_strata(thin)["received"]
+
+    assert received.height > 0
+    assert received["kw_gift_received"].all()
+    assert not received[PROXY_COL].any(), "vekil received satirlarini dislamali"
+
+
+def test_trial_shares_sum_to_one():
+    assert sum(TRIAL_STRATA.values()) == pytest.approx(1.0)
+
+
+# --------------------------------------------------- katman seed'i (Bulgu 3)
+def test_different_strata_draw_different_positions():
+    """Ortak seed ayni boyutlu havuzlarda BIREBIR ayni konumlari sectiriyordu.
+
+    2026-08-27 denetimi: iki farkli katman da [275, 607, 687, 702, 851]
+    konumlarini secmisti. Nokta tahmini yansiz kaliyordu ama katmanlar arasi
+    bagimsizlik yoktu - ve bootstrap guven araliklari bunu varsayiyor.
+    """
+    a = _stratum_seed(SEED, "5|2|<15")
+    b = _stratum_seed(SEED, "9|2|>=40")
+
+    assert a != b
+
+    pool = pl.DataFrame({"row_id": list(range(400))})
+    pos_a = sorted(pool.sample(5, seed=a, shuffle=True)["row_id"].to_list())
+    pos_b = sorted(pool.sample(5, seed=b, shuffle=True)["row_id"].to_list())
+    assert pos_a != pos_b, "turetilmis seed'ler ayni konumlari veriyor"
+
+
+def test_stratum_seed_is_stable_across_processes():
+    """`hash()` PYTHONHASHSEED ile degisir; crc32 degismez.
+
+    hash() kullanilsaydi ornek her sureçte farkli cikardi ve `seed: 42` ile
+    yeniden uretilebilirlik iddiasi yanlis olurdu.
+    """
+    assert _stratum_seed(42, "1|5|<15") == _stratum_seed(42, "1|5|<15")
+    assert _stratum_seed(42, "1|5|<15") == 439307199  # crc32, surece bagli degil
+    assert 0 <= _stratum_seed(42, "x") < 2**31 - 1
+
+
+# ------------------------------------------------- config <-> kod (Bulgu 6a)
+def test_config_strata_must_match_the_code(cfg: Config):
+    """`sampling.strata` degistirilip cikti degismemesi sessizce gecmemeli."""
+    _check_strata(cfg)  # mevcut config gecmeli
+
+    cfg._data["sampling"]["strata"] = ["month", "rating"]
+    with pytest.raises(ValueError, match="sampling.strata"):
+        _check_strata(cfg)
+    cfg._data["sampling"]["strata"] = list(SUPPORTED_STRATA)
+
+
 # ------------------------------------------------------------------ uctan uca
 def test_build_sample_end_to_end(cfg: Config):
     scan_category(cfg, "pilot")
@@ -287,7 +372,9 @@ def test_build_sample_end_to_end(cfg: Config):
 
     assert dest == annotation_sample_path(cfg, "pilot")
     assert sample.height > 0
-    assert set(sample["sample_frame"]).issubset({FRAME_MAIN, FRAME_BOOST})
+    assert set(sample["sample_frame"]).issubset(
+        {FRAME_MAIN, FRAME_BOOST, FRAME_RECEIVED}
+    )
     # Metin tasinmali: LLM'e gidecek olan bu.
     assert sample["text"].null_count() == 0
     # row_id benzersiz -> cerceveler ayrik
@@ -295,10 +382,26 @@ def test_build_sample_end_to_end(cfg: Config):
 
 
 def test_build_sample_is_idempotent(cfg: Config):
+    """Cikti varsa yeniden hesaplanmamali (CLAUDE.md bolum 7, birinci yari)."""
     scan_category(cfg, "pilot")
     first = pl.read_parquet(build_sample(cfg, "pilot"))
 
     second = pl.read_parquet(build_sample(cfg, "pilot"))
+
+    assert first.equals(second)
+
+
+def test_build_sample_recompute_is_deterministic(cfg: Config):
+    """`--force` ile yeniden hesaplama AYNI sonucu vermeli.
+
+    Idempotency iddiasinin ikinci yarisi ve asil onemli olan bu. Onceki test
+    `should_skip` yoluna girip dosyayi kendisiyle karsilastiriyor; yeniden
+    hesaplamanin deterministik oldugunu HIC sinamiyordu (2026-08-27 denetimi).
+    """
+    scan_category(cfg, "pilot")
+    first = pl.read_parquet(build_sample(cfg, "pilot", force=True))
+
+    second = pl.read_parquet(build_sample(cfg, "pilot", force=True))
 
     assert first.equals(second)
 
@@ -314,5 +417,27 @@ def test_trial_ids_are_recorded_for_exclusion(cfg: Config):
     meta = json.loads(trial_ids_path(cfg).read_text(encoding="utf-8"))
 
     assert meta["exclude_from_validation"] is True
-    assert len(meta["row_ids"]) == meta["n"]
-    assert meta["row_ids"] == sorted(meta["row_ids"])
+    assert sum(len(v) for v in meta["excluded"].values()) == meta["n"]
+    for ids in meta["excluded"].values():
+        assert ids == sorted(ids)
+
+
+def test_exclusion_key_is_scoped_by_category(cfg: Config):
+    """`row_id` her kategoride 0'dan basliyor: TEK BASINA benzersiz DEGIL.
+
+    2026-08-27 denetimi: dort kategorinin ornekleri arasinda 78 ortak row_id
+    olculdu. Duz bir row_id listesiyle dislama yapmak baska kategorilerde masum
+    satirlari da atar - ve Hafta 4'un dogrulama seti tam olarak bu listeyi
+    kullanacak.
+    """
+    import json
+
+    scan_category(cfg, "pilot")
+    build_sample(cfg, "pilot")
+    build_trial(cfg, ["pilot"], 4)
+
+    meta = json.loads(trial_ids_path(cfg).read_text(encoding="utf-8"))
+
+    assert "row_ids" not in meta, "duz row_id listesi geri gelmis - anahtar belirsiz"
+    assert set(meta["excluded"]) == {cfg.category_slug("pilot")}
+    assert "(category, row_id)" in meta["note"]

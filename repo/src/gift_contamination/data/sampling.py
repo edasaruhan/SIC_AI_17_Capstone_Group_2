@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import zlib
 from pathlib import Path
 from typing import Hashable
 
@@ -44,13 +45,34 @@ log = get_logger("data.sampling")
 
 FRAME_MAIN = "main"
 FRAME_BOOST = "boost"
+FRAME_RECEIVED = "boost_received"
+
+# Yalnizca FRAME_MAIN yaygınlık hesabina girer. Digerleri kasitli olarak
+# carpitilmis havuzlardan cekilir.
+SUPPLEMENTARY_FRAMES = (FRAME_BOOST, FRAME_RECEIVED)
+
+# `_stratum_id()` bu uc boyutu SABIT kuruyor. Config'teki `sampling.strata`
+# listesi ile ayrisirsa `_check_strata` gurultulu hata verir - aksi halde
+# config'te bir parametre gorunur ama degistirmek hicbir sey yapmaz.
+SUPPORTED_STRATA = ["month", "rating", "text_length_bucket"]
 
 TRIAL_NAME = "prompt_trial_{n}.csv"
 TRIAL_IDS_NAME = "prompt_trial_ids.json"
 
 # Prompt gelistirme orneginin katman paylari. precision_check ile ayni mantik:
 # insanin HER IKI hata yonunu de gormesi gerekiyor, yoksa prompt tek yone ayarlanir.
-TRIAL_STRATA = {"proxy": 0.5, "speculative": 0.25, "unflagged": 0.25}
+#
+# `received` 2026-08-27 denetiminde eklendi. Eskiden uc katman vardi ve
+# `kw_gift_received` satirlari HICBIRINE dusmuyordu: 200 satirlik deneme
+# gecisinde "hediye ALMIS" vakasindan sifir ornek vardi. Oysa "receiving a gift
+# is not giving one" prompt'un uc kritik ayrimindan biri - yani hic sinanmadan
+# dogrulanmis sayilacakti.
+TRIAL_STRATA = {
+    "proxy": 0.35,        # vekilin yanlis pozitifleri
+    "speculative": 0.25,  # "hediye olur" tuzagi
+    "received": 0.15,     # hediye ALAN, veren degil
+    "unflagged": 0.25,    # vekilin kacirdiklari
+}
 
 # Elle doldurulacak etiket sozlugu; configs/annotation_schema.json ile ayni.
 LABELS = ("gift_given", "self", "household", "unclear")
@@ -61,6 +83,32 @@ SAMPLE_COLUMNS = [
     "month", "rating", "n_words", "title", "text",
     "kw_gift_evidence", "kw_gift_speculative", "kw_gift_received", PROXY_COL,
 ]
+
+
+def _stratum_seed(base: int, key: str) -> int:
+    """Katman basina turetilmis, kosular ve platformlar arasi KARARLI seed.
+
+    Tum katmanlarda ayni seed'i kullanmak, ayni buyuklukteki havuzlarda BIREBIR
+    ayni konumlarin secilmesine yol aciyordu (2026-08-27 denetimi: iki farkli
+    katman da [275, 607, 687, 702, 851] konumlarini sectі). Nokta tahmini yansiz
+    kaliyordu ama katmanlar arasi bagimsizlik yoktu ve bootstrap guven araliklari
+    bagimsiz cekim varsayiyor.
+
+    `hash()` kullanilamaz: PYTHONHASHSEED ile string hash'i her sureçte degisir
+    ve ornek yeniden uretilemez hale gelir. crc32 deterministiktir.
+    """
+    return (base + zlib.crc32(str(key).encode("utf-8"))) % (2**31 - 1)
+
+
+def _check_strata(cfg: Config) -> None:
+    """Config'teki katman listesi kodun uyguladigiyla ayni mi."""
+    declared = list(cfg.get("sampling.strata"))
+    if declared != SUPPORTED_STRATA:
+        raise ValueError(
+            f"sampling.strata = {declared}, kod ise {SUPPORTED_STRATA} uyguluyor. "
+            "_stratum_id() bu boyutlari sabit kuruyor; config'i tek basina "
+            "degistirmek ciktiyi degistirmez. Ikisini birlikte guncelleyin."
+        )
 
 
 def annotation_sample_path(cfg: Config, role: str) -> Path:
@@ -199,7 +247,9 @@ def _draw_main(thin: pl.DataFrame, n: int, seed: int) -> tuple[pl.DataFrame, dic
         if take <= 0:
             continue
         pool = thin.filter(pl.col("stratum_id") == stratum)
-        picks.append(pool.sample(take, seed=seed, shuffle=True))
+        # Katman basina TURETILMIS seed - ortak seed ayni boyutlu havuzlarda
+        # ayni konumlari sectiriyordu. Bkz. _stratum_seed.
+        picks.append(pool.sample(take, seed=_stratum_seed(seed, stratum), shuffle=True))
 
     drawn = pl.concat(picks) if picks else thin.head(0)
     report = {
@@ -217,16 +267,27 @@ def _draw_main(thin: pl.DataFrame, n: int, seed: int) -> tuple[pl.DataFrame, dic
 
 
 def _draw_boost(
-    thin: pl.DataFrame, exclude: pl.DataFrame, n: int, seed: int
+    thin: pl.DataFrame,
+    exclude: pl.DataFrame,
+    n: int,
+    seed: int,
+    *,
+    mask: pl.Expr | None = None,
+    tag: str = FRAME_BOOST,
 ) -> pl.DataFrame:
-    """`kw_gift_proxy` havuzundan ek pozitif ornek; main ile AYRIK."""
-    pool = thin.filter(pl.col(PROXY_COL)).join(
-        exclude.select("row_id"), on="row_id", how="anti"
-    )
+    """Carpitilmis bir havuzdan ek ornek; daha once cekilenlerle AYRIK.
+
+    `mask` verilmezse `kw_gift_proxy` havuzu kullanilir (pozitif takviyesi).
+    `received` takviyesi icin `kw_gift_received` maskesi geciliyor.
+    """
+    mask = pl.col(PROXY_COL) if mask is None else mask
+    pool = thin.filter(mask).join(exclude.select("row_id"), on="row_id", how="anti")
     if pool.height == 0:
-        log.warning("boost havuzu bos - kategoride vekil isaretli satir yok")
+        log.warning("'%s' havuzu bos - kategoride uygun satir yok", tag)
         return thin.head(0)
-    return pool.sample(min(n, pool.height), seed=seed + 1, shuffle=True)
+    if pool.height < n:
+        log.warning("'%s' havuzunda %d satir var, %d istendi", tag, pool.height, n)
+    return pool.sample(min(n, pool.height), seed=_stratum_seed(seed, tag), shuffle=True)
 
 
 def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
@@ -241,22 +302,37 @@ def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
             f"Once keyword_scan kosun: {keyword_path(cfg, role)} yok"
         )
 
+    _check_strata(cfg)
     seed = int(cfg.get("seed"))
     cuts = list(cfg.get("sampling.text_length_buckets"))
     n_roles = len(cfg.category_roles())
     n_main = int(cfg.get("sampling.n_annotate")) // n_roles
     n_boost = round(n_main * float(cfg.get("sampling.keyword_boost_fraction")))
+    n_received = round(n_main * float(cfg.get("sampling.received_boost_fraction")))
 
     thin = _thin_frame(cfg, role, cuts)
     log.info("%s: %s satirlik havuz, %s katman", role, f"{thin.height:,}", thin["stratum_id"].n_unique())
 
     main, report = _draw_main(thin, n_main, seed)
     boost = _draw_boost(thin, main, n_boost, seed)
+    # "Hediye ALDIM" takviyesi: vekilin tanim geregi disladigi (PROXY = evidence
+    # AND NOT received) ama LLM'in ayirmasi gereken en zor negatif sinif. Korpusta
+    # %0.08-0.28 oraninda; takviye edilmezse ne egitim setinde ne de dogrulama
+    # setinde yeterli ornek olur.
+    received = _draw_boost(
+        thin,
+        pl.concat([main.select("row_id"), boost.select("row_id")]),
+        n_received,
+        seed,
+        mask=pl.col("kw_gift_received"),
+        tag=FRAME_RECEIVED,
+    )
 
     drawn = pl.concat(
         [
             main.with_columns(pl.lit(FRAME_MAIN).alias("sample_frame")),
             boost.with_columns(pl.lit(FRAME_BOOST).alias("sample_frame")),
+            received.with_columns(pl.lit(FRAME_RECEIVED).alias("sample_frame")),
         ]
     )
 
@@ -275,17 +351,27 @@ def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
     )
 
     out.write_parquet(dest)
-    log_output(log, dest, n_rows=out.height,
-               note=f"main={main.height:,} boost={boost.height:,}")
+    log_output(
+        log, dest, n_rows=out.height,
+        note=f"main={main.height:,} boost={boost.height:,} received={received.height:,}",
+    )
 
     report.update(
         {
             "category": cfg.category_slug(role),
             "seed": seed,
             "text_length_buckets": cuts,
+            "strata": SUPPORTED_STRATA,
             "n_boost_requested": n_boost,
             "n_boost_drawn": boost.height,
-            "frames_disjoint": True,
+            "n_received_requested": n_received,
+            "n_received_drawn": received.height,
+            # HESAPLANIR, iddia edilmez: rapora dogrulanmamis bir sabit yazmak,
+            # kod degistiginde sessizce yalan soyleyen bir alan birakir.
+            "frames_disjoint": bool(out["row_id"].n_unique() == out.height),
+            "frames": dict(
+                out.group_by("sample_frame").len().sort("sample_frame").iter_rows()
+            ),
             "note": (
                 "Yaygınlık tahmini YALNIZCA sample_frame == 'main' uzerinden "
                 "hesaplanir; 'boost' vekil-isaretli havuzdan cekildigi icin "
@@ -299,13 +385,21 @@ def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
 
 # ------------------------------------------------------------- prompt denemesi
 def _trial_strata(df: pl.DataFrame) -> dict[str, pl.DataFrame]:
+    """Dort AYRIK ve TUKETICI katman: her satir tam olarak birine duser.
+
+    Eski uc katmanli hali bayrak uzayini kapsamiyordu: `kw_gift_received`
+    satirlari hicbirine dusmuyordu ve deneme setine giremiyordu.
+    `test_trial_strata_partition_the_frame` bunu kilitliyor.
+    """
+    received = pl.col("kw_gift_received")
     return {
-        "proxy": df.filter(pl.col(PROXY_COL)),
-        "speculative": df.filter(pl.col("kw_gift_speculative") & ~pl.col(PROXY_COL)),
+        "proxy": df.filter(pl.col(PROXY_COL)),  # evidence AND NOT received
+        "received": df.filter(received),
+        "speculative": df.filter(
+            pl.col("kw_gift_speculative") & ~pl.col(PROXY_COL) & ~received
+        ),
         "unflagged": df.filter(
-            ~pl.col("kw_gift_evidence")
-            & ~pl.col("kw_gift_speculative")
-            & ~pl.col("kw_gift_received")
+            ~pl.col("kw_gift_evidence") & ~pl.col("kw_gift_speculative") & ~received
         ),
     }
 
@@ -347,7 +441,7 @@ def build_trial(cfg: Config, roles: list[str], n: int, *, force: bool = False) -
                 log.warning("%s / %s katmani bos veya pay almadi", role, stratum)
                 continue
             frames.append(
-                pool.sample(take, seed=seed, shuffle=True)
+                pool.sample(take, seed=_stratum_seed(seed, f"{role}|{stratum}"), shuffle=True)
                 .with_columns(pl.lit(stratum).alias("trial_stratum"))
             )
 
@@ -371,13 +465,21 @@ def build_trial(cfg: Config, roles: list[str], n: int, *, force: bool = False) -
         {
             "n": out.height,
             "seed": seed,
-            "row_ids": sorted(out["row_id"].to_list()),
+            # KATEGORI BAZLI. `row_id` her kategoride 0'dan basliyor, yani
+            # kategoriler arasinda CAKISIYOR (olculdu: dort kategori arasinda
+            # 78 ortak deger). Duz bir row_id listesiyle dislama yapmak baska
+            # kategorilerde masum satirlari da atar.
+            "excluded": {
+                cat[0]: sorted(g["row_id"].to_list())
+                for cat, g in sorted(out.group_by("category"), key=lambda kv: kv[0])
+            },
             "purpose": "prompt gelistirme (v1 -> v2)",
             "exclude_from_validation": True,
             "note": (
                 "Prompt bu satirlar uzerinde ayarlandi. Hafta 4'un 500'luk "
-                "dogrulama seti bu row_id'leri DISLAMALI; aksi halde prompt "
-                "kendi test setine fit edilmis olur."
+                "dogrulama seti bu satirlari DISLAMALI; aksi halde prompt kendi "
+                "test setine fit edilmis olur. Dislama anahtari (category, row_id) "
+                "CIFTIDIR - tek basina row_id benzersiz DEGIL."
             ),
         },
         trial_ids_path(cfg),

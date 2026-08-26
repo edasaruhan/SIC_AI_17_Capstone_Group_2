@@ -75,9 +75,13 @@ Sırayla sorun, ilk "evet"te durun:
 
 ## 3. Tuzaklar — asıl iş burada
 
-Kolay satırlar zaten kolay. Bu 200 satır kasıtlı olarak zor vakalarla dolduruldu
-(%50'si anahtar kelime ile işaretlenmiş, %26'sı "hediye olur" gibi spekülatif ifade
-içeriyor). Aşağıdakiler prompt'un kırıldığı yerler.
+Kolay satırlar zaten kolay. Etiketleme setleri kasıtlı olarak zor vakalarla
+doldurulur: dört katmandan çekilir — `proxy` (anahtar kelime işaretli, vekilin yanlış
+pozitifleri), `speculative` ("hediye olur" tuzağı), `received` (hediye **alan**, veren
+değil), `unflagged` (vekilin kaçırdıkları). Aşağıdakiler prompt'un kırıldığı yerler.
+
+> Hafta 2'nin 200 satırlık deneme seti `received` katmanı eklenmeden önce çekildi, o
+> yüzden §3.2 vakasını içermiyor. Hafta 4'ün doğrulama seti dördünü de içerecek.
 
 ### 3.1 "Hediye olur" — üç ayrı durum, üç ayrı etiket
 

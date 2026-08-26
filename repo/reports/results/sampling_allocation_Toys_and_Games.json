@@ -912,8 +912,20 @@
     15,
     40
   ],
+  "strata": [
+    "month",
+    "rating",
+    "text_length_bucket"
+  ],
   "n_boost_requested": 1500,
   "n_boost_drawn": 1500,
+  "n_received_requested": 300,
+  "n_received_drawn": 300,
   "frames_disjoint": true,
+  "frames": {
+    "boost": 1500,
+    "boost_received": 300,
+    "main": 10000
+  },
   "note": "Yaygınlık tahmini YALNIZCA sample_frame == 'main' uzerinden hesaplanir; 'boost' vekil-isaretli havuzdan cekildigi icin orani yukari cekerdi."
 }

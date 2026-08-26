@@ -11,6 +11,22 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from ..config import REPO_ROOT
+
+
+def relative_to_repo(path: Path) -> str:
+    """Repo koku altindaki yolu goreli, disaridakini dosya adi olarak dondurur.
+
+    `reports/results/` altindaki JSON'lar commit ediliyor. Icine `str(path)`
+    yazmak isletim sistemi kullanici adini ve tam dizin agacini depoya sokar.
+    Yol yazan HER modul bunu kullanmali - bir modulde duzeltip digerlerini
+    taramamak bu hatayi bir kez daha uretir.
+    """
+    try:
+        return Path(path).resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return Path(path).name
+
 
 def ensure_parent(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)

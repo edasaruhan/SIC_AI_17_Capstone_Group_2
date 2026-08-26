@@ -50,10 +50,10 @@
   "meta": {
     "category_role": "high",
     "category": "Toys_and_Games",
-    "source": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Toys_and_Games_raw.parquet",
+    "source": "data/interim/Toys_and_Games_raw.parquet",
     "outputs": {
-      "clean": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Toys_and_Games_clean.parquet",
-      "kcore": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\interim\\Toys_and_Games_kcore.parquet"
+      "clean": "data/interim/Toys_and_Games_clean.parquet",
+      "kcore": "data/interim/Toys_and_Games_kcore.parquet"
     },
     "params": {
       "verified_only": true,

@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 
 from ..config import Config, add_standard_args, resolve_roles
-from ..utils.io import write_json
+from ..utils.io import relative_to_repo, write_json
 from ..utils.logging import get_logger, human_bytes
 
 log = get_logger("data.download")
@@ -65,7 +65,7 @@ def probe_schema(path: Path, required: list[str], n_lines: int) -> dict:
             "configs/base.yaml içindeki dataset.required_fields ile veri kartını karşılaştırın."
         )
     return {
-        "file": str(path),
+        "file": relative_to_repo(path),
         "lines_probed": n,
         "fields": sorted(seen),
         "field_types": dict(sorted(types.items())),

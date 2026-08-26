@@ -47,6 +47,12 @@ sampling:
   # çok pozitif koymak için. `sample_frame == 'boost'` ile işaretlenir ve
   # yaygınlık hesabına KATILMAZ - katılırsa kendi seçtiğimiz şeyi ölçmüş oluruz.
   keyword_boost_fraction: 0.15
+  # "Hediye ALDIM" takviyesi. Vekil bunlari tanim geregi disliyor
+  # (kw_gift_proxy = evidence AND NOT received) ama LLM'in ayirmasi gereken en zor
+  # negatif sinif bu, ve korpusta %0.08-0.28 gibi seyrek. Takviye edilmezse ne
+  # distillation egitim setinde ne de Hafta 4 dogrulama setinde yeterli ornek olur.
+  # sample_frame == 'boost_received' ile isaretlenir; yaygınlık hesabina KATILMAZ.
+  received_boost_fraction: 0.03
 
 detection:
   # Model seçimi VRAM'e değil GPU KUŞAĞINA bağlı. Elimizdeki her GPU pre-Ampere

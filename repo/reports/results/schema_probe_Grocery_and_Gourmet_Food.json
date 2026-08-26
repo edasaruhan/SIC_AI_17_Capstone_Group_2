@@ -1,5 +1,5 @@
 {
-  "file": "C:\\Users\\kırmızı\\OneDrive\\Masaüstü\\samsung_marketing_program_project\\SIC_AI_17_Capstone_Group_2\\repo\\data\\raw\\raw\\review_categories\\Grocery_and_Gourmet_Food.jsonl",
+  "file": "Grocery_and_Gourmet_Food.jsonl",
   "lines_probed": 1000,
   "fields": [
     "asin",

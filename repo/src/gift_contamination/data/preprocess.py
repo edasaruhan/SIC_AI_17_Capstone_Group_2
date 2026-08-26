@@ -25,7 +25,7 @@ from pathlib import Path
 import polars as pl
 
 from ..config import Config, add_standard_args, resolve_roles
-from ..utils.io import should_skip, write_json
+from ..utils.io import relative_to_repo, should_skip, write_json
 from ..utils.logging import get_logger, log_output
 from .download import raw_review_path
 
@@ -243,6 +243,7 @@ def build_clean(cfg: Config, role: str, *, force: bool = False) -> tuple[Path, P
     k = int(cfg.get("preprocess.k_core"))
     min_words = int(cfg.get("preprocess.min_words"))
     verified_only = bool(cfg.get("preprocess.verified_only"))
+    dedup = bool(cfg.get("preprocess.dedup"))
     unit = detect_timestamp_unit(src, str(cfg.get("preprocess.timestamp_unit")))
 
     funnel: dict[str, dict] = {}
@@ -264,9 +265,12 @@ def build_clean(cfg: Config, role: str, *, force: bool = False) -> tuple[Path, P
     funnel[f"03_min_words_{min_words}"] = _stage(thin, user_col, item_col)
 
     # Ayni user+item birden fazla review: en erken timestamp tutulur (CLAUDE.md bolum 9).
-    thin = thin.sort("timestamp").unique(
-        subset=[user_col, item_col], keep="first", maintain_order=True
-    )
+    # `preprocess.dedup` config'ten OKUNUR: sabit kodlanirsa config'teki anahtar
+    # bir parametre gibi gorunur ama hicbir sey yapmaz (bkz. docs/DECISIONS.md).
+    if dedup:
+        thin = thin.sort("timestamp").unique(
+            subset=[user_col, item_col], keep="first", maintain_order=True
+        )
     funnel["04_dedup"] = _stage(thin, user_col, item_col) | _density(
         thin, user_col, item_col, k
     )
@@ -306,13 +310,16 @@ def build_clean(cfg: Config, role: str, *, force: bool = False) -> tuple[Path, P
     funnel["meta"] = {
         "category_role": role,
         "category": cfg.category_slug(role),
-        "source": str(src),
-        "outputs": {"clean": str(clean_dest), "kcore": str(kcore_dest)},
+        "source": relative_to_repo(src),
+        "outputs": {
+            "clean": relative_to_repo(clean_dest),
+            "kcore": relative_to_repo(kcore_dest),
+        },
         "params": {
             "verified_only": verified_only,
             "min_words": min_words,
             "k_core": k,
-            "dedup": True,
+            "dedup": dedup,
             "timestamp_unit": unit,
         },
     }
