@@ -56,6 +56,8 @@ def cfg(tmp_path: Path) -> Config:
                 "parent_asin",
                 "verified_purchase",
             ],
+            "meta_file_template": "raw/meta_categories/meta_{slug}.jsonl",
+            "meta_required_fields": ["parent_asin", "title"],
             "schema_probe_lines": 1000,
         },
         "preprocess": {
@@ -87,4 +89,10 @@ def cfg(tmp_path: Path) -> Config:
     dest = conf.path("raw") / "raw" / "review_categories" / "Test_Cat.jsonl"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(FIXTURES / "mini_reviews.jsonl", dest)
+
+    # Urun metadata'si. `i5`in basligi kasitli olarak BOS: ornekleme "urun adi
+    # yok" yolunu da gecsin ve n_missing_product_title sayaci sinansin.
+    meta = conf.path("raw") / "raw" / "meta_categories" / "meta_Test_Cat.jsonl"
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(FIXTURES / "mini_meta.jsonl", meta)
     return conf

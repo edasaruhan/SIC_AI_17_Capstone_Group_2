@@ -1,0 +1,40 @@
+{
+  "file": "meta_All_Beauty.jsonl",
+  "lines_probed": 1000,
+  "fields": [
+    "average_rating",
+    "bought_together",
+    "categories",
+    "description",
+    "details",
+    "features",
+    "images",
+    "main_category",
+    "parent_asin",
+    "price",
+    "rating_number",
+    "store",
+    "title",
+    "videos"
+  ],
+  "field_types": {
+    "average_rating": "float",
+    "bought_together": "NoneType",
+    "categories": "list",
+    "description": "list",
+    "details": "dict",
+    "features": "list",
+    "images": "list",
+    "main_category": "str",
+    "parent_asin": "str",
+    "price": "NoneType",
+    "rating_number": "int",
+    "store": "str",
+    "title": "str",
+    "videos": "list"
+  },
+  "required_present": [
+    "parent_asin",
+    "title"
+  ]
+}

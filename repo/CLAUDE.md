@@ -51,7 +51,8 @@ Amazon Reviews 2023 (HF, kategori bazlı)
 src/gift_contamination/
   config.py              # YAML config yükleme, path çözümleme. Tek doğruluk kaynağı.
   data/
-    download.py          # HF'den kategori indirme
+    download.py          # HF'den review + metadata indirme
+    metadata.py          # ürün metadata jsonl -> parquet, parent_asin join'i
     preprocess.py        # filtreleme, 5-core, sekans kurma
     sampling.py          # katmanlı örnekleme (main + boost çerçeveleri)
     labelsheet.py        # elle etiketleme sayfası: CSV <-> xlsx gidiş dönüşü
@@ -99,8 +100,15 @@ src/gift_contamination/
 | Orta | `mid` | `raw_review_Video_Games` | Orta |
 | Düşük (kontrol) | `low` | `raw_review_Grocery_and_Gourmet_Food` | Düşük — **kontrol grubu** |
 
-Kullanılan alanlar: `text`, `title`, `rating`, `timestamp`, `user_id`, `parent_asin`,
-`verified_purchase`. Metadata join anahtarı **`parent_asin`** — `asin` DEĞİL.
+Kullanılan review alanları: `text`, `title`, `rating`, `timestamp`, `user_id`,
+`parent_asin`, `verified_purchase`. (`images` hiç okunmaz; `asin` taşınır ama join'de
+kullanılmaz.)
+
+**Ürün metadata'sı da indiriliyor** (`raw_meta_*`, 4 kategori ~4.35 GB). Tutulan
+alanlar: `parent_asin`, `title`, `main_category`, `store`, `price`, `average_rating`,
+`rating_number`, `categories`. Örnekleme `product_title` ve `product_category` olarak
+join'lenir ve prompt'a girer — LLM v2'ye kadar *"she loved it"* cümlesindeki "it"in ne
+olduğunu bilmiyordu. Join anahtarı **`parent_asin`** — `asin` DEĞİL.
 
 **Depolama:** Ara çıktılar `.parquet`. Ham `.jsonl.gz` `data/raw/` altında, git'e girmez.
 
@@ -110,20 +118,33 @@ Kullanılan alanlar: `text`, `title`, `rating`, `timestamp`, `user_id`, `parent_
 
 `configs/annotation_schema.json` içinde tanımlı, `detection/schema.py` içinde Pydantic karşılığı.
 
-> **v2 — 2026-08-26.** Enum'lar deep EDA (T6/T6b) ölçümüyle revize edildi. Eski şema
-> sezgiyle tasarlanmıştı; veriyle ilk teması bu oldu. Gerekçe `docs/DECISIONS.md`.
+> **v3 — 2026-08-27.** `received` beşinci sınıf oldu; `recipient`'tan `null`
+> kaldırıldı. v2'de (2026-08-26) enum'lar deep EDA (T6/T6b) ölçümüyle revize
+> edilmişti. Gerekçe `docs/DECISIONS.md`.
 
 ```json
 {
-  "purchase_type": "self | gift_given | household | unclear",
+  "purchase_type": "self | gift_given | household | received | unclear",
   "confidence":    "high | medium | low",
-  "recipient":     "child | grandchild | partner | parent | sibling | extended_family | friend | other | unknown | null",
+  "recipient":     "child | grandchild | partner | parent | sibling | extended_family | friend | other | unknown",
   "occasion":      "birthday | christmas | wedding | graduation | anniversary | baby_shower | valentines_day | mothers_day | fathers_day | other | none | unknown",
   "evidence_span": "<review içinden birebir alıntı>"
 }
 ```
 
 - `household` = ev halkı için alınmış (bebeğe bez). Hediye değil ama alıcının kendi tercihi de değil.
+- **`received` = yorumcu hediyeyi ALDI, vermedi.** v2'de bu `self`'e katlanıyordu.
+  Ama `household`'ın var olma gerekçesi *"hediye değil ama kendi tercihi de değil"* —
+  hediye alan da tam olarak bu durumda; aynı mantık iki vakaya farklı uygulanıyordu.
+  Daha önemlisi: bir kez `self` yazıldıktan sonra bilgi geri gelmez ve C1/C2/C3
+  sonradan karar veremez. Annotation anında bilgi yok etmiyoruz.
+- **`recipient` her zaman string, `null` yok.** Alıcı yoksa veya belli değilse
+  `unknown`. Eskiden ikisi de vardı ve hangisinin ne zaman kullanılacağı yazmıyordu.
+  `received` kaydında `recipient` **vereni** gösterir.
+- **`occasion`'da `none` ile `unknown` farklı:** `none` = hediye değil, vesile kavramı
+  geçersiz. `unknown` = hediye ama vesile metinde yok — beklenen çoğunluk cevabı.
+- `confidence` LLM'in öz-beyanıdır. Kullanımı: distillation eğitim setini filtrelemek
+  ve hata analizini önceliklendirmek. Kalibrasyonu zayıf olduğu için **kapı değildir**.
 - **`grandchild` ayrı bir sınıf ve şemadaki en kritik ayrım.** Torun ayrı hanede yaşar →
   torununa alan kişi **hediye** alır. Kendi çocuğuna alan `household` olabilir. Eski şemada
   ikisi de `child`'a düşüyordu, yani şemanın en zor sınırı için en bilgilendirici ipucu

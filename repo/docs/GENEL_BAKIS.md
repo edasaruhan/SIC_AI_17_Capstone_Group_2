@@ -79,7 +79,7 @@ elimizdeki donanımla **haftalar** sürer.
 flowchart TD
     A["Temiz korpus<br/>12.417.784 review · Toys_and_Games"]
     B["Etiketlenecek örnek<br/>47.200 satır · 4 kategori"]
-    C["LLM etiketleri<br/>self · gift_given · household · unclear"]
+    C["LLM etiketleri<br/>self · gift_given · household<br/>received · unclear"]
     H["İnsan etiketi<br/>500 satır · 3 annotator · Hafta 4"]
     G1{"KAPI 1<br/>Aralık–Ocak tepesi var mı?"}
     P["prompt v3 / model değişikliği<br/>tam annotation'a geçilmez"]
@@ -139,7 +139,31 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 | Hediye vekil oranı — Toys_and_Games | **%11,07** |
 | Hediye vekil oranı — Grocery (kontrol) | **%1,85** |
 | Çekilmiş örnek | **47.200** (180 katman) |
-| Geçen test | **127** |
+| Geçen test | **136** |
+
+### Hangi veri, ne kadar
+
+Tek kaynak: **`McAuley-Lab/Amazon-Reviews-2023`** (HuggingFace, açık). Dört kategorinin
+review dosyaları **+** ürün metadata'sı indirildi.
+
+| | |
+|---|---|
+| Ham review JSONL | **15,2 GB** |
+| Ham ürün metadata JSONL | **4,35 GB** |
+| Ara çıktılar (parquet) | ~8 GB |
+| **Dil modeline giden** | **~6 MB** |
+
+Son satır projenin bütün mimarisini açıklıyor: ~28 GB veriden 6 MB'ı LLM'e gidiyor.
+27 milyon review'ı dil modeline koşturmak haftalar sürerdi.
+
+**Review alanları** (Amazon 10 veriyor, 7'sini kullanıyoruz): `text`, `title`, `rating`,
+`timestamp`, `user_id`, `parent_asin`, `verified_purchase`. `images` hiç okunmuyor;
+`asin` taşınıyor ama join'de `parent_asin` kullanılıyor (aynı ürünün renk/beden
+varyantlarını birleştiren anahtar o).
+
+**Metadata alanları**: `title` (ürün adı), `main_category`, `store`, `price`,
+`average_rating`, `rating_number`, `categories`. Ürün adı prompt'a giriyor — LLM v2'ye
+kadar *"she loved it"* cümlesindeki "it"in ne olduğunu bilmiyordu.
 
 ### Hafta 1 — veriyi tanımak
 

@@ -1,4 +1,4 @@
-"""Etiket semasinin Pydantic karsiligi (v2).
+"""Etiket semasinin Pydantic karsiligi (v3).
 
 CLAUDE.md bolum 8, kural 3: LLM ciktisi regex ile parse EDILMEZ. vLLM guided
 decoding `configs/annotation_schema.json` semasini uygular, bu modul de donen
@@ -10,9 +10,20 @@ gecersiz olur ve bunu ancak annotation kosusunun ortasinda fark ederiz.
 `tests/test_schema.py` bu esitligi kilitliyor - biri degisip digeri degismezse
 test kirmizi yanar.
 
-Sema v2 gerekcesi (2026-08-26): `grandchild` ayri bir sinif, cunku torun ayri
-hanede yasar (hediye) ama kendi cocugu `household` olabilir. Toys_and_Games'te
-adi gecen alicilarin %26.2'si torun. Ayrinti: docs/DECISIONS.md.
+Sema v2 (2026-08-26): `grandchild` ayri bir sinif, cunku torun ayri hanede yasar
+(hediye) ama kendi cocugu `household` olabilir. Toys_and_Games'te adi gecen
+alicilarin %26.2'si torun.
+
+Sema v3 (2026-08-27): iki degisiklik.
+  - `received` besinci sinif. `household` zaten "hediye degil ama alicinin kendi
+    tercihi de degil" diye ayri tutuluyor; hediye ALAN kisi de tam olarak bu
+    durumda ama sema onu `self`'e katliyordu. Daha onemlisi: bir kez `self`
+    yazildiktan sonra bilgi geri gelmez ve C1/C2/C3 sonradan karar veremez.
+  - `recipient`'tan `null` kaldirildi. Enum'da hem `null` hem `"unknown"` vardi
+    ve hangisinin ne zaman kullanilacagi hicbir yerde yazmiyordu; 40.000 satirda
+    model ikisi arasinda rastgele gidip gelirdi. Artik tum alanlar string.
+
+Ayrinti: docs/DECISIONS.md.
 """
 
 from __future__ import annotations
@@ -30,10 +41,18 @@ class PurchaseType(StrEnum):
     SELF = "self"
     GIFT_GIVEN = "gift_given"
     HOUSEHOLD = "household"
+    RECEIVED = "received"    # hediye ALAN, veren degil (v3)
     UNCLEAR = "unclear"
 
 
 class Confidence(StrEnum):
+    """LLM oz-beyani.
+
+    Kullanim: distillation egitim setini filtrelemek ve hata analizinde
+    LLM-insan uyusmazliklarini onceliklendirmek. Dil modellerinin guven
+    kalibrasyonu zayif oldugu icin bir KAPI olarak kullanilmaz.
+    """
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -48,7 +67,7 @@ class Recipient(StrEnum):
     EXTENDED_FAMILY = "extended_family"  # yegen/kuzen/hala/amca
     FRIEND = "friend"                  # arkadas/komsu/is arkadasi
     OTHER = "other"
-    UNKNOWN = "unknown"
+    UNKNOWN = "unknown"      # alici yok VEYA belli degil - null yerine bu (v3)
 
 
 class Occasion(StrEnum):
@@ -62,8 +81,8 @@ class Occasion(StrEnum):
     MOTHERS_DAY = "mothers_day"
     FATHERS_DAY = "fathers_day"
     OTHER = "other"
-    NONE = "none"
-    UNKNOWN = "unknown"                # vesile metinden yalnizca %20-29 cikarilabiliyor
+    NONE = "none"        # hediye degil: vesile kavrami gecersiz
+    UNKNOWN = "unknown"  # hediye ama vesile yazmiyor - BEKLENEN cogunluk (%20-29)
 
 
 class GiftAnnotation(BaseModel):
@@ -73,7 +92,7 @@ class GiftAnnotation(BaseModel):
 
     purchase_type: PurchaseType
     confidence: Confidence
-    recipient: Recipient | None = None
+    recipient: Recipient          # v3: `| None` kaldirildi, yoklugu "unknown" ifade eder
     occasion: Occasion
     evidence_span: str = Field(
         description="Review metninden BIREBIR alinti; dogrulanmazsa kayit unclear'a duser."

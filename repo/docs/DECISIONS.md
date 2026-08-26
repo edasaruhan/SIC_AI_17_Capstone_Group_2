@@ -555,3 +555,103 @@ insan etiketiyle sınanmadı.
 `utils/io.py`, `configs/base.yaml`, testler (117 → 127), `reports/results/` (9 dosya),
 `data/annotations/human/prompt_trial_ids.json`
 **Kim:** Ekip
+
+---
+
+### 2026-08-27 — Şema v3: `received` beşinci sınıf, `recipient`'ta `null` kaldırıldı
+
+Şema, LLM koşusundan **önce** eleştirel okundu. Bir kusur 40.000 satır etiketlendikten
+sonra geri alınamaz: yeniden annotation Kaggle kotasını ikinci kez harcamak demek.
+
+**1 — `received` beşinci sınıf oldu.** v2 "hediye alan"ı `self`'e katlıyordu. Ama
+`household` sınıfının var olma gerekçesi *"hediye değil ama alıcının kendi tercihi de
+değil"* — hediye **alan** da tam olarak bu durumda; aynı mantık iki vakaya farklı
+uygulanıyordu. Asıl sorun bilgi kaybı: bir kez `self` yazıldıktan sonra geri gelmez ve
+C1/C2/C3 sonradan karar veremez. Annotation anında bilgi yok etmiyoruz.
+
+Yan etki yok: mevcut 200 etiketli satırda `kw_gift_received` sıfır, yani yeniden eşleme
+kaybı yok. (Vekilin duyarlılığı mükemmel olmadığı için birkaç satır kaçmış olabilir;
+ölçülemez ve etkisi ihmal edilebilir.)
+
+**2 — `recipient`'tan `null` kaldırıldı.** Enum'da hem `null` hem `"unknown"` vardı ve
+hangisinin ne zaman kullanılacağı hiçbir yerde yazmıyordu; 40.000 satırda model ikisi
+arasında rastgele gidip gelir ve analiz karışırdı. Artık tüm alanlar string — guided
+decoding de sadeleşti. `received` kaydında `recipient` **vereni** gösterir.
+
+**3 — `occasion`'da `none` / `unknown` kuralı prompt'a yazıldı.** Ayrım anlamlıydı
+(`none` = hediye değil, vesile kavramı geçersiz; `unknown` = hediye ama vesile yazmıyor)
+ama yalnızca örneklerden çıkarılabiliyordu.
+
+**4 — `confidence`'ın kullanım amacı yazıldı.** Alan duruyordu ama ne işe yarayacağı
+hiçbir dokümanda yoktu. Amaç: distillation eğitim setini filtrelemek ve hata analizini
+önceliklendirmek. LLM öz-beyanı ve kalibrasyonu zayıf olduğu için **kapı değildir** —
+bu da yazıldı.
+
+**Prompt v3 açıldı**, v2 silinmedi. v2'nin üç kuralı aynen taşındı.
+
+**Ayrıca düzeltildi:** `PROJECT_SPEC.md` ve `ROADMAP.md` hâlâ **v1** şemasını gösteriyordu
+(`spouse`, `colleague`) — 26 Ağustos'taki v2 revizyonunda atlanmışlar.
+**Etkilediği bölüm:** `configs/annotation_schema.json`, `detection/schema.py`,
+`data/sampling.py` (LABELS), `prompts/gift_detection_v3.md`, CLAUDE.md §4,
+PROJECT_SPEC, ROADMAP, ETIKETLEME_REHBERI §1-3.2
+**Kim:** Ekip
+
+---
+
+### 2026-08-27 — Ürün metadata'sı indiriliyor ve prompt'a giriyor
+
+**Bulgu.** `configs/base.yaml` başından beri `meta_prefix: raw_meta_` ve
+`join_key: parent_asin` tanımlıyordu ama `download.py`'de metadata diye bir şey yoktu.
+Yani config bir yeteneği ilan ediyordu, kod onu hiç uygulamıyordu — denetimde bulunan
+"ölü config anahtarı" sınıfının bir örneği daha.
+
+**Sonucu.** LLM bir review'ı etiketlerken *"she loved it"* cümlesindeki "it"in ne
+olduğunu bilmiyordu; yalnızca dataset kategorisini (`Toys_and_Games`) görüyordu.
+
+**Karar.** Dört kategorinin metadata'sı indiriliyor (**4,35 GB**: Toys 2,5 · Grocery 1,3
+· Video Games 0,4 · All_Beauty 0,2). `data/metadata.py` jsonl'i parquet'e çeviriyor ve
+**yalnızca ihtiyaç duyulan alanları** okuyor — `description`, `features`, `images`,
+`videos`, `details` hiç ayrıştırılmıyor. Tutulanlar: `parent_asin`, `title`,
+`main_category`, `store`, `price`, `average_rating`, `rating_number`, `categories`.
+
+Örneklem `product_title` ve `product_category` olarak join'liyor (`main_category` →
+`product_category`: dataset kategorisiyle ve review başlığıyla karışmasın). Prompt v3'ün
+USER bloğuna `Product: {product_title}` satırı girdi.
+
+**Ürün adı bağlamdır, kanıt değildir.** Prompt bunu açıkça yasaklıyor: oyuncak olduğu
+için `gift_given` demek en bariz yeni hata yolu. `evidence_span` yalnızca review
+metninden alınabilir. `test_prompt_forbids_inferring_the_label_from_the_product_type`
+bu yasağı kilitliyor.
+
+**Kapsam ölçülüyor, varsayılmıyor.** Eşleşmeyen `parent_asin` ve metadata'da boş gelen
+başlıklar birlikte sayılıp tahsis raporuna `n_missing_product_title` olarak yazılıyor.
+Pilot kategoride: 11.800 satırda 2 boş başlık, 0 eşleşmeme.
+
+**Kapsam dışı:** RecBole `.item` dosyaları bu blokta yazılmadı. Metadata Hafta 6'da item
+feature olarak da kullanılabilir ama SASRec/BPR ID tabanlı çalıştığı için MVP
+gerektirmiyor.
+**Etkilediği bölüm:** `data/download.py` (`--meta`), `data/metadata.py` (yeni),
+`data/sampling.py`, `detection/prompting.py` (`REQUIRED_FIELDS`), `configs/base.yaml`,
+CLAUDE.md §2-3
+**Kim:** Ekip
+
+---
+
+### 2026-08-27 — Test fixture'ları gitignore'a takılıyordu
+
+**Bulgu.** `tests/fixtures/` altında **hiçbir dosya takip edilmiyordu.** `.gitignore`'daki
+`*.jsonl` kuralı — 15 GB'lık ham veriyi dışarıda tutmak için yazılmış — sentetik test
+fixture'larını da yutuyordu. Yani temiz bir clone'da `mini_reviews.jsonl` yok ve **136
+testin tamamı kırılıyordu.**
+
+Metadata fixture'ı (`mini_meta.jsonl`) eklenirken `git status`'ta görünmemesi üzerine
+fark edildi.
+
+**Neden önemli:** CLAUDE.md §10 testlerin sentetik fixture ile koşmasını şart koşuyor ve
+projenin teslim vaadi "yeniden üretilebilir kod". Fixture repoda yoksa ikisi de geçersiz.
+
+**Düzeltme:** `!tests/fixtures/` + `!tests/fixtures/**` istisnası. Gerçek veriyi dışarıda
+tutan kural aynen duruyor.
+**Etkilediği bölüm:** `.gitignore`, `tests/fixtures/mini_reviews.jsonl`,
+`tests/fixtures/mini_meta.jsonl`
+**Kim:** Ekip

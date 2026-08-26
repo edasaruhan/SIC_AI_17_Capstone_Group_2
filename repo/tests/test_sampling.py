@@ -27,6 +27,7 @@ from gift_contamination.data.sampling import (
     _draw_main,
     _length_bucket,
     allocate_by_share,
+    allocation_path,
     annotation_sample_path,
     build_sample,
     build_trial,
@@ -379,6 +380,28 @@ def test_build_sample_end_to_end(cfg: Config):
     assert sample["text"].null_count() == 0
     # row_id benzersiz -> cerceveler ayrik
     assert sample["row_id"].n_unique() == sample.height
+
+
+def test_sample_carries_the_product_name(cfg: Config):
+    """Urun adi ornege girmeli - LLM prompt'unun yeni girdisi bu.
+
+    Fixture'daki `i5` urununun basligi kasitli olarak BOS: eksik urun adi yolu
+    da gecilsin ve sayac sinansin. Kacirma "kapsam tamdir" diye varsayilmaz,
+    olculup tahsis raporuna yazilir.
+    """
+    import json
+
+    scan_category(cfg, "pilot")
+    sample = pl.read_parquet(build_sample(cfg, "pilot"))
+    report = json.loads(allocation_path(cfg, "pilot").read_text(encoding="utf-8"))
+
+    assert {"parent_asin", "product_title", "product_category"} <= set(sample.columns)
+    assert sample["product_title"].null_count() == 0, "null degil bos string olmali"
+    # i5'in basligi bos: sayac onu gormeli
+    n_blank = int((sample["product_title"].str.strip_chars() == "").sum())
+    assert report["n_missing_product_title"] == n_blank
+    # ...ama hepsi bos olmamali, yoksa join hic calismamis demektir
+    assert n_blank < sample.height
 
 
 def test_build_sample_is_idempotent(cfg: Config):

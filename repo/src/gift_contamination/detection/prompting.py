@@ -26,7 +26,7 @@ _BLOCK = r"^##\s+{name}\s*$.*?^```[a-zA-Z]*\s*$\n(?P<body>.*?)^```\s*$"
 _VERSION = re.compile(r"^\*\*Versiyon:\*\*\s*(?P<v>[^\s·]+)", re.MULTILINE)
 
 # USER blogunda beklenen yer tutucular. Fazlasi veya eksigi hatadir.
-REQUIRED_FIELDS = ("category", "title", "text")
+REQUIRED_FIELDS = ("product_title", "category", "title", "text")
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 
@@ -36,9 +36,11 @@ class Prompt(NamedTuple):
     user_template: str
     source: Path
 
-    def render(self, *, category: str, title: str, text: str) -> str:
+    def render(self, *, product_title: str, category: str, title: str, text: str) -> str:
         """USER blogunu doldurur. SYSTEM ayri gonderilir (chat rolleri)."""
-        filled = self.user_template.format(category=category, title=title, text=text)
+        filled = self.user_template.format(
+            product_title=product_title, category=category, title=title, text=text
+        )
         left = _PLACEHOLDER.findall(filled)
         if left:
             raise ValueError(
@@ -46,11 +48,18 @@ class Prompt(NamedTuple):
             )
         return filled
 
-    def messages(self, *, category: str, title: str, text: str) -> list[dict[str, str]]:
+    def messages(
+        self, *, product_title: str, category: str, title: str, text: str
+    ) -> list[dict[str, str]]:
         """vLLM / OpenAI uyumlu mesaj listesi."""
         return [
             {"role": "system", "content": self.system},
-            {"role": "user", "content": self.render(category=category, title=title, text=text)},
+            {
+                "role": "user",
+                "content": self.render(
+                    product_title=product_title, category=category, title=title, text=text
+                ),
+            },
         ]
 
 
@@ -106,6 +115,10 @@ def load_prompt(cfg: Config | None = None, path: Path | None = None) -> Prompt:
     )
 
 
-def render(category: str, title: str, text: str, cfg: Config | None = None) -> str:
+def render(
+    product_title: str, category: str, title: str, text: str, cfg: Config | None = None
+) -> str:
     """Tek seferlik kullanim icin kisayol; toplu kosuda `load_prompt` bir kez cagirilir."""
-    return load_prompt(cfg).render(category=category, title=title, text=text)
+    return load_prompt(cfg).render(
+        product_title=product_title, category=category, title=title, text=text
+    )

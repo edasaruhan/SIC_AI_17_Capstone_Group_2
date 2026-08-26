@@ -46,9 +46,10 @@ alınmış? Projenin tamamı bu ayrımın üzerine kurulu: öneri sistemi her sa
 
 | Etiket | Anlamı |
 |---|---|
-| `self` | Kendisi için almış (ya da hediye **almış**, veren değil) |
+| `self` | Kendisi için almış |
 | `gift_given` | Başkasına hediye olarak vermiş |
 | `household` | Ev halkı için / ortak kullanım. Hediye değil ama kendi zevki de değil |
+| `received` | Kendisi hediye **almış** — ürünü kullanıyor ama seçmemiş |
 | `unclear` | Metinde karar vermeye yetecek kanıt yok |
 
 ---
@@ -65,11 +66,15 @@ Sırayla sorun, ilk "evet"te durun:
    Örn. "bebeğimizin bezleri", "mutfağımız için aldık", "eşimle ikimiz kullanıyoruz"
    → **`household`**
 
-**3. Metinde ürünün kullanımı/deneyimi hakkında birinci ağızdan bir şey var mı?**
+**3. Ürünü kendisi hediye **almış** mı?**
+   Örn. "doğum günümde hediye geldi", "kardeşim yolladı"
+   → **`received`**
+
+**4. Metinde ürünün kullanımı/deneyimi hakkında birinci ağızdan bir şey var mı?**
    Örn. "üç haftadır kullanıyorum", "cildime iyi geldi", "kurulumu kolaydı"
    → **`self`**
 
-**4. Hiçbiri yoksa** → **`unclear`**
+**5. Hiçbiri yoksa** → **`unclear`**
 
 ---
 
@@ -114,15 +119,19 @@ Ayırt edici soru sırası: **(a)** ürün el değiştirmiş mi? → `gift_given
 **(b)** Değilse, kişinin kendi kullanımına dair bir şey var mı? → `self`.
 **(c)** İkisi de yoksa → `unclear`.
 
-### 3.2 Hediye **almak** ≠ hediye **vermek** → `self`
+### 3.2 Hediye **almak** ≠ hediye **vermek** → `received`
 
 > *"Bunu doğum günümde hediye aldım ve bayıldım."*
 
-Değerlendiren kişi **alıcı**. Ürün onda, o kullanıyor, yorum onun deneyimi.
-Öneri sistemi açısından bu bir kirlenme değil → **`self`**.
+Değerlendiren kişi **alıcı**. Ürün onda, o kullanıyor, yorum onun deneyimi — ama
+ürünü **o seçmedi**. → **`received`**
 
-> Not: teknik olarak bu da kişinin kendi seçimi değil. Ama biz **verenin** hesabındaki
-> kirlenmeyi ölçüyoruz; alanın hesabında ürün gerçekten kullanılıyor.
+> **v3'te değişti.** Eskiden bu vaka `self` yazılıyordu. Ama `household` sınıfı zaten
+> *"hediye değil ama kendi tercihi de değil"* diye ayrı tutuluyor ve hediye alan da tam
+> olarak bu durumda. Bir kez `self` yazılırsa bilgi geri gelmez.
+
+`notes` alanına bir şey yazmanız gerekmiyor; `received` etiketi tek başına yeterli.
+`recipient` sorulursa **vereni** gösterir (ör. "kız kardeşim yolladı" → `sibling`).
 
 ### 3.3 Torun ≠ ev halkı → `gift_given`
 

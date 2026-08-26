@@ -33,6 +33,7 @@ You classify reviews.
 ## USER
 
 ```
+Product: {product_title}
 Category: {category}
 Title: {title}
 Review: {text}
@@ -73,7 +74,9 @@ def test_real_prompt_documents_the_critical_distinctions():
     # Ornek CUMLELERE degil KURALLARA bakiliyor: ornekler gercek review metniyle
     # ortusmemek icin degistirilebiliyor, kurallar degismemeli.
     assert "realized" in system and "suggested" in system, "gerceklesmis/onerilmis ayrimi yok"
-    assert "receiving a gift is not giving one" in system
+    # v3'te ifade "receiving is not giving" oldu ve etiket `self` degil `received`;
+    # kural ayni, sozler degisti - test soze degil kurala bakiyor.
+    assert "receiving is not giving" in system, "alan/veren ayrimi dusmus"
     assert "grandchild" in system, "sema revizyonu prompt'a yansimamis"
 
 
@@ -95,15 +98,18 @@ def test_prompt_keeps_the_rules_learned_from_the_trial_pass():
 
 
 def test_render_fills_every_placeholder():
-    out = render("Toys_and_Games", "Nice", "bought for my grandson")
+    out = render("Wooden Puzzle", "Toys_and_Games", "Nice", "bought for my grandson")
 
+    assert "Wooden Puzzle" in out
     assert "Toys_and_Games" in out
     assert "bought for my grandson" in out
     assert "{" not in out
 
 
 def test_messages_carry_system_and_user_roles():
-    msgs = load_prompt().messages(category="Toys", title="T", text="body")
+    msgs = load_prompt().messages(
+        product_title="Wooden Puzzle", category="Toys", title="T", text="body"
+    )
 
     assert [m["role"] for m in msgs] == ["system", "user"]
     assert msgs[0]["content"] == load_prompt().system

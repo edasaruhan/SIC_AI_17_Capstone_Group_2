@@ -1,0 +1,23 @@
+{
+  "category": "Video_Games",
+  "n_products_raw": 137269,
+  "n_products": 137269,
+  "n_duplicate_parent_asin": 0,
+  "columns": [
+    "parent_asin",
+    "title",
+    "main_category",
+    "store",
+    "price",
+    "average_rating",
+    "rating_number",
+    "categories"
+  ],
+  "null_rate": {
+    "title": 0.0,
+    "main_category": 0.08039,
+    "store": 0.03177,
+    "price": 0.548274,
+    "average_rating": 0.0
+  }
+}

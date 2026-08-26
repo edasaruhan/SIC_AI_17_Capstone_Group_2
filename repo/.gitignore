@@ -11,6 +11,14 @@ reports/results/*.csv
 *.jsonl.gz
 *.arrow
 
+# ...ama test fixture'lari SENTETIKTIR ve commit EDILMEK ZORUNDA. Yukaridaki
+# `*.jsonl` kurali (15 GB'lik ham veri icin) onlari da yutuyordu: `tests/fixtures/`
+# altinda hicbir dosya takip edilmiyordu, yani temiz bir clone'da test paketi hic
+# calismiyordu. CLAUDE.md bolum 10 testlerin sentetik fixture'la kosmasini sart
+# kosuyor - o fixture repoda olmali.
+!tests/fixtures/
+!tests/fixtures/**
+
 # İnsan etiketleme dosyaları birebir review metni taşır. concept-note ve
 # implementation-plan açıkça taahhüt ediyor: "No verbatim review text appears in
 # any published output." Ham etiket dosyaları YEREL kalır; git'e yalnızca

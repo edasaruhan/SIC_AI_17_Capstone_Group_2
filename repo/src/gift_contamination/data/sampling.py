@@ -1,17 +1,19 @@
 """Katmanli annotation ornekleme (Hafta 2).
 
-LLM'in etiketleyecegi ornegi ceker. IKI AYRI CERCEVE uretir ve bu ayrim projenin
+LLM'in etiketleyecegi ornegi ceker. UC AYRI CERCEVE uretir ve bu ayrim projenin
 istatistiksel olarak en kolay bozulan ozelligi:
 
-    main   -- month x rating x text_length_bucket hucrelerine ORANTILI tahsisle
-              cekilmis katmanli rastgele ornek. Orantili oldugu icin KENDINDEN
-              AGIRLIKLI: yaygınlık tahmini duz ortalamayla hesaplanir.
-    boost  -- yalnizca `kw_gift_proxy` havuzundan cekilmis EK ornek. Amaci
-              distillation egitim setine daha cok pozitif ornek koymak ve hata
-              analizini kolaylastirmak.
+    main            -- month x rating x text_length_bucket hucrelerine ORANTILI
+                       tahsisle cekilmis katmanli rastgele ornek. Orantili oldugu
+                       icin KENDINDEN AGIRLIKLI: yaygınlık duz ortalamayla hesaplanir.
+    boost           -- yalnizca `kw_gift_proxy` havuzundan cekilmis EK ornek.
+                       Distillation egitim setine daha cok pozitif koymak icin.
+    boost_received  -- `kw_gift_received` havuzundan ek ornek. Vekilin tanim geregi
+                       disladigi (PROXY = evidence AND NOT received) ama LLM'in
+                       ayirmasi gereken en zor negatif sinif; korpusta %0.08-0.28.
 
-`boost` satirlarini `main`'e katip yaygınlık hesaplamak, kendi sectiginiz seyi
-olcmek demektir. `configs/base.yaml` icindeki "ayri tutulur, ana orana KATILMAZ"
+Yaygınlık tahmini YALNIZCA `main` uzerinden hesaplanir. Takviye cercevelerini
+`main`'e katip oran hesaplamak, kendi sectiginiz seyi olcmek demektir. `configs/base.yaml` icindeki "ayri tutulur, ana orana KATILMAZ"
 notu tam olarak bunu soyluyor; `sample_frame` kolonu o notu makine tarafindan
 uygulanabilir hale getiriyor. Iki cerceve AYRIKTIR - bir satir ikisinde birden
 gecmez.
@@ -37,6 +39,8 @@ import polars as pl
 
 from ..analysis.keyword_scan import PROXY_COL, keyword_path
 from ..config import Config, add_standard_args, resolve_roles
+from ..data.download import raw_meta_path
+from ..data.metadata import build_meta_parquet, load_join_frame, meta_parquet_path
 from ..data.preprocess import build_clean, clean_parquet_path
 from ..utils.io import should_skip, write_json
 from ..utils.logging import get_logger, log_output
@@ -75,12 +79,17 @@ TRIAL_STRATA = {
 }
 
 # Elle doldurulacak etiket sozlugu; configs/annotation_schema.json ile ayni.
-LABELS = ("gift_given", "self", "household", "unclear")
+# v3 (2026-08-27): `received` eklendi - hediye ALAN, veren degil.
+LABELS = ("gift_given", "self", "household", "received", "unclear")
 
 # Ornekten tasinacak kolonlar. Metin dahil - LLM'e gidecek.
 SAMPLE_COLUMNS = [
     "row_id", "category", "sample_frame", "stratum_id",
-    "month", "rating", "n_words", "title", "text",
+    "month", "rating", "n_words",
+    # Urun kimligi ve adi: LLM "she loved it" cumlesindeki "it"i bilmeden
+    # etiketliyordu. `parent_asin` izlenebilirlik icin tasiniyor.
+    "parent_asin", "product_title", "product_category",
+    "title", "text",
     "kw_gift_evidence", "kw_gift_speculative", "kw_gift_received", PROXY_COL,
 ]
 
@@ -301,6 +310,17 @@ def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
         raise FileNotFoundError(
             f"Once keyword_scan kosun: {keyword_path(cfg, role)} yok"
         )
+    # `build_clean` ile ayni davranis: turetilebilir olan turetilir, indirilmesi
+    # gereken icin gurultulu hata verilir. Metadata indirmesi aga bagli, o yuzden
+    # sessizce halledilemez.
+    if not meta_parquet_path(cfg, role).exists():
+        if not raw_meta_path(cfg, role).exists():
+            raise FileNotFoundError(
+                f"Urun metadata'si yok: {raw_meta_path(cfg, role)}\n"
+                "Once indirin:\n"
+                f"  python -m gift_contamination.data.download --category {role} --meta"
+            )
+        build_meta_parquet(cfg, role)
 
     _check_strata(cfg)
     seed = int(cfg.get("seed"))
@@ -336,15 +356,31 @@ def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
         ]
     )
 
-    # Metni ancak simdi, secilen satirlar icin getiriyoruz.
+    # Metni ve urun kimligini ancak simdi, secilen satirlar icin getiriyoruz.
     text = (
         pl.scan_parquet(clean_parquet_path(cfg, role))
-        .select("row_id", "title", "text")
+        .select("row_id", "title", "text", "parent_asin")
         .join(drawn.lazy().select("row_id"), on="row_id", how="semi")
         .collect()
     )
+    # Urun adi LEFT join: metadata'da olmayan parent_asin bos string kalir ve
+    # kacirma orani raporlanir. "kapsam tamdir" varsayilmaz, olculur.
+    meta = load_join_frame(cfg, role)
+    joined = text.join(meta, on="parent_asin", how="left").with_columns(
+        pl.col("product_title").fill_null(""),
+        pl.col("product_category").fill_null(""),
+    )
+    # Join kacirmasi VE metadata'da bos gelen basliklar birlikte sayiliyor:
+    # LLM icin ikisi de ayni sey - urun adi gormeyecek.
+    n_missing = int((joined["product_title"].str.strip_chars() == "").sum())
+    if n_missing:
+        log.warning(
+            "%s: %s/%s satirda urun adi bos (eslesmeyen parent_asin veya metadata'da bos baslik)",
+            role, f"{n_missing:,}", f"{joined.height:,}",
+        )
+
     out = (
-        drawn.join(text, on="row_id", how="inner")
+        drawn.join(joined, on="row_id", how="inner")
         .with_columns(pl.lit(cfg.category_slug(role)).alias("category"))
         .select(SAMPLE_COLUMNS)
         .sort("row_id")
@@ -366,6 +402,7 @@ def build_sample(cfg: Config, role: str, *, force: bool = False) -> Path:
             "n_boost_drawn": boost.height,
             "n_received_requested": n_received,
             "n_received_drawn": received.height,
+            "n_missing_product_title": n_missing,  # bos VEYA eslesmeyen
             # HESAPLANIR, iddia edilmez: rapora dogrulanmamis bir sabit yazmak,
             # kod degistiginde sessizce yalan soyleyen bir alan birakir.
             "frames_disjoint": bool(out["row_id"].n_unique() == out.height),

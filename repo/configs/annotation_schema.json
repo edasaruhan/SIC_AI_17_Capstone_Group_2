@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "GiftAnnotation",
-  "description": "v2 (2026-08-26). Enum'lar deep EDA T6/T6b olcumlerine gore revize edildi; gerekce docs/DECISIONS.md.",
+  "description": "v3 (2026-08-27). `received` besinci sinif olarak eklendi: hediye ALAN kisi de 'kendi tercihi degil' durumunda ve bu bilgi annotation aninda yok edilmemeli. `recipient`'tan null kaldirildi - enum'da hem null hem 'unknown' vardi ve hangisinin ne zaman kullanilacagi tanimli degildi. Gerekce: docs/DECISIONS.md.",
   "type": "object",
   "properties": {
     "purchase_type": {
@@ -10,9 +10,10 @@
         "self",
         "gift_given",
         "household",
+        "received",
         "unclear"
       ],
-      "description": "self=kendisi icin, gift_given=baskasina hediye, household=ev halki icin, unclear=belirsiz"
+      "description": "self=kendisi icin aldi · gift_given=baskasina hediye verdi · household=ev halki icin · received=kendisi hediye ALDI (veren degil) · unclear=belirsiz"
     },
     "confidence": {
       "type": "string",
@@ -20,13 +21,11 @@
         "high",
         "medium",
         "low"
-      ]
+      ],
+      "description": "LLM'in oz-beyani. Kullanim: (a) distillation egitim setini filtrelemek, (b) hata analizinde LLM-insan uyusmazliklarini onceliklendirmek. Dil modellerinin guven kalibrasyonu zayiftir - KAPI OLARAK KULLANILMAZ."
     },
     "recipient": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": "string",
       "enum": [
         "child",
         "grandchild",
@@ -36,10 +35,9 @@
         "extended_family",
         "friend",
         "other",
-        "unknown",
-        null
+        "unknown"
       ],
-      "description": "grandchild AYRI tutulur: torun ayri hanede yasar, yani hediye; kendi cocugu household olabilir. Toys kategorisinde alicilarin %26.2'si torun. extended_family = yegen/kuzen/hala/amca. partner = es/sevgili/nisanli."
+      "description": "grandchild AYRI tutulur: torun ayri hanede yasar, yani hediye; kendi cocugu household olabilir. Toys kategorisinde alicilarin %26.2'si torun. extended_family = yegen/kuzen/hala/amca. partner = es/sevgili/nisanli. Alici yoksa veya belli degilse 'unknown' - null DEGIL, tek bir bilinmiyor yolu var."
     },
     "occasion": {
       "type": "string",
@@ -57,7 +55,7 @@
         "none",
         "unknown"
       ],
-      "description": "Vesile metinden nadiren cikarilabiliyor (lexical olarak yalnizca %20-29); 'unknown' yaygin ve BEKLENEN bir cevap, zorlamayin."
+      "description": "'none' = hediye degil (self/household/received), vesile kavrami gecersiz. 'unknown' = hediye ama vesile metinde gecmiyor; BEKLENEN cogunluk cevabi (vesile lexical olarak yalnizca %20-29 cikarilabiliyor). Modeli vesile uydurmaya zorlamayin."
     },
     "evidence_span": {
       "type": "string",

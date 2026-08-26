@@ -172,19 +172,26 @@ float16 tercih değil zorunluluk: bfloat16 compute capability 8.0 istiyor. Koşu
 notebook'unda**; Windows'ta vLLM yok ve 4 GB'a model sığmıyor. Yerelde prompt denemesi için
 llama.cpp/GGUF — ama veri setine giren etiketler yalnızca vLLM koşusundan gelir.
 
-### [B2] Etiket şeması — ikili değil, dörtlü
+### [B2] Etiket şeması — ikili değil, beşli
 
 Bu detay projeyi sıradan olmaktan çıkarır:
 
 ```json
 {
-  "purchase_type": "self | gift_given | household | unclear",
+  "purchase_type": "self | gift_given | household | received | unclear",
   "confidence": "high | medium | low",
-  "recipient": "child | spouse | parent | friend | colleague | unknown | null",
-  "occasion": "birthday | christmas | wedding | graduation | none | unknown",
+  "recipient": "child | grandchild | partner | parent | sibling | extended_family | friend | other | unknown",
+  "occasion": "birthday | christmas | wedding | graduation | anniversary | baby_shower | valentines_day | mothers_day | fathers_day | other | none | unknown",
   "evidence_span": "kızımın doğum günü için aldım"
 }
 ```
+
+> **v3 (2026-08-27).** `received` beşinci sınıf olarak eklendi: hediye **alan** kişi
+> de "kendi tercihi değil" durumunda ve `household` zaten tam bu gerekçeyle ayrı
+> tutuluyor. Bir kez `self` yazılırsa bilgi geri gelmez, C1/C2/C3 sonradan karar
+> veremez. `recipient`'tan `null` kaldırıldı — enum'da hem `null` hem `unknown`
+> vardı ve hangisinin ne zaman kullanılacağı tanımlı değildi. Gerekçe:
+> `docs/DECISIONS.md`.
 
 **`household` neden ayrı:** Bebeğine bez almak hediye değil, ama alıcının kendi tercihini de yansıtmıyor. Bu ara kategori hem gerçekçi hem de RQ3 için ilginç — üçünü farklı ağırlıklandırmayı test edebilirsiniz.
 

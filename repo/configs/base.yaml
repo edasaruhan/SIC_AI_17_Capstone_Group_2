@@ -26,6 +26,11 @@ dataset:
   # artık çalışmıyor (datasets 4.x); dosyayı doğrudan çekiyoruz. Bkz docs/DECISIONS.md.
   review_file_template: raw/review_categories/{slug}.jsonl
   required_fields: [text, title, rating, timestamp, user_id, parent_asin, verified_purchase]
+  # Urun metadata'si. Annotation kalitesi icin: LLM "she loved it" cumlesindeki
+  # "it"in ne oldugunu bilmeden etiketliyordu, yalnizca dataset kategorisini
+  # goruyordu. 4 kategori toplam ~4.35 GB.
+  meta_file_template: raw/meta_categories/meta_{slug}.jsonl
+  meta_required_fields: [parent_asin, title]
   schema_probe_lines: 1000
 
 preprocess:
@@ -72,7 +77,7 @@ detection:
   schema_path: configs/annotation_schema.json
   # v1 -> v2: 200 review'luk deneme gecisinden sonra revize edildi. v1 dosyasi
   # silinmedi - hangi annotation hangi prompt'la uretildigi izlenebilsin diye.
-  prompt_path: prompts/gift_detection_v2.md
+  prompt_path: prompts/gift_detection_v3.md
 
 distill:
   # ModernBERT verimlilik ve 149M'lik ayak izi için seçildi, 8192 context için

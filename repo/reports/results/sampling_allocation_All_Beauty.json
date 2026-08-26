@@ -921,6 +921,7 @@
   "n_boost_drawn": 1500,
   "n_received_requested": 300,
   "n_received_drawn": 300,
+  "n_missing_product_title": 2,
   "frames_disjoint": true,
   "frames": {
     "boost": 1500,

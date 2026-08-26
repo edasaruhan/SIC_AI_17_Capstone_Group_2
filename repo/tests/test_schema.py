@@ -48,8 +48,9 @@ VALID = {
 def test_enum_parity_with_json_schema(field: str, enum_cls):
     """Pydantic enum'lari JSON semasindakiyle BIREBIR ayni olmali.
 
-    `recipient` semada `null` da kabul ediyor; o Pydantic tarafinda `| None`
-    olarak ifade edildigi icin karsilastirmadan cikariliyor.
+    v3'ten beri hicbir alanda `null` yok - tum degerler string. Filtre yine de
+    duruyor ki `null` sessizce geri eklenirse test bunu yakalasin degil, bariz
+    olsun diye: geri eklenirse Pydantic tarafi eslesmez ve test kirmizi yanar.
     """
     from_json = [v for v in json_schema_enums(load_json_schema())[field] if v is not None]
 
@@ -83,10 +84,30 @@ def test_valid_annotation_parses():
     assert ann.recipient is Recipient.GRANDCHILD
 
 
-def test_null_recipient_is_allowed():
-    ann = GiftAnnotation(**{**VALID, "recipient": None})
+def test_null_recipient_is_rejected():
+    """v3: `null` kaldirildi, tek bir "bilinmiyor" yolu var.
 
-    assert ann.recipient is None
+    Enum'da hem `null` hem `"unknown"` vardi ve hangisinin ne zaman
+    kullanilacagi hicbir yerde yazmiyordu; 40.000 satirda model ikisi arasinda
+    rastgele gidip gelirdi ve analiz karisirdi.
+    """
+    with pytest.raises(ValidationError):
+        GiftAnnotation(**{**VALID, "recipient": None})
+
+    assert GiftAnnotation(**{**VALID, "recipient": "unknown"}).recipient is Recipient.UNKNOWN
+
+
+def test_received_is_its_own_class():
+    """v3: hediye ALAN, `self`'e katlanmiyor.
+
+    `household` zaten "hediye degil ama kendi tercihi de degil" diye ayri
+    tutuluyor; hediye alan da tam olarak bu durumda. Bir kez `self` yazilirsa
+    bilgi geri gelmez ve C1/C2/C3 sonradan karar veremez.
+    """
+    ann = GiftAnnotation(**{**VALID, "purchase_type": "received"})
+
+    assert ann.purchase_type is PurchaseType.RECEIVED
+    assert PurchaseType.RECEIVED != PurchaseType.SELF
 
 
 @pytest.mark.parametrize(
@@ -160,7 +181,7 @@ def test_already_unclear_with_empty_span_is_not_counted_as_a_failure():
     sisirir ve raporlanan sayiyi anlamsiz kilar.
     """
     ann = GiftAnnotation(
-        purchase_type="unclear", confidence="low", recipient=None,
+        purchase_type="unclear", confidence="low", recipient="unknown",
         occasion="unknown", evidence_span="",
     )
 
