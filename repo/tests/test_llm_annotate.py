@@ -444,3 +444,23 @@ def test_partial_run_labels_itself_in_the_report(sampled: Config):
 
     assert meta["is_partial"] is True
     assert meta["limit"] == 3
+
+
+def test_report_records_the_code_version(sampled: Config):
+    """Etiketler bir kod surumune baglanabilmeli.
+
+    Kaggle notebook'u depoyu bir kez klonlayip bir daha guncellemiyordu ve kosu
+    sessizce eski kodla devam ediyordu; hangi surumun urettigi ancak cikti
+    formatindan sezilebiliyordu.
+    """
+    annotate(sampled, "pilot", backend_name="stub")
+
+    meta = json.loads(
+        annotation_stats_path(sampled, "pilot").read_text(encoding="utf-8")
+    )["meta"]
+
+    assert "code_version" in meta
+    # Depo degilse None olabilir; varsa kisa SHA gibi gorunmeli.
+    if meta["code_version"] is not None:
+        assert 6 <= len(meta["code_version"]) <= 12
+        assert meta["code_version"].isalnum()

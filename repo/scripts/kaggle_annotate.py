@@ -13,22 +13,32 @@ ON KOSULLAR (Kaggle arayuzunde, elle):
   2. Notebook > Settings > Internet = **On**  (vLLM kurulumu + HF model indirme)
   3. Add Input > Datasets > kendi ozel dataset'iniz:
      `data/interim/*_annotation_sample.parquet` dosyalari (4 dosya, ~6 MB)
-     Dataset adini asagida SAMPLE_DATASET degiskenine yazin.
+     Ekledikten sonra sag panelde gorunen TAM yolu DATASET_PATH'e yazin.
 
 KOSU BITINCE: /kaggle/working/out/ altindaki parquet + json dosyalarini indirin
 ve depodaki data/annotations/ + reports/results/ altina koyun.
 
-Kesinti olursa: ayni hucreyi tekrar calistirin. Bitmis satirlar atlanir -
-`_shards/` klasoru /kaggle/working altinda durdugu surece. Kaggle oturumu
-tamamen sifirlanirsa parcalar da gider; o yuzden uzun kosularda ara ara
+Kesinti olursa: ayni hucreyi tekrar calistirin (FORCE=False). Bitmis satirlar
+atlanir - `_shards/` klasoru /kaggle/working altinda durdugu surece. Kaggle
+oturumu tamamen sifirlanirsa parcalar da gider; o yuzden uzun kosularda ara ara
 `out/` klasorunu indirin.
+
+DUMAN TESTINDEN TAM KOSUYA GECERKEN: LIMIT=None **ve** FORCE=True. Aksi halde
+diskte kalan 200 satirlik parquet yuzunden kod kosuyu reddeder (dogru davranis;
+sessizce atlamaktansa hata vermeyi tercih ediyoruz).
 """
 
 # ---------------------------------------------------------------- ayarlar
 CATEGORY = "high"          # high=Toys_and_Games · pilot=All_Beauty · mid · low
-SAMPLE_DATASET = "gift-contamination-samples"   # Kaggle dataset klasor adi
+# Kaggle'da "Add Input > Datasets" ile ekledikten sonra sag panelde gorunen TAM yol.
+DATASET_PATH = "/kaggle/input/recsys-interim"
 REPO = "https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_2.git"
 LIMIT = None               # duman testi icin ornegin 200; tam kosu icin None
+# Diskteki cikti EZILSIN mi? Duman testinden (LIMIT=200) sonra tam kosuya
+# gecerken TRUE yapin: 200 satirlik parquet /kaggle/working'de duruyor ve
+# kod onu dogru sekilde reddediyor. Yarim kalmis bir kosuya DEVAM etmek
+# istiyorsaniz False birakin - parcalar korunur ve bitmis satirlar atlanir.
+FORCE = False
 
 # ------------------------------------------------------------------ kurulum
 import os  # noqa: E402
@@ -46,13 +56,30 @@ def sh(cmd: str) -> None:
 WORK = Path("/kaggle/working")
 REPO_DIR = WORK / "SIC_AI_17_Capstone_Group_2" / "repo"
 
-if not REPO_DIR.exists():
-    sh(f"git clone --depth 1 {REPO} {WORK / 'SIC_AI_17_Capstone_Group_2'}")
+# DEPO HER KOSUDA GUNCELLENIR. Onceki hali `if not REPO_DIR.exists(): clone`
+# idi ve /kaggle/working oturum boyunca kaldigi icin depo BIR KEZ klonlanip
+# bir daha hic guncellenmiyordu: yerelde duzeltilen bir hata Kaggle'a asla
+# ulasmiyordu ve kosu sessizce eski kodla devam ediyordu. Fark ancak cikti
+# formatindan anlasilabiliyordu.
+CLONE = WORK / "SIC_AI_17_Capstone_Group_2"
+if REPO_DIR.exists():
+    sh(f"git -C {CLONE} fetch --depth 1 origin main")
+    sh(f"git -C {CLONE} reset --hard origin/main")
+else:
+    sh(f"git clone --depth 1 {REPO} {CLONE}")
+# Hangi surumun kostugu KAYDA GECSIN; cikti bir kod surumune baglanabilmeli.
+sh(f"git -C {CLONE} --no-pager log -1 --format='kod surumu: %h %s'")
 
 # vLLM Kaggle imajinda kurulu DEGIL. Surum araligi bilerek genis: structured
 # output API'si 0.10'da yeniden adlandirildi ve `llm_annotate` ikisini de
 # destekliyor, o yuzden burada bir surume kilitlenmiyoruz.
-sh(f"{sys.executable} -m pip install -q 'vllm>=0.7' polars pydantic pyyaml python-dotenv")
+try:
+    import vllm  # noqa: F401, PLC0415
+
+    print("vLLM zaten kurulu, pip atlaniyor")
+except ImportError:
+    sh(f"{sys.executable} -m pip install -q 'vllm>=0.7' polars pydantic pyyaml "
+       "python-dotenv")
 
 sys.path.insert(0, str(REPO_DIR / "src"))
 os.chdir(REPO_DIR)
@@ -60,7 +87,7 @@ os.chdir(REPO_DIR)
 # ------------------------------------------------- ornekleme dosyalarini yerlestir
 # Config yollari depo koku ile goreli; dataset'ten kopyalamak, Kaggle'a ozel bir
 # config turevi tutmaktan basit ve az hataya acik (6 MB).
-src_dir = Path("/kaggle/input") / SAMPLE_DATASET
+src_dir = Path(DATASET_PATH)
 dest_dir = REPO_DIR / "data" / "interim"
 dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -68,7 +95,8 @@ found = sorted(src_dir.rglob("*_annotation_sample.parquet"))
 if not found:
     raise SystemExit(
         f"Ornekleme dosyasi bulunamadi: {src_dir}\n"
-        "Add Input > Datasets ile ozel dataset'i ekleyin ve SAMPLE_DATASET'i duzeltin."
+        "Add Input > Datasets ile ozel dataset'i ekleyin ve DATASET_PATH'i "
+        "sag paneldeki TAM yol ile degistirin."
     )
 for f in found:
     shutil.copy(f, dest_dir / f.name)
@@ -93,7 +121,9 @@ print("gorunen GPU   :", torch.cuda.device_count(),
 if torch.cuda.device_count() < 2:
     print("!! UYARI: tek GPU gorunuyor. Settings > Accelerator = GPU T4 x2 mi?")
 
-out = annotate(cfg, CATEGORY, backend_name="vllm", limit=LIMIT)
+print("force  :", FORCE, "| limit:", LIMIT)
+
+out = annotate(cfg, CATEGORY, backend_name="vllm", limit=LIMIT, force=FORCE)
 
 # ------------------------------------------------------------------- cikti
 import json  # noqa: E402
@@ -102,14 +132,25 @@ report = json.loads(annotation_stats_path(cfg, CATEGORY).read_text(encoding="utf
 print(json.dumps(report, ensure_ascii=False, indent=2))
 
 # Gerceklesen throughput: dokumanlardaki tahminin yerine bu sayi gecer.
-tp = report["throughput"]
-print(f"\n{tp['rows_per_s']} satir/sn toplam "
-      f"({report['meta']['n_workers']} GPU, {tp['rows_per_s_per_gpu']} satir/sn/GPU) "
-      f"· {tp['output_tokens_per_s']} cikti-token/sn")
-print(f"ortak onek: {tp['shared_prefix_chars']} karakter "
-      f"({tp['system_prompt_tokens']} token)")
-if tp["shared_prefix_chars"] < 1000:
+# 73 dakikalik bir kosunun SONUNDA KeyError ile patlamak kabul edilemez, o
+# yuzden alanlar `.get()` ile okunuyor.
+tp = report.get("throughput", {})
+meta = report.get("meta", {})
+print(f"\nuretim     : {tp.get('rows_per_s_generating')} satir/sn "
+      f"({meta.get('n_workers')} GPU, {tp.get('rows_per_s_per_gpu')} satir/sn/GPU) "
+      f"· {tp.get('output_tokens_per_s')} cikti-token/sn")
+print(f"kurulum    : {tp.get('startup_s')} sn (tek seferlik, satir sayisindan bagimsiz)")
+print(f"duvar saati: {tp.get('elapsed_s')} sn")
+print(f"ortak onek : {tp.get('shared_prefix_chars')} karakter "
+      f"({tp.get('system_prompt_tokens')} token)")
+if (tp.get("shared_prefix_chars") or 0) < 1000:
     print("!! UYARI: ortak onek cok kisa, prefix caching ise yaramiyor olabilir")
+if meta.get("is_partial"):
+    print(f"!! Bu KISMI bir kosu (limit={meta.get('limit')}). Tam kosu icin "
+          "LIMIT=None ve FORCE=True yapin.")
+if "rows_per_s_generating" not in tp:
+    print("!! Rapor ESKI formatta - depo guncellenmemis olabilir, "
+       "yukaridaki 'kod surumu' satirini kontrol edin.")
 
 dl = WORK / "out"
 dl.mkdir(exist_ok=True)

@@ -61,7 +61,7 @@ from pathlib import Path
 import polars as pl
 from pydantic import ValidationError
 
-from ..config import Config, add_standard_args, resolve_roles
+from ..config import REPO_ROOT, Config, add_standard_args, resolve_roles
 from ..data.sampling import annotation_sample_path
 from ..utils.io import read_json, should_skip, write_json
 from ..utils.logging import get_logger, log_output
@@ -121,6 +121,29 @@ def annotation_stats_path(cfg: Config, role: str) -> Path:
 def shard_dir(cfg: Config, role: str) -> Path:
     """Yarim kalan kosunun parcalari. Kosu bitince silinmez - kanit olarak kalir."""
     return cfg.path("annotations", "_shards", cfg.category_slug(role))
+
+
+def code_version() -> str | None:
+    """Kosan kodun git surumu; belirlenemezse None.
+
+    Neden rapora giriyor: Kaggle notebook'u depoyu bir kez klonlayip bir daha
+    guncellemiyordu ve kosu sessizce eski kodla devam ediyordu (2026-08-28).
+    Fark ancak cikti formatindan sezilebiliyordu. Artik etiketler bir kod
+    surumune baglanabiliyor - notebook ciktisi kaybolsa bile.
+
+    Sessizce None doner: git yoksa veya depo degilse kosu durmamali, bu bir
+    kayit alani, bir kapi degil.
+    """
+    import subprocess  # noqa: PLC0415
+
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() or None
 
 
 # ---------------------------------------------------------------- backend'ler
@@ -701,6 +724,7 @@ def _write_stats(cfg, role, final, stats, elapsed, *, limit, n_workers) -> None:
             "model": cfg.get("detection.primary_model"),
             "prompt_version": stats["prompt_version"],
             "backend": stats["backend"],
+            "code_version": code_version(),
             "n_rows": n,
             "n_workers": n_workers,
             # Kismi kosu KENDINI TANITMALI. Duman testinin 200 satirlik raporu
