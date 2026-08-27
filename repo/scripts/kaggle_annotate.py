@@ -5,7 +5,11 @@ depoyu sisirir ve iki kisi ayni anda duzenleyince catisir. Bu dosya duz Python;
 Kaggle'da tek bir hucreye yapistirilir.
 
 ON KOSULLAR (Kaggle arayuzunde, elle):
-  1. Notebook > Settings > Accelerator = **GPU T4 x2**  (tek T4 de yeter)
+  1. Notebook > Settings > Accelerator = **GPU T4 x2**
+     Iki kart da kullanilir: `detection.gpus: auto` -> iki VERI-PARALEL surec,
+     her biri satirlarin yarisini alir. Sure ~yariya, kota da ~yariya iner
+     (Kaggle kotayi OTURUM saati olarak sayiyor, GPU basina degil).
+     Tek T4 de calisir, sadece iki kat surer.
   2. Notebook > Settings > Internet = **On**  (vLLM kurulumu + HF model indirme)
   3. Add Input > Datasets > kendi ozel dataset'iniz:
      `data/interim/*_annotation_sample.parquet` dosyalari (4 dosya, ~6 MB)
@@ -78,10 +82,16 @@ from gift_contamination.detection.llm_annotate import (  # noqa: E402
     annotation_stats_path,
 )
 
+import torch  # noqa: E402
+
 cfg = Config.load("configs/base.yaml")
 print("model  :", cfg.get("detection.primary_model"))
 print("prompt :", cfg.get("detection.prompt_path"))
 print("prefix caching:", cfg.get("detection.enable_prefix_caching"))
+print("gorunen GPU   :", torch.cuda.device_count(),
+      [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())])
+if torch.cuda.device_count() < 2:
+    print("!! UYARI: tek GPU gorunuyor. Settings > Accelerator = GPU T4 x2 mi?")
 
 out = annotate(cfg, CATEGORY, backend_name="vllm", limit=LIMIT)
 
@@ -93,7 +103,9 @@ print(json.dumps(report, ensure_ascii=False, indent=2))
 
 # Gerceklesen throughput: dokumanlardaki tahminin yerine bu sayi gecer.
 tp = report["throughput"]
-print(f"\n{tp['rows_per_s']} satir/sn · {tp['output_tokens_per_s']} cikti-token/sn")
+print(f"\n{tp['rows_per_s']} satir/sn toplam "
+      f"({report['meta']['n_workers']} GPU, {tp['rows_per_s_per_gpu']} satir/sn/GPU) "
+      f"· {tp['output_tokens_per_s']} cikti-token/sn")
 print(f"ortak onek: {tp['shared_prefix_chars']} karakter "
       f"({tp['system_prompt_tokens']} token)")
 if tp["shared_prefix_chars"] < 1000:

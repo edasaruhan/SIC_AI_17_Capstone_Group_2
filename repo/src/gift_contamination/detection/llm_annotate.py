@@ -8,7 +8,7 @@ ISLETIM: Kaggle T4. Yerel GTX 1650 Ti 4 GB, Qwen3-4B fp16 ~8 GB - sigmiyor.
 Yerelde `--backend stub` ile butun boru hatti (yollar, sema, sayaclar, parquet)
 GPU'suz kosturulabilir; yalnizca uretim adimi taklit edilir.
 
-UC TASARIM KARARI, ucu de bir arizadan geliyor:
+DORT TASARIM KARARI; ilk ucu birer arizadan, dorduncusu donanimdan geliyor:
 
 1. PREFIX CACHING PAZARLIK KONUSU DEGIL (CLAUDE.md bolum 6). SYSTEM blogu ~2.450
    token, review medyani ~30 token: her satirin prefill'inin %99'u ayni. Bunun
@@ -28,12 +28,24 @@ UC TASARIM KARARI, ucu de bir arizadan geliyor:
    YAZILIR ve orani raporlanir. Cikti satir sayisi girdiye esit olmak zorunda -
    aksi halde eksik satirlar yaygınlık hesabini sessizce kaydirir.
 
+4. IKI GPU VERI-PARALEL KULLANILIR, TENSOR-PARALEL DEGIL. Kaggle iki T4 veriyor
+   ve Qwen3-4B fp16 (~8 GB) TEK karta sigiyor. Modeli bolmenin (TP) tek yaptigi
+   sey PCIe uzerinden all-reduce maliyeti eklemek - T4'lerde NVLink yok. Onun
+   yerine iki BAGIMSIZ surec kosuyor, her biri satirlarin yarisini aliyor:
+   GPU'lar arasi hic iletisim yok, her surecin kendi TAM prefix cache'i var,
+   hizlanma ~2x. Kaggle kotasi OTURUM saati olarak sayildigi icin bu kotayi da
+   yariya indiriyor. Bolme (`_worker_slice`) deterministik ve yeniden
+   baslatmada AYNI - degisirse bir isci digerinin yarim biraktigi satirlari
+   asla gormez ve kosu hic bitmez. TP yalnizca model tek karta sigmazsa
+   gerekir; `tensor_parallel_size` o gun icin duruyor ve kod
+   `gpus x tp <= mevcut kart` kontrolunu yapiyor.
+
 Kullanim:
     # GPU'suz kuru kosu (gercek veri, taklit model)
     python -m gift_contamination.detection.llm_annotate --category high \\
         --backend stub --limit 200
 
-    # Kaggle T4
+    # Kaggle: iki T4'u de kullanir (detection.gpus: auto)
     python -m gift_contamination.detection.llm_annotate --category high
 """
 
@@ -41,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,7 +63,7 @@ from pydantic import ValidationError
 
 from ..config import Config, add_standard_args, resolve_roles
 from ..data.sampling import annotation_sample_path
-from ..utils.io import should_skip, write_json
+from ..utils.io import read_json, should_skip, write_json
 from ..utils.logging import get_logger, log_output
 from .prompting import Prompt, load_prompt
 from .schema import (
@@ -190,6 +203,10 @@ class VllmBackend:
             model=model,
             dtype=cfg.get("detection.dtype"),
             max_model_len=cfg.get("detection.max_model_len"),
+            # Normalde 1: model tek T4'e siginca tensor parallel yalnizca
+            # PCIe all-reduce maliyeti ekler. Coklu GPU kazanci VERI paralel
+            # sureclerden geliyor (bkz. `_resolve_gpus`).
+            tensor_parallel_size=cfg.get("detection.tensor_parallel_size"),
             # ZORUNLU. Kapaliysa 47.200 satirda ~116M gereksiz prefill token.
             enable_prefix_caching=cfg.get("detection.enable_prefix_caching"),
             gpu_memory_utilization=cfg.get("detection.gpu_memory_utilization"),
@@ -288,14 +305,24 @@ def parse_one(raw: str, review: str) -> tuple[dict, bool, bool]:
 
 
 # ----------------------------------------------------------------- ana akislar
-def _done_row_ids(shards: Path) -> set[int]:
+def _done_row_ids(shards: Path, worker: int) -> set[int]:
+    """Bu iscinin daha once bitirdigi satirlar.
+
+    YALNIZCA kendi parcalarina bakiyor. Dilimler ayrik oldugu icin bu dogru;
+    hepsine bakmak ayrica log'u yanlis yapardi ("5.900 satir zaten etiketli"
+    derken aslinda digerinin satirlarini sayardi).
+
+    Isci sayisi kosular arasi degisirse (once 1 GPU, sonra 2) bolme kayar ve
+    bir kisim satir yeniden uretilir. Cikti yine dogru - `merge` tekrarlari
+    `unique` ile ayikliyor - sadece bir miktar is bosa gider.
+    """
     if not shards.exists():
         return set()
     done: set[int] = set()
-    for part in sorted(shards.glob("part_*.parquet")):
+    for part in sorted(shards.glob(f"part_w{worker}_*.parquet")):
         done |= set(pl.read_parquet(part, columns=["row_id"])["row_id"].to_list())
     if done:
-        log.info("yarim kosu bulundu: %s satir zaten etiketli, atlaniyor", f"{len(done):,}")
+        log.info("isci %s: %s satir zaten etiketli, atlaniyor", worker, f"{len(done):,}")
     return done
 
 
@@ -316,6 +343,59 @@ def _stale_backend(dest: Path, backend_name: str) -> str | None:
     return None if existing == backend_name else existing
 
 
+def _worker_slice(df: pl.DataFrame, worker: int, workers: int) -> pl.DataFrame:
+    """Isciler arasinda deterministik, ayrik, dengeli bolme.
+
+    `row_id`e gore siralayip her n'inciyi almak, `row_id % n`den daha iyi:
+    ikincisi ham dosyadaki id dagilimina bagli, bu degil. Bolme YENIDEN
+    BASLATMADA DA AYNI kalmak zorunda - degisirse bir isci digerinin yarim
+    biraktigi satirlari asla gormez ve kosu hic bitmez.
+    """
+    if workers == 1:
+        return df
+    return df.sort("row_id").gather_every(workers, offset=worker)
+
+
+def _resolve_gpus(cfg: Config, backend_name: str) -> int:
+    """Kac veri-paralel surec kosacak.
+
+    Kaggle iki T4 veriyor. Model tek karta sigdigi icin (Qwen3-4B fp16 ~8 GB,
+    T4 16 GB) TENSOR parallel DEGIL VERI parallel dogru secim: T4'lerde NVLink
+    yok, all-reduce PCIe uzerinden gidiyor ve 4B'lik bir modelde iletisim
+    maliyeti kazanci yiyor. Iki bagimsiz surec ise birbiriyle hic konusmuyor,
+    her birinin kendi tam prefix cache'i oluyor ve hizlanma ~2x.
+
+    Kaggle kotasi OTURUM saati olarak sayiliyor, GPU basina degil - yani iki
+    GPU kullanmak kotayi da yariya indiriyor.
+    """
+    requested = cfg.get("detection.gpus")
+    tp = cfg.get("detection.tensor_parallel_size")
+    if backend_name != "vllm":
+        return 1   # kuru kosuda GPU yok, surec cogaltmak anlamsiz
+
+    try:
+        import torch  # noqa: PLC0415 - yalnizca LLM ortaminda var
+
+        available = torch.cuda.device_count()
+    except ImportError:
+        if requested == "auto":
+            log.warning("torch yok, gpus=auto -> 1")
+            return 1
+        available = None
+
+    n = available if requested == "auto" else int(requested)
+    n = max(1, n // tp)   # her surec `tp` kart tuketiyor
+
+    if available is not None and n * tp > available:
+        raise RuntimeError(
+            f"gpus({n}) x tensor_parallel_size({tp}) = {n * tp} kart isteniyor "
+            f"ama {available} kart var."
+        )
+    if n > 1:
+        log.info("veri-paralel: %s surec x %s kart", n, tp)
+    return n
+
+
 def annotate(
     cfg: Config,
     role: str,
@@ -323,7 +403,9 @@ def annotate(
     backend_name: str = "vllm",
     limit: int | None = None,
     force: bool = False,
+    gpus: int | None = None,
 ) -> Path:
+    """Tek giris noktasi. `gpus > 1` ise kendini alt sureclerde cogaltir."""
     dest = annotation_path(cfg, role)
     stale = _stale_backend(dest, backend_name)
     if stale is not None and not force:
@@ -342,25 +424,98 @@ def annotate(
             f"--category {role}"
         )
 
-    df = pl.read_parquet(src)
-    if limit is not None:
-        df = df.head(limit)
-
     shards = shard_dir(cfg, role)
     if force and shards.exists():
-        for part in shards.glob("part_*.parquet"):
-            part.unlink()
+        for leftover in shards.iterdir():
+            leftover.unlink()
     shards.mkdir(parents=True, exist_ok=True)
 
-    done = _done_row_ids(shards)
+    n_gpus = gpus if gpus is not None else _resolve_gpus(cfg, backend_name)
+    if backend_name != "vllm" and n_gpus > 1:
+        # Kuru kosuda GPU yok; surec cogaltmak yalnizca gurultu uretir.
+        log.warning("backend=%s icin gpus=%s yok sayildi", backend_name, n_gpus)
+        n_gpus = 1
+    started = time.perf_counter()
+    if n_gpus > 1:
+        _spawn_workers(cfg, role, backend_name, limit, n_gpus)
+    else:
+        run_worker(cfg, role, backend_name=backend_name, limit=limit,
+                   worker=0, workers=1)
+    return merge(cfg, role, limit=limit, elapsed=time.perf_counter() - started)
+
+
+def _spawn_workers(
+    cfg: Config, role: str, backend_name: str, limit: int | None, n_gpus: int
+) -> None:
+    """Her GPU icin bir alt surec; hepsi bitene kadar beklenir.
+
+    vLLM'in kendi coklu-GPU backend'i (ray/multiproc) yerine duz surec
+    cogaltmayi tercih ediyoruz: her cocuk sirradan bir TEK GPU vLLM ornegi,
+    yani Kaggle'da kirilacak bir sey yok.
+    """
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    # Cocuk taze bir yorumlayici; notebook'un sys.path'ini gormez.
+    src_root = Path(__file__).resolve().parents[2]
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(src_root), env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+
+    # `tensor_parallel_size > 1` ise her isciye BIRDEN COK kart dusuyor;
+    # tek kart vermek TP'yi sessizce bozardi.
+    tp = cfg.get("detection.tensor_parallel_size")
+    procs = []
+    for w in range(n_gpus):
+        devices = ",".join(str(w * tp + k) for k in range(tp))
+        child_env = dict(env, CUDA_VISIBLE_DEVICES=devices)
+        cmd = [
+            sys.executable, "-m", "gift_contamination.detection.llm_annotate",
+            "--config", str(cfg.source), "--category", role,
+            "--backend", backend_name,
+            "--worker", str(w), "--workers", str(n_gpus), "--no-merge",
+        ]
+        if limit is not None:
+            cmd += ["--limit", str(limit)]
+        log.info("GPU %s -> alt surec baslatiliyor", devices)
+        procs.append((w, subprocess.Popen(cmd, env=child_env)))
+
+    failed = [w for w, p in procs if p.wait() != 0]
+    if failed:
+        raise RuntimeError(
+            f"{len(failed)} isci basarisiz oldu (GPU {failed}). Parcalar "
+            f"{shard_dir(cfg, role)} altinda duruyor - ayni komutu tekrar "
+            "calistirmak kaldigi yerden devam eder."
+        )
+
+
+def run_worker(
+    cfg: Config,
+    role: str,
+    *,
+    backend_name: str,
+    limit: int | None,
+    worker: int,
+    workers: int,
+) -> None:
+    """Tek bir iscinin isi: kendi dilimini etiketleyip parcalarini yazmak."""
+    df = pl.read_parquet(annotation_sample_path(cfg, role))
+    if limit is not None:
+        df = df.head(limit)
+    df = _worker_slice(df, worker, workers)
+
+    shards = shard_dir(cfg, role)
+    shards.mkdir(parents=True, exist_ok=True)
+    done = _done_row_ids(shards, worker)
     todo = df.filter(~pl.col("row_id").is_in(list(done))) if done else df
 
     prompt = load_prompt(cfg)
     backend = BACKENDS[backend_name](cfg, prompt)
     log.info(
-        "%s | model=%s | prompt=%s | %s satir etiketlenecek",
-        backend.name, cfg.get("detection.primary_model"), prompt.version,
-        f"{todo.height:,}",
+        "isci %s/%s | %s | model=%s | prompt=%s | %s satir etiketlenecek",
+        worker, workers, backend.name, cfg.get("detection.primary_model"),
+        prompt.version, f"{todo.height:,}",
     )
 
     shard_rows = cfg.get("detection.shard_rows")
@@ -370,7 +525,8 @@ def annotate(
              "n_output_tokens": 0, "n_retried": 0}
     prefix_chars = 0
 
-    n_existing = len(list(shards.glob("part_*.parquet")))
+    # Parca adi isciyi tasiyor: iki surec ayni dosyaya yazamaz.
+    n_existing = len(list(shards.glob(f"part_w{worker}_*.parquet")))
     for i, chunk in enumerate(todo.iter_slices(shard_rows)):
         prompts, reviews, n_cut = build_prompts(chunk, prompt, backend)
         stats["n_truncated"] += n_cut
@@ -416,39 +572,77 @@ def annotate(
             # ciktisi yanlislikla analize girmesin.
             pl.lit(backend.name).alias("backend"),
         )
-        part = shards / f"part_{n_existing + i:05d}.parquet"
+        part = shards / f"part_w{worker}_{n_existing + i:05d}.parquet"
         out.write_parquet(part)
 
         elapsed = time.perf_counter() - started
-        n_seen = (i + 1) * shard_rows
+        n_seen = min((i + 1) * shard_rows, todo.height)
         log.info(
-            "parca %s yazildi | %s satir | %.1f satir/sn",
-            part.name, f"{min(n_seen, todo.height):,}", min(n_seen, todo.height) / elapsed,
+            "isci %s | parca %s | %s satir | %.1f satir/sn",
+            worker, part.name, f"{n_seen:,}", n_seen / elapsed,
         )
 
-    final = pl.concat(
-        [pl.read_parquet(p) for p in sorted(shards.glob("part_*.parquet"))],
-        how="vertical",
-    ).unique(subset=["row_id", "category"], keep="last", maintain_order=True)
+    # Isci kendi sayaclarini yazar; birlestirme onlari toplar. Wall-clock
+    # ISCININ degil EBEVEYNIN saatinden alinir - paralel kosuda toplam sure
+    # iscilerin toplami degil en yavas iscinin suresidir.
+    stats |= {"shared_prefix_chars": prefix_chars, "backend": backend.name,
+              "prompt_version": prompt.version,
+              "system_prompt_tokens": getattr(backend, "shared_prefix_tokens", None)}
+    write_json(stats, shards / f"stats_w{worker}.json")
 
+
+def merge(cfg: Config, role: str, *, limit: int | None, elapsed: float) -> Path:
+    """Butun iscilerin parcalarini tek parquet'e toplar ve raporu yazar."""
+    dest = annotation_path(cfg, role)
+    shards = shard_dir(cfg, role)
+    parts = sorted(shards.glob("part_w*.parquet"))
+    if not parts:
+        raise RuntimeError(f"Birlestirilecek parca yok: {shards}")
+
+    final = pl.concat([pl.read_parquet(p) for p in parts], how="vertical").unique(
+        subset=["row_id", "category"], keep="last", maintain_order=True
+    ).sort("row_id")
+
+    expected = pl.read_parquet(annotation_sample_path(cfg, role), columns=["row_id"]).height
+    if limit is not None:
+        expected = min(expected, limit)
     # Girdi = cikti. Esit degilse satir kaybolmus demektir ve bu sessizce
-    # gecilemez: eksik satirlar yaygınlık hesabini kaydirir.
-    if final.height != df.height:
+    # gecilemez: eksik satirlar yaygınlık hesabini kaydirir. Veri-paralel
+    # kosuda bu kontrol ayrica bir isciyi sessizce kaybetmedigimizi de gosterir.
+    if final.height != expected:
         raise RuntimeError(
-            f"satir sayisi tutmuyor: girdi {df.height}, cikti {final.height}. "
-            f"Parcalar {shards} altinda duruyor, veri kaybolmadi."
+            f"satir sayisi tutmuyor: beklenen {expected}, cikti {final.height}. "
+            f"Parcalar {shards} altinda duruyor, veri kaybolmadi - ayni komutu "
+            "tekrar calistirmak eksigi tamamlar."
         )
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     final.write_parquet(dest)
     log_output(log, dest, n_rows=final.height)
 
-    _write_stats(cfg, role, final, prompt, backend, stats, prefix_chars,
-                 time.perf_counter() - started)
+    stats = _sum_worker_stats(shards)
+    _write_stats(cfg, role, final, stats, elapsed, n_workers=len(
+        list(shards.glob("stats_w*.json"))
+    ))
     return dest
 
 
-def _write_stats(cfg, role, final, prompt, backend, stats, prefix_chars, elapsed) -> None:
+def _sum_worker_stats(shards: Path) -> dict:
+    files = sorted(shards.glob("stats_w*.json"))
+    total = {"n_parse_fail": 0, "n_downgraded": 0, "n_truncated": 0,
+             "n_output_tokens": 0, "n_retried": 0, "shared_prefix_chars": 0}
+    meta = {}
+    for f in files:
+        s = read_json(f)
+        for k in total:
+            total[k] = (max(total[k], s[k]) if k == "shared_prefix_chars"
+                        else total[k] + s[k])
+        meta = {"backend": s["backend"], "prompt_version": s["prompt_version"],
+                "system_prompt_tokens": s["system_prompt_tokens"]}
+    return total | meta
+
+
+def _write_stats(cfg, role, final, stats, elapsed, *, n_workers) -> None:
     """Kosu raporu. Kapi 1 bu dosyayi okur; tahmin degil olcum yazilir."""
     n = final.height
     # `group_by` anahtari TUPLE dondurur ("main",); dict anahtari olarak
@@ -467,19 +661,25 @@ def _write_stats(cfg, role, final, prompt, backend, stats, prefix_chars, elapsed
         "meta": {
             "category": cfg.category_slug(role),
             "model": cfg.get("detection.primary_model"),
-            "prompt_version": prompt.version,
-            "backend": backend.name,
+            "prompt_version": stats["prompt_version"],
+            "backend": stats["backend"],
             "n_rows": n,
+            "n_workers": n_workers,
         },
         "throughput": {
+            # DUVAR SAATI: paralel kosuda toplam sure iscilerin toplami degil,
+            # en yavas iscinin suresi. rows_per_s bu yuzden GERCEK toplam hiz -
+            # isci basina hiz degil.
             "elapsed_s": round(elapsed, 1),
             "rows_per_s": round(n / elapsed, 2) if elapsed else None,
+            "rows_per_s_per_gpu": round(n / elapsed / n_workers, 2)
+            if elapsed and n_workers else None,
             "output_tokens": stats["n_output_tokens"],
             "output_tokens_per_s": round(stats["n_output_tokens"] / elapsed, 1)
             if elapsed else None,
             # Prefix caching'in dayanagi. Sifira yakinsa caching ise yaramiyor.
-            "shared_prefix_chars": prefix_chars,
-            "system_prompt_tokens": getattr(backend, "shared_prefix_tokens", None),
+            "shared_prefix_chars": stats["shared_prefix_chars"],
+            "system_prompt_tokens": stats["system_prompt_tokens"],
         },
         "quality": {
             "parse_fail_rate": round(stats["n_parse_fail"] / n, 6) if n else None,
@@ -510,13 +710,28 @@ def main(argv: list[str] | None = None) -> int:
         "--limit", type=int, default=None,
         help="Yalnizca ilk N satir (duman testi)",
     )
+    parser.add_argument(
+        "--gpus", default=None,
+        help="Kac veri-paralel surec. Varsayilan config'ten (detection.gpus, "
+             "'auto' = torch.cuda.device_count()). Kaggle'da 2.",
+    )
+    # Asagidaki ucu ALT SURECLER icin; elle verilmesi gerekmez.
+    parser.add_argument("--worker", type=int, default=0, help=argparse.SUPPRESS)
+    parser.add_argument("--workers", type=int, default=1, help=argparse.SUPPRESS)
+    parser.add_argument("--no-merge", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
     for role in resolve_roles(cfg, args.category):
+        if args.no_merge:
+            # Alt surec: yalnizca kendi dilimini etiketler, birlestirmez.
+            run_worker(cfg, role, backend_name=args.backend, limit=args.limit,
+                       worker=args.worker, workers=args.workers)
+            continue
         log.info("=== kategori: %s (%s) ===", role, cfg.category_slug(role))
         annotate(cfg, role, backend_name=args.backend, limit=args.limit,
-                 force=args.force)
+                 force=args.force,
+                 gpus=int(args.gpus) if args.gpus is not None else None)
     return 0
 
 

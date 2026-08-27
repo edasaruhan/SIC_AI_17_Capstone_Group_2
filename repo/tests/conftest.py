@@ -97,6 +97,9 @@ def cfg(tmp_path: Path) -> Config:
             "enable_prefix_caching": True,
             "max_model_len": 4096,
             "gpu_memory_utilization": 0.9,
+            # Testte GPU yok; stub backend zaten `gpus`i 1'e zorluyor.
+            "gpus": "auto",
+            "tensor_parallel_size": 1,
             # Kasitli kucuk: fixture ornekleminde birden fazla parca olussun ki
             # devam-ettirme yolu (bitmis satirlari atlama) gercekten sinansin.
             "shard_rows": 3,

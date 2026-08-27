@@ -225,6 +225,35 @@ Kaggle kotası boşa gider.
 - Review metni `str.format` ile değil düz `replace` ile yerleştirilir: gerçek bir review'da
   `{LOOSE}` geçiyor ve `format` bunu yer tutucu sanıp koşunun ortasında patlıyordu.
 
+**Kaggle iki T4 veriyor — GPU isteyen her adım ikisini de kullanmalı.**
+Kural: **veri paralel, tensor paralel değil.** Model tek karta sığdığı sürece
+(Qwen3-4B fp16 ~8 GB / 16 GB) modeli bölmenin tek yaptığı şey PCIe üzerinden
+all-reduce maliyeti eklemek — Kaggle T4'lerinde NVLink yok. İki bağımsız süreç
+birbiriyle hiç konuşmaz, her birinin kendi **tam** prefix cache'i olur, hızlanma
+~2×. Kaggle kotası **oturum saati** olarak sayıldığı için bu kotayı da yarıya
+indirir.
+
+Desen `detection/llm_annotate.py`'de kurulu; sonraki modüller onu tekrar kullansın:
+
+- İş, `row_id`'ye göre sıralanıp `[worker::n_workers]` ile bölünür. Bölme
+  **yeniden başlatmada da aynı** olmak zorunda — değişirse bir işçi diğerinin
+  yarım bıraktığı satırları asla görmez ve koşu hiç bitmez.
+- Her işçi kendi parçalarını yazar (`part_w{worker}_*.parquet`), ebeveyn
+  birleştirir ve **girdi = çıktı** satır kontrolünü yapar. Bir işçi çökerse
+  eksik çıktı yazılmaz, hata verilir.
+- Throughput **duvar saatinden** raporlanır: `rows_per_s` toplam hız,
+  `rows_per_s_per_gpu` ayrıca. İkisini karıştırmak 2× hızlanmayı görünmez yapar.
+- Testle kilitli: iki işçinin çıktısı tek işçininkiyle **birebir aynı**
+  (`test_two_workers_produce_the_same_output_as_one`). Paralellik sonucu
+  değiştirirse bu bir optimizasyon değil, sessiz bir veri hatasıdır.
+
+`tensor_parallel_size` config'te duruyor ama **1**; yalnızca model tek karta
+sığmazsa (14B+) gerekir ve o zaman `gpus` düşürülür — kod
+`gpus × tensor_parallel_size ≤ mevcut kart` kontrolünü yapıyor.
+
+`distill.py` (ModernBERT eğitimi) için karşılığı DDP; `inference.py` (4,97M
+satır) için yine veri paralel, aynı parça deseni.
+
 **Inference kapsamı: önce `kcore`, sonra `clean`.** RQ2–RQ4 yalnızca k-core korpusuna
 etiket istiyor (**4,97M satır**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25 saat) RQ1'in
 betimsel eğrilerini keskinleştiriyor ama zorunlu değil — RQ1 `main` çerçevesinden güven

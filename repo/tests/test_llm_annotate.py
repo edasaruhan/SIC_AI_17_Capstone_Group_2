@@ -27,8 +27,11 @@ from gift_contamination.detection.llm_annotate import (
     annotate,
     annotation_path,
     annotation_stats_path,
+    _worker_slice,
     build_prompts,
+    merge,
     parse_one,
+    run_worker,
     shard_dir,
     shared_prefix_len,
 )
@@ -279,3 +282,109 @@ def test_stub_output_cannot_be_mistaken_for_a_real_run(sampled: Config):
     assert pl.read_parquet(annotation_path(sampled, "pilot"))["backend"][0] == "stub"
     with pytest.raises(RuntimeError, match="stub"):
         annotate(sampled, "pilot", backend_name="vllm")
+
+
+# ------------------------------------------------------- veri-paralel (2x T4)
+def test_worker_slices_partition_the_rows_exactly(sampled: Config):
+    """Isci dilimleri AYRIK ve TAM kapsayici olmali.
+
+    Ustuste binerse ayni satir iki kez etiketlenir (bosa GPU); bosluk kalirsa
+    `merge` satir sayisi kontrolunde patlar ve kosu hic bitmez.
+    """
+    df = pl.read_parquet(annotation_sample_path(sampled, "pilot"))
+
+    slices = [_worker_slice(df, w, 3) for w in range(3)]
+    ids = [set(s["row_id"].to_list()) for s in slices]
+
+    assert sum(len(i) for i in ids) == df.height
+    assert set().union(*ids) == set(df["row_id"].to_list())
+    assert ids[0] & ids[1] == set() and ids[1] & ids[2] == set()
+
+
+def test_worker_slice_is_stable_across_restarts(sampled: Config):
+    """Bolme yeniden baslatmada DEGISMEMELI.
+
+    Degisirse bir isci, digerinin yarim biraktigi satirlari asla gormez:
+    kosu sonsuza kadar "eksik satir" hatasi verir.
+    """
+    df = pl.read_parquet(annotation_sample_path(sampled, "pilot"))
+
+    first = _worker_slice(df, 1, 2)["row_id"].to_list()
+    second = _worker_slice(df.sample(fraction=1.0, shuffle=True, seed=7), 1, 2)
+
+    assert first == second["row_id"].to_list()
+
+
+def test_two_workers_produce_the_same_output_as_one(sampled: Config):
+    """PARALELLIK SONUCU DEGISTIRMEMELI.
+
+    Iki GPU kullanmak bir hiz optimizasyonu; etiketleri veya satir sirasini
+    degistirirse optimizasyon degil sessiz bir veri hatasi olur.
+    """
+    single = pl.read_parquet(annotate(sampled, "pilot", backend_name="stub"))
+
+    annotation_path(sampled, "pilot").unlink()
+    for part in shard_dir(sampled, "pilot").iterdir():
+        part.unlink()
+    for w in range(2):
+        run_worker(sampled, "pilot", backend_name="stub", limit=None,
+                   worker=w, workers=2)
+    parallel = pl.read_parquet(merge(sampled, "pilot", limit=None, elapsed=1.0))
+
+    assert parallel.equals(single)
+
+
+def test_workers_do_not_overwrite_each_others_shards(sampled: Config):
+    """Parca adi isciyi tasimali; tasimazsa ikinci isci birincisini ezer."""
+    for w in range(2):
+        run_worker(sampled, "pilot", backend_name="stub", limit=None,
+                   worker=w, workers=2)
+
+    names = sorted(p.name for p in shard_dir(sampled, "pilot").glob("part_*.parquet"))
+
+    assert any(n.startswith("part_w0_") for n in names)
+    assert any(n.startswith("part_w1_") for n in names)
+
+
+def test_merge_refuses_when_a_worker_is_missing(sampled: Config):
+    """Bir isci coktuyse eksik cikti YAZILMAMALI.
+
+    Sessizce yarim bir parquet yazmak, yaygınlık hesabini o iscinin dilimi
+    kadar kaydirirdi - ve dilim rastgele degil, `row_id` siralamasina bagli.
+    """
+    run_worker(sampled, "pilot", backend_name="stub", limit=None,
+               worker=0, workers=2)
+
+    with pytest.raises(RuntimeError, match="satir sayisi tutmuyor"):
+        merge(sampled, "pilot", limit=None, elapsed=1.0)
+
+
+def test_stub_backend_never_spawns_workers(sampled: Config):
+    """GPU'suz kuru kosuda surec cogaltmak yalnizca gurultu."""
+    from gift_contamination.detection import llm_annotate
+
+    assert llm_annotate._resolve_gpus(sampled, "stub") == 1
+    # Acikca istense bile yok sayilmali: alt surec baslatmaya kalkarsa test
+    # ya cok yavaslar ya da import hatasiyla patlar.
+    out = pl.read_parquet(annotate(sampled, "pilot", backend_name="stub", gpus=2))
+    assert out.height == pl.read_parquet(
+        annotation_sample_path(sampled, "pilot")
+    ).height
+
+
+def test_report_records_how_many_gpus_ran(sampled: Config):
+    """Throughput sayisi kac GPU ile alindigi bilinmeden yorumlanamaz."""
+    for w in range(2):
+        run_worker(sampled, "pilot", backend_name="stub", limit=None,
+                   worker=w, workers=2)
+    merge(sampled, "pilot", limit=None, elapsed=2.0)
+
+    report = json.loads(
+        annotation_stats_path(sampled, "pilot").read_text(encoding="utf-8")
+    )
+
+    assert report["meta"]["n_workers"] == 2
+    # Duvar saati toplam hiz; GPU basina hiz ayrica veriliyor.
+    assert report["throughput"]["rows_per_s"] == pytest.approx(
+        report["throughput"]["rows_per_s_per_gpu"] * 2, rel=1e-6
+    )

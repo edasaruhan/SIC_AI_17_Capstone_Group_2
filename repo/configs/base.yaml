@@ -89,6 +89,16 @@ detection:
   # boyutunu düşürür; review'lar 6.000 karaktere kırpılıyor (~1.500 token).
   max_model_len: 4096
   gpu_memory_utilization: 0.90    # T4 16 GB; fp16 ağırlık ~8 GB + KV cache
+  # Kaç VERİ-PARALEL süreç. `auto` = torch.cuda.device_count(); Kaggle'da 2.
+  # Model tek T4'e sığdığı için (fp16 ~8 GB / 16 GB) tensor parallel DEĞİL veri
+  # parallel doğru seçim: T4'lerde NVLink yok, all-reduce PCIe üzerinden gider
+  # ve 4B'lik bir modelde iletişim maliyeti kazancı yer. İki bağımsız süreç
+  # birbiriyle hiç konuşmaz, her birinin kendi tam prefix cache'i olur.
+  # Kaggle kotası oturum saati olarak sayıldığı için bu kotayı da yarıya indirir.
+  gpus: auto
+  # Model TEK karta sığmazsa (ör. 14B+) burası 2 yapılır ve `gpus` 1'e düşer.
+  # gpus × tensor_parallel_size mevcut GPU sayısını aşamaz — kod kontrol ediyor.
+  tensor_parallel_size: 1
   # Çıktı bu boyutta parçalar halinde yazılır. Kaggle oturumu 12 saatte kesilir,
   # GPU OOM olabilir; yeniden başlatıldığında bitmiş satırlar atlanır.
   shard_rows: 2000
