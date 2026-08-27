@@ -83,6 +83,39 @@ def cfg(tmp_path: Path) -> Config:
             "keyword_boost_fraction": 0.25,
             "received_boost_fraction": 0.25,
         },
+        # Prompt ve sema dosyalari GERCEK olanlar - keywords.path ile ayni
+        # gerekce. Sentetik bir prompt, `llm_annotate`in dogrulamasi gereken
+        # sozlesmeyi (yer tutucular, enum'lar, versiyon satiri) sinamaz.
+        "detection": {
+            "primary_model": "stub-model",   # stub backend model indirmez
+            "dtype": "float16",
+            "max_new_tokens": 220,
+            "temperature": 0.0,
+            "retry_on_parse_fail": 1,
+            "schema_path": "configs/annotation_schema.json",
+            "prompt_path": "prompts/gift_detection_v3.md",
+            "enable_prefix_caching": True,
+            "max_model_len": 4096,
+            "gpu_memory_utilization": 0.9,
+            # Kasitli kucuk: fixture ornekleminde birden fazla parca olussun ki
+            # devam-ettirme yolu (bitmis satirlari atlama) gercekten sinansin.
+            "shard_rows": 3,
+        },
+        # gate1 figuru (F17) bu iki anahtari okuyor.
+        "eda": {"figure_dpi": 72, "figure_format": "png"},
+        # Esikler configs/base.yaml ile AYNI. Testin isi esik degerini degil,
+        # esigin baglayici olup olmadigini sinamak; farkli bir deger koymak
+        # "gercek config'te de boyle mi" sorusunu cevapsiz birakirdi.
+        "gate1": {
+            "seasonality_ratio_min": 1.25,
+            "seasonality_bootstrap_n": 400,   # testte 2000 gereksiz yavas
+            "beyond_keyword_rate_min": 0.01,
+            "parse_fail_rate_max": 0.01,
+            "span_downgrade_rate_max": 0.10,
+            "trial_agreement_min": 0.70,
+            "peak_months": [12, 1],
+            "trough_months": [6, 7, 8, 9],
+        },
     }
     conf = Config(data, tmp_path / "test.yaml")
 

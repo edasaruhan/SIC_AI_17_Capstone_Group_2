@@ -177,3 +177,17 @@ def test_default_path_comes_from_the_config_not_a_literal():
 def test_nonexistent_file_raises(tmp_path: Path):
     with pytest.raises(FileNotFoundError):
         load_prompt(path=tmp_path / "yok.md")
+
+
+def test_review_text_with_braces_is_not_treated_as_a_template():
+    """Gercek bir review'da gecti: "...the {LOOSE} piece...".
+
+    `str.format` bunu yer tutucu sanip kosunun ortasinda patliyordu. Review
+    metni kullanici icerigidir ve ASLA sablon olarak yorumlanmamali.
+    """
+    out = render("Robot Kit", "Toys_and_Games", "Missing {ROBOT}",
+                 "One of the {LOOSE} pieces fell out. Also {} and {0}.")
+
+    assert "{LOOSE}" in out
+    assert "{ROBOT}" in out
+    assert "{0}" in out

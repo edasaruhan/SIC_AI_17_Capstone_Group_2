@@ -701,3 +701,67 @@ yedeğimiz olur; büyükse damıtma gerekçesi sayıyla desteklenir. Şu an bu y
 gereklilik notu — kod Hafta 5'te.
 **Etkilediği bölüm:** `CLAUDE.md` §6 ve §13, `docs/GENEL_BAKIS.md` §5
 **Kim:** Ekip
+
+---
+
+### 2026-08-28 — Hafta 3: pilot kategori Toys, Kapı 1 eşikleri koşudan önce sabitlendi
+
+**Karar 1 — Pilot annotation `Toys_and_Games`'te koşuyor, `All_Beauty`'de değil.**
+Roadmap §10 "pilot kategori" diyor ve `pilot` rolü `All_Beauty`. Bu seçim, inference'ın
+pahalı olduğu varsayımından geliyordu; prefix caching ölçüldükten sonra üç kategorinin
+maliyeti aynı (dosya başına 11.800 satır). Toys'a geçmenin üç gerekçesi var:
+
+- Deneyin gücü yalnızca orada: %11 yaygınlık, 2,16M k-core etkileşimi. All_Beauty'nin
+  k-core'u **boş**, yani C0–C4'e hiç girmiyor (2026-08-25 kararı).
+- ~1.300 `gift_given` satırı → aylık eğri ve sınıf bazlı hata analizi için yeterli
+  kütle. All_Beauty %2,13 ile ~250 satır bırakırdı, ayda ~20.
+- Kapı 1'in koruma amacı: All_Beauty'de çalışıp Toys'ta patlayan bir detektörü
+  All_Beauty kapısı yakalayamaz.
+
+`All_Beauty` **pipeline pilotu olarak kalıyor** (CLAUDE.md §14) — kuru koşu ve yol
+doğrulaması orada yapılabilir.
+
+**Karar 2 — Kapı 1'in dört ölçütü `configs/base.yaml` → `gate1:` altında, sonuç
+görülmeden yazıldı.** Roadmap "Aralık–Ocak tepesi görünüyor mu?" diyordu; sayısal eşik
+yoktu ve "tepe var gibi" diyerek bozuk bir detektörle devam etme riski açıktı. Her ölçüt
+farklı bir arıza tipini yakalıyor:
+
+| # | Ölçüt | Eşik | Yakaladığı arıza |
+|---|---|---|---|
+| 1 | (Ara+Oca) ÷ (Haz–Eyl) oranı, bootstrap %95 GA 1,0'ı dışlıyor | ≥ 1,25 | **Sinyalsizlik** — etiket gerektirmeyen dış geçerlilik testi (V2) |
+| 2 | Vekilin işaretlemediği satırlarda `gift_given` oranı | ≥ %1 | **Anahtar kelime taklidi** — LLM bedava regex'in işini pahalıya tekrar ediyor |
+| 3 | parse hatası / `evidence_span` düşürme | < %1 / < %10 | **Şema çöküşü** |
+| 4 | 200 satırlık deneme setiyle uyum | ≥ %70 | **Aşırı tetikleme** |
+
+Eşik 1 için gerekçe: sözcüksel vekil dört kategoride de 1,34–1,90× veriyor (T14). LLM en
+az bu kadarını görmeli, ama eşik alt sınırın (Toys 1,34) biraz altında bilerek — LLM
+vekilin kaçırdığı mevsimsel-olmayan vakaları da yakalarsa oran doğal olarak seyrelir.
+
+**4. ölçüt bir doğrulama DEĞİL.** Prompt v2/v3 tam o 200 satır okunarak yazıldı
+(2026-08-26 kararı), dolayısıyla çıkan sayı F1 olarak raporlanamaz. Yalnızca "model her
+şeye hediye mi diyor" sorusunu yanıtlar. Deneme koşusu yoksa ölçüt **atlanır** ve karar
+`PASS` değil `INCOMPLETE` olur — atlanan ölçüt sessizce geçmiş sayılmaz.
+
+**Sonucu gördükten sonra eşik gevşetmek yasak.** κ eşiğinde reddettiğimiz şeyin aynısı.
+Gevşetme gerekiyorsa buraya tarih + gerekçe yazılır.
+
+**Karar 3 — 200 satırlık deneme seti şema v3'te geçerli, yeniden etiketlenmiyor.**
+Ölçüldü (2026-08-28): `kw_gift_received` taşıyan satır **0/200**; dar alıcı-tarafı
+regex'i **0 eşleşme**; geniş regex 6 satır buldu, altısı da doğru şekilde `gift_given`.
+`self` etiketli 50 satırın tamamı birinci ağızdan satın alma/kullanım. Yani v2
+rehberinin "hediye aldıysa `self` yaz" kuralı bu 200 satırda hiç tetiklenmedi.
+
+Nedeni tesadüf değil: denetimin 2. bulgusu (2026-08-27) deneme setinin katmanlarının
+`kw_gift_received`'ı kapsamadığıydı. **Bedeli:** `received` kuralı hâlâ hiçbir insan
+etiketine karşı sınanmadı; ilk sınavı Hafta 4'ün 500'lük setinde olacak (katman payı
+%15 → ~75 satır, 3 annotator).
+
+**Yan bulgu:** denetim sonrası yeniden çekim, deneme satırlarının 195'ini örneklemden
+çıkardı (All_Beauty'de 5 ortak, diğer üçünde 0). `row_id` ham jsonl satır indeksi
+olduğu için `prompt_trial_ids.json` hâlâ doğru review'ları gösteriyor ve Hafta 4'ün
+dışlama kuralı sağlam. Ama 200 insan etiketi LLM koşusuyla karşılaştırılmak istenirse
+deneme CSV'si **ayrıca** koşturulmalı (200 satır, bedava).
+
+**Etkilediği bölüm:** `configs/base.yaml` (`gate1`, `detection`), `analysis/gate1.py`,
+`detection/llm_annotate.py`, `CLAUDE.md` §2/§7
+**Kim:** Ekip

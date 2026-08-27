@@ -66,15 +66,32 @@ detection:
   # pratikte çalışmıyor. Bu yüzden dense/text-only/standart GQA olan bir model
   # seçildi. Gerekçe: technology-review §4.2, docs/DECISIONS.md.
   primary_model:   Qwen/Qwen3-4B-Instruct-2507   # dense 4B, text-only, GQA, non-thinking
+  # ⚠️ Aşağıdaki iki anahtar HENÜZ OKUNMUYOR. Model-arası uyum ölçümü MVP dışı
+  # (CLAUDE.md §11) ve kodu yazılmadı. Seçim kayıtta kalsın diye duruyorlar;
+  # okuyan kod gelince bu not silinir.
   secondary_model: google/gemma-4-E4B            # sadece uyum alt örneklemi
   secondary_sample_n: 5000                       # ikincil model tüm korpusa koşmaz
   quantization: none            # fp16 ağırlık ~8 GB, T4'e sığıyor; AWQ/Marlin riski yok
   dtype: float16                # ZORUNLU: bfloat16 compute capability >= 8.0 istiyor
   max_new_tokens: 220
   temperature: 0.0
-  guided_json: true
+  # `guided_json: true` KALDIRILDI (2026-08-28): hiçbir yerde okunmuyordu ve
+  # kapatılabilir bir seçenek olduğunu ima ediyordu. Guided decoding zorunlu
+  # (CLAUDE.md §8, kural 3) — `llm_annotate` şemayı koşulsuz uygular.
   retry_on_parse_fail: 1
   schema_path: configs/annotation_schema.json
+  # ZORUNLU, pazarlık konusu değil. SYSTEM bloğu ~2.450 token, review medyanı
+  # ~30 token: her satırın prefill'inin %99'u aynı. Kapalıysa 47.200 satırda
+  # ~116M gereksiz prefill token üretilir ve Kaggle kotası boşa gider.
+  # Gerçekleşen ortak önek `llm_annotate` tarafından ÖLÇÜLÜP raporlanıyor.
+  enable_prefix_caching: true
+  # 2.450 (system) + review + 220 (çıktı). Fazlası KV cache'i şişirir ve batch
+  # boyutunu düşürür; review'lar 6.000 karaktere kırpılıyor (~1.500 token).
+  max_model_len: 4096
+  gpu_memory_utilization: 0.90    # T4 16 GB; fp16 ağırlık ~8 GB + KV cache
+  # Çıktı bu boyutta parçalar halinde yazılır. Kaggle oturumu 12 saatte kesilir,
+  # GPU OOM olabilir; yeniden başlatıldığında bitmiş satırlar atlanır.
+  shard_rows: 2000
   # v1 -> v2: 200 review'luk deneme gecisinden sonra revize edildi. v1 dosyasi
   # silinmedi - hangi annotation hangi prompt'la uretildigi izlenebilsin diye.
   prompt_path: prompts/gift_detection_v3.md
@@ -112,6 +129,33 @@ analysis:
   # değil Aralık-Ocak; bu gecikme concept-note'ta önceden not edilmişti.
   # Şubat/Mayıs tepesi ölçümde YOK - beklenen listeden çıkarıldı.
   expected_peaks: [12, 1]
+
+# Kapı 1 — Hafta 3 sonu, "detektör çalışıyor mu?" Eşikler KOŞUDAN ÖNCE, sonuç
+# görülmeden yazıldı (2026-08-28). Sonucu gördükten sonra eşik gevşetmek, κ
+# eşiğinde reddettiğimiz şeyin aynısı: bulguyu geçersiz kılar. Gevşetme
+# gerekiyorsa docs/DECISIONS.md'ye tarih + gerekçe yazılır.
+gate1:
+  # 1) MEVSİMSELLİK. Aralık+Ocak hediye oranı ÷ Haziran-Eylül oranı. Sözcüksel
+  # vekil dört kategoride de 1,34-1,90 aralığında veriyor (T14); LLM en az bu
+  # kadarını görmeli. Eşik alt sınırın (Toys 1,34) biraz altında bilerek: LLM
+  # vekilin kaçırdığı mevsimsel-olmayan vakaları da yakalarsa oran doğal olarak
+  # bir miktar seyrelir.
+  seasonality_ratio_min: 1.25
+  seasonality_bootstrap_n: 2000   # oranın %95 GA'sı 1,0'ı dışlamalı
+  # 2) VEKİL ÖTESİ RECALL. Anahtar kelimenin İŞARETLEMEDİĞİ satırlarda LLM'in
+  # bulduğu gift_given oranı. Sıfıra yakınsa LLM, bedava vekilin işini pahalıya
+  # tekrar ediyor demektir ve bütün damıtma yığını gereksizdir.
+  beyond_keyword_rate_min: 0.01
+  # 3) ŞEMA SAĞLIĞI.
+  parse_fail_rate_max: 0.01
+  span_downgrade_rate_max: 0.10
+  # 4) DUMAN TESTİ. 200 satırlık deneme setiyle uyum. F1 OLARAK RAPORLANMAZ:
+  # prompt v2/v3 tam bu satırlar okunarak yazıldı (DECISIONS 2026-08-26).
+  # Yalnızca "aşırı tetikleme var mı" sorusunu yanıtlar.
+  trial_agreement_min: 0.70
+  # Mevsimsellik hangi aylardan okunuyor
+  peak_months: [12, 1]
+  trough_months: [6, 7, 8, 9]
 
 keywords:
   path: configs/gift_keywords.yaml

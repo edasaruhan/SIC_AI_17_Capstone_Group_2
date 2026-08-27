@@ -67,6 +67,7 @@ src/gift_contamination/
     precision_check.py   # vekilin elle doğrulanması (T4)
     eda.py               # betimsel analiz, T1-T4 / F1-F8
     deep_eda.py          # varsayım sınama, T5-T14 / F9-F16
+    gate1.py             # Kapı 1: dört ölçüt + LLM/vekil aylık eğri (F17)
     viz.py               # ortak grafik stili
     validation.py        # kappa, F1, mevsimsellik, duyarlılık  (Hafta 4)
   recsys/
@@ -207,12 +208,22 @@ Sequential recommendation, leave-one-out.
 **Prefix caching neden zorunlu.** Ölçüldü (2026-08-27): SYSTEM prompt'u `v3`'te
 **~2.450 token**, review medyanı **~30 token**. Yani her satırın prefill'inin **%99'u
 aynı**. Caching kapalıysa 47.200 satırda ~**116M gereksiz prefill token** üretilir ve
-Kaggle kotası boşa gider. `detection/llm_annotate.py` yazılırken:
+Kaggle kotası boşa gider.
+
+> ✅ **Uygulandı 2026-08-28.** Anahtarlar `configs/base.yaml` → `detection:` altında ve
+> `detection/llm_annotate.py` tarafından okunuyor. Ölü anahtar bırakılmadı.
 
 - `LLM(..., enable_prefix_caching=True, max_model_len=4096)` — 4096 = 2.450 (system)
   + review + 220 çıktı. Fazlası KV cache'i şişirir ve batch boyutunu düşürür.
-- Koşu başında **gerçekleşen throughput loglanmalı** (satır/sn ve token/sn). Elimizdeki
-  tek sayı şu an bir tahmin (1.000–2.000 token/sn); rapora tahmin değil ölçüm girmeli.
+- Chat template'i **vLLM'e değil tokenizer'a** uygulatıyoruz (`llm.generate(list[str])`).
+  Sebebi: caching'in çalışması için paylaşılan önek her satırda **bayt bayt aynı** olmalı
+  ve `llm.chat()` sürümler arası değişken davranıyor. Gerçekleşen önek uzunluğu
+  koşu raporuna yazılıyor (`shared_prefix_chars`) — varsayılmıyor. Yerel kuru koşuda
+  ölçüldü: **9.813 karakter**.
+- Koşu **gerçekleşen throughput'u loglar** (satır/sn ve token/sn). Rapora tahmin değil
+  ölçüm girer.
+- Review metni `str.format` ile değil düz `replace` ile yerleştirilir: gerçek bir review'da
+  `{LOOSE}` geçiyor ve `format` bunu yer tutucu sanıp koşunun ortasında patlıyordu.
 
 **Inference kapsamı: önce `kcore`, sonra `clean`.** RQ2–RQ4 yalnızca k-core korpusuna
 etiket istiyor (**4,97M satır**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25 saat) RQ1'in
@@ -233,7 +244,8 @@ Kod bu arayüze göre yazılmalı. Her adım tek başına yeniden çalıştırı
 python -m gift_contamination.data.download      --config configs/base.yaml --category pilot
 python -m gift_contamination.data.preprocess    --config configs/base.yaml --category pilot
 python -m gift_contamination.data.sampling      --config configs/base.yaml --category pilot --n 10000
-python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --category pilot
+python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --category high
+python -m gift_contamination.analysis.gate1         --config configs/base.yaml --category high
 python -m gift_contamination.detection.distill  --config configs/base.yaml
 python -m gift_contamination.detection.inference --config configs/base.yaml --category high
 python -m gift_contamination.analysis.descriptive --config configs/base.yaml
@@ -346,6 +358,9 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
 - [ ] **TBD** **κ eşiği 5 sınıfta hâlâ 0.60 mı?** Fleiss' κ sınıf sayısı arttıkça düşme
   eğilimindedir — anlaşmazlık için daha çok yol var. Hafta 4 **öncesinde** gözden
   geçirilmeli; düşürülecekse gerekçesi sonuç görülmeden yazılmalı
+- [x] ~~**TBD** Kapı 1'in sayısal geçme ölçütü~~ → **KARARLAŞTI 2026-08-28.** Dört
+  ölçüt, `configs/base.yaml` → `gate1:` altında, koşudan önce sabitlendi.
+  Gerekçe: `docs/DECISIONS.md`
 - [ ] **TBD** Kaç seed (3 mü 5 mi) — koşu süresine göre
 - [x] ~~**TBD** GPU: yerel RTX mi Kaggle mı~~ → **KARARLAŞTI 2026-08-26.** Yerel kart
   GTX 1650 Ti (4 GB, Turing). LLM annotation **Kaggle**'da (2× T4, ~30 sa/hafta);

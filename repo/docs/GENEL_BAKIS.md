@@ -223,7 +223,7 @@ sonuçlarından `prompts/gift_detection_v2.md` yazıldı.
 |:---:|---|---|
 | 1 | Veri indirme, ön işleme, sözcüksel vekil, derin EDA | ✅ bitti |
 | 2 | Katmanlı örnekleme, etiket şeması, prompt v2, 200 deneme etiketi | ✅ bitti |
-| 3 | Kaggle'da vLLM kurulumu, 10.000 review'lık pilot annotation, ilk aylık oran eğrisi | ▶ sırada |
+| 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ▶ kod hazır, koşu bekliyor |
 | 4 | 500 satır insan etiketleme (3 kişi), Fleiss κ ve sınıf bazlı F1, duyarlılık analizi | ⏳ |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ⏳ |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | ⏳ |
@@ -232,11 +232,26 @@ sonuçlarından `prompts/gift_detection_v2.md` yazıldı.
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
 
-Aylık hediye oranı **Aralık–Ocak tepesi** gösteriyor mu, ve LLM anahtar kelimenin
-kaçırdığı vakaları yakalıyor mu?
+Dört ölçüt, dördü de **koşudan önce** sabitlendi (`configs/base.yaml` → `gate1:`,
+2026-08-28). Sonucu gördükten sonra eşik gevşetmek yasak — bulguyu geçersiz kılar.
 
-Geçemezse prompt v3 yazılır veya model değiştirilir. **Tam annotation'a geçilmez** —
-40.000 satırı bozuk bir detektörle etiketlemek hem Kaggle kotasını hem iki haftayı yakar.
+| # | Ölçüt | Eşik | Yakaladığı arıza |
+|---|---|---|---|
+| 1 | (Ara+Oca) ÷ (Haz–Eyl) hediye oranı, %95 GA 1,0'ı dışlıyor | ≥ 1,25 | **sinyalsizlik** |
+| 2 | Vekilin işaretlemediği satırlarda `gift_given` oranı | ≥ %1 | **anahtar kelime taklidi** |
+| 3 | parse hatası · `evidence_span` düşürme | < %1 · < %10 | **şema çöküşü** |
+| 4 | 200 satırlık deneme setiyle uyum (F1 değil, duman testi) | ≥ %70 | **aşırı tetikleme** |
+
+Ölçüt 1 etiket gerektirmez: hediye vermek gerçek dünyada mevsimseldir ve bedava
+sözcüksel vekil bile tepeyi görüyor (1,34–1,90×). LLM'in eğrisi düzse etiketlediği şey
+gürültüdür. Ölçüt 2 en pahalı soruyu sorar: LLM bedava bir regex'in işini pahalıya
+tekrar ediyorsa bütün damıtma yığını gereksizdir.
+
+Çalıştırma: `python -m gift_contamination.analysis.gate1 --category high`
+
+Geçemezse prompt v4 yazılır veya model değiştirilir (`secondary_model` config'te hazır).
+**Tam annotation'a geçilmez** — 47.200 satırı bozuk bir detektörle etiketlemek hem
+Kaggle kotasını hem iki haftayı yakar.
 
 ### 🚦 Kapı 2 — Hafta 6 sonu · deney geçerli mi?
 

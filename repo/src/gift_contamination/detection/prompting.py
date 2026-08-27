@@ -37,14 +37,27 @@ class Prompt(NamedTuple):
     source: Path
 
     def render(self, *, product_title: str, category: str, title: str, text: str) -> str:
-        """USER blogunu doldurur. SYSTEM ayri gonderilir (chat rolleri)."""
-        filled = self.user_template.format(
-            product_title=product_title, category=category, title=title, text=text
-        )
-        left = _PLACEHOLDER.findall(filled)
+        """USER blogunu doldurur. SYSTEM ayri gonderilir (chat rolleri).
+
+        `str.format` KULLANILMIYOR, bilerek. Review metni kullanici icerigi ve
+        icinde suslu parantez gecebiliyor - gercek bir ornek: "...the {LOOSE}
+        piece..." `format` bunu bir yer tutucu sanip `KeyError` atiyordu ve hata
+        11.800 satirlik kosunun ortasinda cikiyordu. Duz `replace` ile review
+        metni asla sablon olarak yorumlanmaz.
+        """
+        filled = self.user_template
+        for field, value in (
+            ("product_title", product_title), ("category", category),
+            ("title", title), ("text", text),
+        ):
+            filled = filled.replace("{" + field + "}", value)
+
+        # Kontrol yalnizca BILDIGIMIZ yer tutucularda: doldurulmus metnin
+        # icindeki `{LOOSE}` bizim sorunumuz degil, review'un icerigi.
+        left = [f for f in REQUIRED_FIELDS if "{" + f + "}" in filled]
         if left:
             raise ValueError(
-                f"{self.source.name}: doldurulmamis yer tutucu kaldi: {sorted(set(left))}"
+                f"{self.source.name}: doldurulmamis yer tutucu kaldi: {sorted(left)}"
             )
         return filled
 
