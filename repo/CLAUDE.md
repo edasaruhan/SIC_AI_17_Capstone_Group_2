@@ -196,7 +196,7 @@ Sequential recommendation, leave-one-out.
 | Katman | Seçim | Not |
 |---|---|---|
 | Büyük veri işleme | **polars** | pandas 10M+ satırda kullanılmayacak |
-| LLM servis | **vLLM** (`--dtype float16`, **`enable_prefix_caching=True`**, `max_model_len=4096`) | offline batch, Kaggle Linux notebook'ta. Yerelde sadece smoke test için llama.cpp/GGUF — Windows'ta vLLM yok, 4 GB'a model sığmıyor. **Prefix caching pazarlık konusu değil** — aşağıya bakın |
+| LLM servis | **vLLM 0.28** (`--dtype float16`, **`enable_prefix_caching=True`**, `max_model_len=4096`, iki T4 veri-paralel) | offline batch, Kaggle Linux notebook'ta. Yerelde sadece smoke test için llama.cpp/GGUF — Windows'ta vLLM yok, 4 GB'a model sığmıyor. **Prefix caching pazarlık konusu değil** — aşağıya bakın |
 | Annotator LLM | **Qwen/Qwen3-4B-Instruct-2507** birincil, **google/gemma-4-E4B** ikincil (5K alt örneklem) | Seçim VRAM'e değil **GPU kuşağına** bağlı: elimizdeki her GPU pre-Ampere (Turing sm75), bfloat16 ve FlashAttention yok. Qwen3.5 ailesi hibrit GDN + VL, Turing'de pratikte koşmuyor. Gerekçe: technology-review §4.2 |
 | Structured output | vLLM guided decoding (JSON schema) | serbest metin parse edilmeyecek |
 | Distillation | **ModernBERT-base** | `AutoModelForSequenceClassification` |
@@ -213,17 +213,38 @@ Kaggle kotası boşa gider.
 > ✅ **Uygulandı 2026-08-28.** Anahtarlar `configs/base.yaml` → `detection:` altında ve
 > `detection/llm_annotate.py` tarafından okunuyor. Ölü anahtar bırakılmadı.
 
-- `LLM(..., enable_prefix_caching=True, max_model_len=4096)` — 4096 = 2.450 (system)
-  + review + 220 çıktı. Fazlası KV cache'i şişirir ve batch boyutunu düşürür.
+- `LLM(..., enable_prefix_caching=True, max_model_len=4096)` — 4096 = 2.277 (system,
+  ölçüldü) + review (≤6.000 karakter ≈ 1.500 token) + 220 çıktı. Fazlası KV cache'i
+  şişirir ve eşzamanlı istek sayısını düşürür.
 - Chat template'i **vLLM'e değil tokenizer'a** uygulatıyoruz (`llm.generate(list[str])`).
   Sebebi: caching'in çalışması için paylaşılan önek her satırda **bayt bayt aynı** olmalı
   ve `llm.chat()` sürümler arası değişken davranıyor. Gerçekleşen önek uzunluğu
-  koşu raporuna yazılıyor (`shared_prefix_chars`) — varsayılmıyor. Yerel kuru koşuda
-  ölçüldü: **9.813 karakter**.
-- Koşu **gerçekleşen throughput'u loglar** (satır/sn ve token/sn). Rapora tahmin değil
-  ölçüm girer.
+  koşu raporuna yazılıyor (`shared_prefix_chars`) — varsayılmıyor. Kaggle koşusunda
+  ölçüldü: **9.859 karakter = 2.277 token**.
+- Koşu **gerçekleşen throughput'u loglar** ve **kurulumu üretimden ayırır**. Ayırmak
+  şart: 200 satırlık duman testinde motor kurulumu (model indirme + `torch.compile` +
+  CUDA graph capture) 252 sn'nin ~181'ini yiyip toplam hızı 0,79 satır/sn gösteriyordu,
+  oysa üretim 2,8 satır/sn gidiyordu. Küçükten büyüğe uzatma **yalnızca**
+  `rows_per_s_generating` ile yapılır.
+
 - Review metni `str.format` ile değil düz `replace` ile yerleştirilir: gerçek bir review'da
   `{LOOSE}` geçiyor ve `format` bunu yer tutucu sanıp koşunun ortasında patlıyordu.
+
+> ✅ **Ölçüldü 2026-08-28** (Kaggle 2× T4, 200 satır, Toys). Buradaki sayılar artık
+> tahmin değil:
+>
+> | | ölçüm |
+> |---|---|
+> | SYSTEM prompt'u | **2.277 token** (9.859 karakter) — tahmin 2.450'ydi |
+> | Üretim | **2,8 satır/sn** toplam · 1,4 satır/sn/GPU |
+> | Çıktı | **133 token/sn** toplam — tahmin 1.000–2.000'di, **5–15× iyimserdi** |
+> | Motor kurulumu | ~181 sn, satır sayısından bağımsız tek seferlik |
+> | parse hatası | %0 · span düşürme %1 |
+>
+> **Uzatma:** Toys'un 11.800 satırı ≈ **73 dk**; dört kategori (47.200) ≈ **4,9 saat**.
+> Kaggle'ın 30 sa/hafta kotasına rahat sığıyor. Darboğaz T4'te decode: FlashAttention
+> yok (compute capability 7.5 → `TRITON_ATTN`), KV cache 4,45 GiB → aynı anda ~8 istek.
+
 
 **Kaggle iki T4 veriyor — GPU isteyen her adım ikisini de kullanmalı.**
 Kural: **veri paralel, tensor paralel değil.** Model tek karta sığdığı sürece

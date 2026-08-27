@@ -765,3 +765,61 @@ deneme CSV'si **ayrıca** koşturulmalı (200 satır, bedava).
 **Etkilediği bölüm:** `configs/base.yaml` (`gate1`, `detection`), `analysis/gate1.py`,
 `detection/llm_annotate.py`, `CLAUDE.md` §2/§7
 **Kim:** Ekip
+
+---
+
+### 2026-08-28 — Kaggle duman testi (200 satır): ne çalıştı, ne bulundu
+
+İlk gerçek LLM koşusu. Kaggle 2× T4, vLLM 0.28, Qwen3-4B-Instruct-2507, prompt v3.
+**Boru hattı uçtan uca çalıştı**: iki GPU veri-paralel, 100+100 satır, birleştirme
+temiz, parse hatası %0, `evidence_span` düşürme %1 (2/200), beş sınıfın hepsi üretildi.
+
+**Ölçümler (artık tahmin değil):** SYSTEM prompt'u 2.277 token / 9.859 karakter;
+üretim 2,8 satır/sn (1,4/GPU); çıktı 133 token/sn; motor kurulumu ~181 sn.
+Uzatma: Toys 11.800 satır ≈ 73 dk, dört kategori ≈ 4,9 saat.
+
+> **Çıktı hızı tahmini 5–15× iyimserdi.** `technology-review` 1.000–2.000 token/sn
+> diyordu, gerçek 133. Sebep: T4 compute capability 7.5 → FlashAttention yok
+> (`TRITON_ATTN` backend'i), KV cache 4,45 GiB → aynı anda yalnızca ~8 istek. Proje
+> planı yine de bozulmuyor çünkü 47.200 satır Kaggle kotasının %16'sı.
+
+**İki kod kusuru duman testiyle ortaya çıktı ve düzeltildi:**
+
+1. **Kurulum süresi üretim hızına karışıyordu.** Rapor 0,79 satır/sn diyordu, gerçek
+   üretim 2,8 satır/sn idi — 252 sn'nin 181'i motor kurulumuydu. Küçük koşudan tam
+   koşuya uzatma 4 kat yanlış çıkardı. Rapor artık `generation_s` / `startup_s` /
+   `rows_per_s_generating` ayrımını yapıyor.
+2. **`--limit` çıktısı tam koşuyu sessizce atlatıyordu.** 200 satırlık parquet diskte
+   kalınca idempotans devreye giriyor ve tam koşu atlanıyordu; backend kontrolü bunu
+   yakalamıyor (ikisi de `vllm`). Artık satır sayısı kontrol ediliyor ve rapor
+   `is_partial` / `limit` taşıyor.
+
+**İki ölçüm bulgusu — kod kusuru değil, veriye dair:**
+
+3. **`kw_gift_received` deseninin precision'ı düşük.** `boost_received` çerçevesinden
+   gelen 8 satırın yalnızca **2'si** gerçekten alıcı tarafı; 6'sı veren tarafı
+   ("Got this as a gift **for my little brother**"). Desen `got this ... as a gift`
+   kalıbını yakalıyor ama yönü ayırt edemiyor. **Sonucu:** Hafta 4'ün 500'lük setinde
+   `received` katmanına ayrılan %15 (~75 satır) gerçekte ~19 alıcı-tarafı satır
+   getirecek. Hâlâ sıfırdan iyi ama beklenti buna göre kurulmalı. Desen **bilerek
+   düzeltilmedi**: doğrulama etiketleri görüldükten sonra ayar yapmak precision'ı
+   yapay olarak iyileştirir (aynı gerekçe: 2026-08-26, `stocking stuffer`).
+4. **LLM'de bir yön hatası (1/8).** *"This was a present from my son"* → `gift_given`
+   yazdı, `received` olmalıydı. Ayrıca `recipient` alanında en az 2 hata: eş →
+   `sibling` (olmalıydı `partner`), erkek kardeş → `child` (olmalıydı `sibling`).
+   `recipient` betimsel bir alan (T6), kapı değil — ama Hafta 4 hata analizinde
+   bakılacak listeye girdi.
+
+**Beklenmedik ve iyi haber:** vekilin işaretlemediği `main` satırlarında LLM %19,9
+`gift_given` buluyor (Kapı 1 eşiği %1). Bulunanların büyük kısmı **torun** deseni —
+*"great game for my grandson"*, *"Our grandson spends hours playing with these"* —
+içinde hiç hediye kelimesi geçmiyor, yani sözcüksel vekilin yapısal olarak
+göremeyeceği vakalar. Şema v2'de `grandchild`'ı ayrı sınıf yapmanın gerekçesi buydu
+ve ilk kez veriyle doğrulandı.
+
+`main` çerçevesinde `gift_given` %27,1 (45/166) çıktı; vekil %11,07 diyordu. 200
+satırlık bir alt küme, güven aralığı geniş — ama fark tam koşuda doğrulanırsa RQ1'in
+cevabı sözcüksel tahminin iki katından fazla demektir.
+
+**Etkilediği bölüm:** `CLAUDE.md` §6, `detection/llm_annotate.py`
+**Kim:** Ekip

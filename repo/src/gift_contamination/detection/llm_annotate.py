@@ -396,6 +396,28 @@ def _resolve_gpus(cfg: Config, backend_name: str) -> int:
     return n
 
 
+def _refuse_partial_output(dest: Path, src: Path, limit: int | None, force: bool) -> None:
+    """`--limit` ile uretilmis kismi cikti, tam kosuyu SESSIZCE atlatmamali.
+
+    Duman testi tam bu tuzagi acti: `--limit 200` ciktisi diskte kalinca tam
+    kosu idempotans yuzunden atlanir ve elde 200 satirlik bir dosya kalir.
+    Backend kontrolu bunu yakalamaz - ikisi de `vllm`. Kismi ciktinin satir
+    sayisi ornekleme boyutundan kucuk oldugu icin burada yakalaniyor.
+    """
+    if force or not dest.exists() or not src.exists():
+        return
+    have = pl.read_parquet(dest, columns=["row_id"]).height
+    want = limit if limit is not None else pl.read_parquet(
+        src, columns=["row_id"]
+    ).height
+    if have < want:
+        raise RuntimeError(
+            f"{dest.name} yalnizca {have:,} satir iceriyor, {want:,} isteniyor "
+            "(muhtemelen bir --limit kosusundan kalma). Sessizce atlamiyorum - "
+            "ya dosyayi silin ya --force verin."
+        )
+
+
 def annotate(
     cfg: Config,
     role: str,
@@ -413,10 +435,11 @@ def annotate(
             f"{dest.name} '{stale}' backend'iyle uretilmis, simdi '{backend_name}' "
             f"isteniyor. Sessizce atlamiyorum - ya dosyayi silin ya --force verin."
         )
+    src = annotation_sample_path(cfg, role)
+    _refuse_partial_output(dest, src, limit, force)
     if should_skip(dest, force, log):
         return dest
 
-    src = annotation_sample_path(cfg, role)
     if not src.exists():
         raise FileNotFoundError(
             f"Ornekleme yok: {src}\n"
@@ -587,7 +610,15 @@ def run_worker(
     # iscilerin toplami degil en yavas iscinin suresidir.
     stats |= {"shared_prefix_chars": prefix_chars, "backend": backend.name,
               "prompt_version": prompt.version,
-              "system_prompt_tokens": getattr(backend, "shared_prefix_tokens", None)}
+              "system_prompt_tokens": getattr(backend, "shared_prefix_tokens", None),
+              # YALNIZCA uretim suresi - motor kurulumu haric. `started` backend
+              # insa edildikten SONRA baslatiliyor. Ikisini ayirmak sart: 200
+              # satirlik duman testinde kurulum (indirme + torch.compile + CUDA
+              # graph) 252 sn'nin ~185'ini yiyordu ve toplam hiz 0,79 satir/sn
+              # gorunuyordu; gercek uretim hizi 3,0 satir/sn idi. Ayirmazsak
+              # kucuk kosudan buyuk kosuya uzatma yapilamaz.
+              "generation_s": time.perf_counter() - started,
+              "n_rows_generated": todo.height}
     write_json(stats, shards / f"stats_w{worker}.json")
 
 
@@ -621,7 +652,7 @@ def merge(cfg: Config, role: str, *, limit: int | None, elapsed: float) -> Path:
     log_output(log, dest, n_rows=final.height)
 
     stats = _sum_worker_stats(shards)
-    _write_stats(cfg, role, final, stats, elapsed, n_workers=len(
+    _write_stats(cfg, role, final, stats, elapsed, limit=limit, n_workers=len(
         list(shards.glob("stats_w*.json"))
     ))
     return dest
@@ -630,21 +661,28 @@ def merge(cfg: Config, role: str, *, limit: int | None, elapsed: float) -> Path:
 def _sum_worker_stats(shards: Path) -> dict:
     files = sorted(shards.glob("stats_w*.json"))
     total = {"n_parse_fail": 0, "n_downgraded": 0, "n_truncated": 0,
-             "n_output_tokens": 0, "n_retried": 0, "shared_prefix_chars": 0}
+             "n_output_tokens": 0, "n_retried": 0, "n_rows_generated": 0}
+    # Bu ikisi TOPLANMAZ: onek her iscide ayni, sure ise paralel gectigi icin
+    # toplami degil EN YAVAS isciyi gosterir.
+    peak = {"shared_prefix_chars": 0, "generation_s": 0.0}
     meta = {}
     for f in files:
         s = read_json(f)
         for k in total:
-            total[k] = (max(total[k], s[k]) if k == "shared_prefix_chars"
-                        else total[k] + s[k])
+            total[k] += s.get(k, 0)
+        for k in peak:
+            peak[k] = max(peak[k], s.get(k, 0))
         meta = {"backend": s["backend"], "prompt_version": s["prompt_version"],
                 "system_prompt_tokens": s["system_prompt_tokens"]}
-    return total | meta
+    return total | peak | meta
 
 
-def _write_stats(cfg, role, final, stats, elapsed, *, n_workers) -> None:
+def _write_stats(cfg, role, final, stats, elapsed, *, limit, n_workers) -> None:
     """Kosu raporu. Kapi 1 bu dosyayi okur; tahmin degil olcum yazilir."""
     n = final.height
+    # Uretim suresi en yavas isciden; sifirsa (devam ettirilen kosuda hicbir
+    # isci uretim yapmadiysa) duvar saatine dus.
+    gen_s = stats.get("generation_s") or elapsed
     # `group_by` anahtari TUPLE dondurur ("main",); dict anahtari olarak
     # kullanilirsa json.dump patlar. Denetimde ayni desen `build_trial`da da
     # cikmisti - o yuzden burada da acikca [0] aliniyor.
@@ -665,18 +703,29 @@ def _write_stats(cfg, role, final, stats, elapsed, *, n_workers) -> None:
             "backend": stats["backend"],
             "n_rows": n,
             "n_workers": n_workers,
+            # Kismi kosu KENDINI TANITMALI. Duman testinin 200 satirlik raporu
+            # ile tam kosunun 11.800'luk raporu aksi halde yapisal olarak ayni
+            # gorunur ve yanlislikla analize girebilir.
+            "limit": limit,
+            "is_partial": bool(limit is not None),
         },
+        # KURULUM ile URETIM AYRI raporlanir. Motor kurulumu (model indirme,
+        # torch.compile, CUDA graph capture) satir sayisindan BAGIMSIZ sabit bir
+        # maliyet: 200 satirlik duman testinde 252 sn'nin ~185'ini yiyip toplam
+        # hizi 0,79 satir/sn gosteriyordu, oysa uretim 3,0 satir/sn gidiyordu.
+        # Kucuk kosudan buyuk kosuya uzatma YALNIZCA `rows_per_s_generating`
+        # ile yapilir; `rows_per_s` tek seferlik bu kosunun gercek maliyeti.
         "throughput": {
-            # DUVAR SAATI: paralel kosuda toplam sure iscilerin toplami degil,
-            # en yavas iscinin suresi. rows_per_s bu yuzden GERCEK toplam hiz -
-            # isci basina hiz degil.
             "elapsed_s": round(elapsed, 1),
+            "generation_s": round(gen_s, 1),
+            "startup_s": round(max(elapsed - gen_s, 0.0), 1),
             "rows_per_s": round(n / elapsed, 2) if elapsed else None,
-            "rows_per_s_per_gpu": round(n / elapsed / n_workers, 2)
-            if elapsed and n_workers else None,
+            "rows_per_s_generating": round(n / gen_s, 2) if gen_s else None,
+            "rows_per_s_per_gpu": round(n / gen_s / n_workers, 2)
+            if gen_s and n_workers else None,
             "output_tokens": stats["n_output_tokens"],
-            "output_tokens_per_s": round(stats["n_output_tokens"] / elapsed, 1)
-            if elapsed else None,
+            "output_tokens_per_s": round(stats["n_output_tokens"] / gen_s, 1)
+            if gen_s else None,
             # Prefix caching'in dayanagi. Sifira yakinsa caching ise yaramiyor.
             "shared_prefix_chars": stats["shared_prefix_chars"],
             "system_prompt_tokens": stats["system_prompt_tokens"],
@@ -697,6 +746,18 @@ def _write_stats(cfg, role, final, stats, elapsed, *, n_workers) -> None:
         "by_frame": by_frame,
     }
     write_json(report, annotation_stats_path(cfg, role), log)
+
+    tp = report["throughput"]
+    if tp["rows_per_s_generating"]:
+        full = pl.read_parquet(
+            annotation_sample_path(cfg, role), columns=["row_id"]
+        ).height
+        log.info(
+            "uretim %.2f satir/sn (%s GPU) | kurulum %.0f sn tek seferlik | "
+            "tam kategori (%s satir) tahmini ~%.0f dk",
+            tp["rows_per_s_generating"], n_workers, tp["startup_s"], f"{full:,}",
+            (full / tp["rows_per_s_generating"] + tp["startup_s"]) / 60,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

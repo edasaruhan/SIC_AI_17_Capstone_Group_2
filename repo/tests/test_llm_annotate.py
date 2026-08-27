@@ -384,7 +384,63 @@ def test_report_records_how_many_gpus_ran(sampled: Config):
     )
 
     assert report["meta"]["n_workers"] == 2
-    # Duvar saati toplam hiz; GPU basina hiz ayrica veriliyor.
-    assert report["throughput"]["rows_per_s"] == pytest.approx(
-        report["throughput"]["rows_per_s_per_gpu"] * 2, rel=1e-6
+    tp = report["throughput"]
+    # GPU basina hiz, uretim hizinin isci sayisina bolunmusu.
+    # Ikisi de bagimsiz yuvarlandigi icin tam esitlik beklenmez.
+    assert tp["rows_per_s_generating"] == pytest.approx(
+        tp["rows_per_s_per_gpu"] * 2, abs=0.02
     )
+
+
+def test_startup_cost_is_reported_separately_from_generation(sampled: Config):
+    """Motor kurulumu uretim hizina karistirilmamali.
+
+    Kaggle duman testinde (200 satir) kurulum - model indirme, torch.compile,
+    CUDA graph capture - 252 sn'nin ~185'ini yiyordu ve rapor toplam hizi
+    0,79 satir/sn gosteriyordu; gercek uretim 3,0 satir/sn gidiyordu. Bu farkla
+    kucuk kosudan tam kosuya uzatma yapmak 4 kat yanlis tahmin verir.
+    """
+    for w in range(2):
+        run_worker(sampled, "pilot", backend_name="stub", limit=None,
+                   worker=w, workers=2)
+    # Duvar saati uretimden cok daha uzun: aradaki fark kurulum.
+    merge(sampled, "pilot", limit=None, elapsed=500.0)
+
+    tp = json.loads(
+        annotation_stats_path(sampled, "pilot").read_text(encoding="utf-8")
+    )["throughput"]
+
+    assert tp["elapsed_s"] == 500.0
+    assert tp["generation_s"] < tp["elapsed_s"]
+    assert tp["startup_s"] == pytest.approx(
+        tp["elapsed_s"] - tp["generation_s"], abs=0.11
+    )
+    # Uzatilabilir sayi uretim hizi; duvar saati hizi bu kosunun maliyeti.
+    assert tp["rows_per_s_generating"] > tp["rows_per_s"]
+
+
+def test_partial_run_cannot_satisfy_a_full_run(sampled: Config):
+    """`--limit` ciktisi diskte kalinca tam kosu SESSIZCE atlanmamali.
+
+    Kaggle duman testi tam bu tuzagi acti: backend kontrolu yakalamiyor (ikisi
+    de vllm), satir sayisi kontrolu yakaliyor.
+    """
+    annotate(sampled, "pilot", backend_name="stub", limit=3)
+
+    with pytest.raises(RuntimeError, match="satir iceriyor"):
+        annotate(sampled, "pilot", backend_name="stub")
+
+    # --force ile temiz baslamak calismali.
+    full = pl.read_parquet(annotate(sampled, "pilot", backend_name="stub", force=True))
+    assert full.height == pl.read_parquet(annotation_sample_path(sampled, "pilot")).height
+
+
+def test_partial_run_labels_itself_in_the_report(sampled: Config):
+    annotate(sampled, "pilot", backend_name="stub", limit=3)
+
+    meta = json.loads(
+        annotation_stats_path(sampled, "pilot").read_text(encoding="utf-8")
+    )["meta"]
+
+    assert meta["is_partial"] is True
+    assert meta["limit"] == 3
