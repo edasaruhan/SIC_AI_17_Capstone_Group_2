@@ -47,6 +47,9 @@ Kullanim:
 
     # Kaggle: iki T4'u de kullanir (detection.gpus: auto)
     python -m gift_contamination.detection.llm_annotate --category high
+
+    # Kapi 1'in dorduncu olcutu: elle etiketlenmis 200 satirlik deneme seti
+    python -m gift_contamination.detection.llm_annotate --trial 200
 """
 
 from __future__ import annotations
@@ -62,7 +65,7 @@ import polars as pl
 from pydantic import ValidationError
 
 from ..config import REPO_ROOT, Config, add_standard_args, resolve_roles
-from ..data.sampling import annotation_sample_path
+from ..data.sampling import annotation_sample_path, trial_source_path
 from ..utils.io import read_json, should_skip, write_json
 from ..utils.logging import get_logger, log_output
 from .prompting import Prompt, load_prompt
@@ -328,6 +331,72 @@ def parse_one(raw: str, review: str) -> tuple[dict, bool, bool]:
 
 
 # ----------------------------------------------------------------- ana akislar
+
+
+def _label_chunk(
+    chunk: pl.DataFrame, prompt: Prompt, backend, retries: int, stats: dict,
+    *, tag: str = "",
+) -> tuple[list[dict], list[bool], list[bool], int]:
+    """Bir parcayi etiketler: prompt uret -> uret -> parse -> basarisizlari tekrar dene.
+
+    Hem gercek kosu hem deneme kosusu (Kapi 1 olcut 4) BURADAN geciyor. Iki ayri
+    kopya olsaydi uyum sayisi zamanla uretimde kosan boru hattini olcmeyi
+    birakabilirdi ve bunu fark etmenin bir yolu olmazdi.
+
+    `stats` YERINDE guncelleniyor; donen deger (kayitlar, parse_ok, downgrade,
+    ortak onek uzunlugu).
+    """
+    prompts, reviews, n_cut = build_prompts(chunk, prompt, backend)
+    stats["n_truncated"] += n_cut
+
+    gens = backend.generate(prompts, reviews)
+    records, ok_flags, down_flags = [], [], []
+    for gen, review in zip(gens, reviews):
+        record, ok, down = parse_one(gen.text, review)
+        # Tek bir tekrar denemesi tum parcayi yeniden uretmeyi gerektirir;
+        # bunun yerine basarisiz satirlar toplanip ayrica deneniyor (asagida).
+        records.append(record)
+        ok_flags.append(ok)
+        down_flags.append(down)
+        stats["n_output_tokens"] += gen.n_output_tokens
+
+    if retries and not all(ok_flags):
+        idx = [j for j, ok in enumerate(ok_flags) if not ok]
+        stats["n_retried"] += len(idx)
+        log.warning("%s%s satir yeniden deneniyor", tag, len(idx))
+        regen = backend.generate([prompts[j] for j in idx], [reviews[j] for j in idx])
+        for j, gen in zip(idx, regen):
+            record, ok, down = parse_one(gen.text, reviews[j])
+            records[j], ok_flags[j], down_flags[j] = record, ok, down
+            stats["n_output_tokens"] += gen.n_output_tokens
+
+    stats["n_parse_fail"] += ok_flags.count(False)
+    stats["n_downgraded"] += down_flags.count(True)
+    return records, ok_flags, down_flags, shared_prefix_len(prompts)
+
+
+def _attach_labels(
+    chunk: pl.DataFrame, records: list[dict], ok_flags: list[bool],
+    down_flags: list[bool], *, cfg: Config, prompt: Prompt, backend,
+    keep: list[str],
+) -> pl.DataFrame:
+    """Etiketleri girdi satirlarina yapistirir. Kolon sozlesmesi TEK YERDE."""
+    return chunk.select([c for c in keep if c in chunk.columns]).with_columns(
+        **{
+            col: pl.Series(col, [r[col] for r in records], dtype=pl.String)
+            for col in LABEL_COLUMNS
+        },
+        parse_ok=pl.Series("parse_ok", ok_flags, dtype=pl.Boolean),
+        span_downgraded=pl.Series("span_downgraded", down_flags, dtype=pl.Boolean),
+    ).with_columns(
+        pl.lit(prompt.version).alias("prompt_version"),
+        pl.lit(cfg.get("detection.primary_model")).alias("model"),
+        # Taklit etiket gercek etiketten AYIRT EDILEBILIR olmali; kuru kosu
+        # ciktisi yanlislikla analize girmesin.
+        pl.lit(backend.name).alias("backend"),
+    )
+
+
 def _done_row_ids(shards: Path, worker: int) -> set[int]:
     """Bu iscinin daha once bitirdigi satirlar.
 
@@ -574,49 +643,13 @@ def run_worker(
     # Parca adi isciyi tasiyor: iki surec ayni dosyaya yazamaz.
     n_existing = len(list(shards.glob(f"part_w{worker}_*.parquet")))
     for i, chunk in enumerate(todo.iter_slices(shard_rows)):
-        prompts, reviews, n_cut = build_prompts(chunk, prompt, backend)
-        stats["n_truncated"] += n_cut
-        prefix_chars = max(prefix_chars, shared_prefix_len(prompts))
-
-        gens = backend.generate(prompts, reviews)
-        records, ok_flags, down_flags = [], [], []
-        for gen, review in zip(gens, reviews):
-            record, ok, down = parse_one(gen.text, review)
-            # Tek bir tekrar denemesi tum parcayi yeniden uretmeyi gerektirir;
-            # bunun yerine basarisiz satirlar toplanip ayrica denenir (asagida).
-            records.append(record)
-            ok_flags.append(ok)
-            down_flags.append(down)
-            stats["n_output_tokens"] += gen.n_output_tokens
-
-        if retries and not all(ok_flags):
-            idx = [j for j, ok in enumerate(ok_flags) if not ok]
-            stats["n_retried"] += len(idx)
-            log.warning("parca %s: %s satir yeniden deneniyor", i, len(idx))
-            regen = backend.generate([prompts[j] for j in idx], [reviews[j] for j in idx])
-            for j, gen in zip(idx, regen):
-                record, ok, down = parse_one(gen.text, reviews[j])
-                records[j], ok_flags[j], down_flags[j] = record, ok, down
-                stats["n_output_tokens"] += gen.n_output_tokens
-
-        stats["n_parse_fail"] += ok_flags.count(False)
-        stats["n_downgraded"] += down_flags.count(True)
-
-        out = chunk.select(
-            [c for c in KEY_COLUMNS if c in chunk.columns]
-        ).with_columns(
-            **{
-                col: pl.Series(col, [r[col] for r in records], dtype=pl.String)
-                for col in LABEL_COLUMNS
-            },
-            parse_ok=pl.Series("parse_ok", ok_flags, dtype=pl.Boolean),
-            span_downgraded=pl.Series("span_downgraded", down_flags, dtype=pl.Boolean),
-        ).with_columns(
-            pl.lit(prompt.version).alias("prompt_version"),
-            pl.lit(cfg.get("detection.primary_model")).alias("model"),
-            # Taklit etiket gercek etiketten AYIRT EDILEBILIR olmali; kuru kosu
-            # ciktisi yanlislikla analize girmesin.
-            pl.lit(backend.name).alias("backend"),
+        records, ok_flags, down_flags, prefix = _label_chunk(
+            chunk, prompt, backend, retries, stats, tag=f"parca {i}: ",
+        )
+        prefix_chars = max(prefix_chars, prefix)
+        out = _attach_labels(
+            chunk, records, ok_flags, down_flags,
+            cfg=cfg, prompt=prompt, backend=backend, keep=KEY_COLUMNS,
         )
         part = shards / f"part_w{worker}_{n_existing + i:05d}.parquet"
         out.write_parquet(part)
@@ -643,6 +676,122 @@ def run_worker(
               "generation_s": time.perf_counter() - started,
               "n_rows_generated": todo.height}
     write_json(stats, shards / f"stats_w{worker}.json")
+
+
+# --------------------------------------------------- deneme kosusu (Kapi 1 / 4)
+def trial_annotation_path(cfg: Config, n: int = 200) -> Path:
+    return cfg.path("annotations", f"prompt_trial_{n}_llm.parquet")
+
+
+def trial_stats_path(cfg: Config, n: int = 200) -> Path:
+    return cfg.path("results", f"llm_annotate_prompt_trial_{n}.json")
+
+
+def annotate_trial(
+    cfg: Config, n: int = 200, *, backend_name: str = "vllm", force: bool = False,
+) -> Path:
+    """Elle etiketlenmis deneme setini LLM'e etiketletir (Kapi 1, olcut 4).
+
+    TEK SUREC, PARCALAMA YOK. 200 satir tek T4'te ~1 dakika uretim; kesintiye
+    dayaniklilik makinesi burada hicbir sey kazandirmaz, yalnizca yuzey ekler.
+    Uretim kosusunun aksine bu dosya kucuk ve yeniden uretmek ucuz.
+
+    Etiketleme `_label_chunk` uzerinden gidiyor - yani gercek kosuyla AYNI
+    prompt, ayni chat template, ayni parse ve ayni tekrar deneme mantigi. Uyum
+    sayisinin olctugu sey uretimde kosan boru hatti olmak zorunda.
+    """
+    dest = trial_annotation_path(cfg, n)
+    stale = _stale_backend(dest, backend_name)
+    if stale is not None and not force:
+        raise RuntimeError(
+            f"{dest.name} '{stale}' backend'iyle uretilmis, simdi '{backend_name}' "
+            f"isteniyor. Sessizce atlamiyorum - ya dosyayi silin ya --force verin."
+        )
+    if should_skip(dest, force, log):
+        return dest
+
+    src = trial_source_path(cfg, n)
+    if not src.exists():
+        raise FileNotFoundError(
+            f"Deneme kaynagi yok: {src}\n"
+            "Once uretin: python -m gift_contamination.data.sampling "
+            f"--trial-source {n}"
+        )
+
+    df = pl.read_parquet(src)
+    prompt = load_prompt(cfg)
+    started_all = time.perf_counter()
+    backend = BACKENDS[backend_name](cfg, prompt)
+    startup_s = time.perf_counter() - started_all
+
+    log.info(
+        "deneme kosusu | %s | model=%s | prompt=%s | %s satir",
+        backend.name, cfg.get("detection.primary_model"), prompt.version,
+        f"{df.height:,}",
+    )
+
+    stats = {"n_parse_fail": 0, "n_downgraded": 0, "n_truncated": 0,
+             "n_output_tokens": 0, "n_retried": 0}
+    retries = cfg.get("detection.retry_on_parse_fail")
+    started = time.perf_counter()
+    parts, prefix_chars = [], 0
+    for chunk in df.iter_slices(cfg.get("detection.shard_rows")):
+        records, ok_flags, down_flags, prefix = _label_chunk(
+            chunk, prompt, backend, retries, stats, tag="deneme: ",
+        )
+        prefix_chars = max(prefix_chars, prefix)
+        parts.append(_attach_labels(
+            chunk, records, ok_flags, down_flags,
+            cfg=cfg, prompt=prompt, backend=backend,
+            keep=["trial_id", *KEY_COLUMNS],
+        ))
+    generation_s = time.perf_counter() - started
+
+    final = pl.concat(parts, how="vertical").sort("trial_id")
+    if final.height != df.height:
+        raise RuntimeError(
+            f"satir sayisi tutmuyor: girdi {df.height}, cikti {final.height}"
+        )
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    final.write_parquet(dest)
+    log_output(log, dest, n_rows=final.height)
+
+    write_json(
+        {
+            "meta": {
+                "n": n,
+                "model": cfg.get("detection.primary_model"),
+                "prompt_version": prompt.version,
+                "backend": backend.name,
+                "code_version": code_version(),
+                "n_rows": final.height,
+            },
+            "throughput": {
+                "generation_s": round(generation_s, 1),
+                "startup_s": round(startup_s, 1),
+                "rows_per_s_generating": round(final.height / generation_s, 2)
+                if generation_s else None,
+                "output_tokens": stats["n_output_tokens"],
+                "shared_prefix_chars": prefix_chars,
+                "system_prompt_tokens": getattr(backend, "shared_prefix_tokens", None),
+            },
+            "quality": {
+                "parse_fail_rate": round(stats["n_parse_fail"] / final.height, 6),
+                "n_parse_fail": stats["n_parse_fail"],
+                "n_retried": stats["n_retried"],
+                "span_downgrade_rate": round(stats["n_downgraded"] / final.height, 6),
+                "n_span_downgraded": stats["n_downgraded"],
+                "n_truncated_reviews": stats["n_truncated"],
+            },
+            "by_purchase_type": dict(sorted(
+                final.group_by("purchase_type").len().iter_rows()
+            )),
+        },
+        trial_stats_path(cfg, n),
+        log,
+    )
+    return dest
 
 
 def merge(cfg: Config, role: str, *, limit: int | None, elapsed: float) -> Path:
@@ -800,6 +949,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Kac veri-paralel surec. Varsayilan config'ten (detection.gpus, "
              "'auto' = torch.cuda.device_count()). Kaggle'da 2.",
     )
+    parser.add_argument(
+        "--trial", type=int, default=None, metavar="N",
+        help="Kategori yerine N satirlik deneme setini etiketle (Kapi 1, olcut 4)",
+    )
     # Asagidaki ucu ALT SURECLER icin; elle verilmesi gerekmez.
     parser.add_argument("--worker", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--workers", type=int, default=1, help=argparse.SUPPRESS)
@@ -807,6 +960,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
+    if args.trial:
+        annotate_trial(cfg, args.trial, backend_name=args.backend, force=args.force)
+        return 0
+
     for role in resolve_roles(cfg, args.category):
         if args.no_merge:
             # Alt surec: yalnizca kendi dilimini etiketler, birlestirmez.

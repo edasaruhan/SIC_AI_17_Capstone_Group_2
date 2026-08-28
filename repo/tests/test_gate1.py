@@ -27,7 +27,11 @@ from gift_contamination.analysis.gate1 import (
 from gift_contamination.analysis.keyword_scan import PROXY_COL, scan_category
 from gift_contamination.config import Config
 from gift_contamination.data.sampling import build_sample
-from gift_contamination.detection.llm_annotate import annotate, annotation_path
+from gift_contamination.detection.llm_annotate import (
+    annotate,
+    annotation_path,
+    trial_annotation_path,
+)
 
 
 @pytest.fixture
@@ -219,3 +223,69 @@ def test_boost_frames_are_excluded_from_the_verdict(annotated: Config):
 
     assert report["meta"]["n_main"] == n_main
     assert n_main < boosted.height
+
+
+def _write_trial_pair(
+    cfg: Config, human: list[str], llm: list[str], *, backend: str = "vllm"
+) -> None:
+    """Deneme setinin iki yakasini kurar: insan CSV'si + LLM parquet'i."""
+    ids = list(range(1, len(human) + 1))
+    csv = cfg.path("human", "prompt_trial_200_labeled.csv")
+    csv.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({"trial_id": ids, "label": human}).write_csv(csv)
+
+    dest = trial_annotation_path(cfg)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "trial_id": ids,
+        "purchase_type": llm,
+        "backend": [backend] * len(llm),
+    }).write_parquet(dest)
+
+
+def test_trial_agreement_is_measured_against_the_human_labels(cfg: Config):
+    """Uyum, insan etiketiyle LLM etiketinin BIREBIR ortusmesi."""
+    _write_trial_pair(
+        cfg,
+        human=["self", "gift_given", "household", "unclear"],
+        llm=["self", "gift_given", "household", "self"],
+    )
+
+    result = trial_agreement(cfg)
+
+    assert result["skipped"] is False
+    assert result["n_compared"] == 4
+    assert result["agreement"] == 0.75
+
+
+def test_llm_only_received_label_counts_as_disagreement(cfg: Config):
+    """`received` sema v3'te var, v2 rehberinde YOKTU.
+
+    Insanin secemedigi bir etiketi uyusmazlik saymak olcutu ZORLASTIRIR;
+    disarida birakmak uyumu sisirirdi. Sayisi ayrica raporlanmali ki secim
+    gorunur kalsin.
+    """
+    _write_trial_pair(
+        cfg,
+        human=["gift_given", "gift_given", "self", "self"],
+        llm=["received", "gift_given", "self", "self"],
+    )
+
+    result = trial_agreement(cfg)
+
+    assert result["agreement"] == 0.75
+    assert result["n_llm_received"] == 1
+
+
+def test_stub_trial_run_cannot_enter_the_gate(cfg: Config):
+    """Kuru kosunun etiketleri RASTGELE; uyum sayisi da rastgele cikar.
+
+    Taklit bir kosu bu olcutu gecirebilir de bosuna dusurebilir de - iki yon de
+    kabul edilemez, cunku ortaya gercek gorunen bir karar cikar.
+    """
+    _write_trial_pair(
+        cfg, human=["self", "self"], llm=["self", "self"], backend="stub",
+    )
+
+    with pytest.raises(RuntimeError, match="Kuru kosu"):
+        trial_agreement(cfg)

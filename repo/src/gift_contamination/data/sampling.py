@@ -25,6 +25,7 @@ havuzlama agirligi da gerekmiyor.
 Kullanim:
     python -m gift_contamination.data.sampling --config configs/base.yaml --category all
     python -m gift_contamination.data.sampling --trial 200 --category all
+    python -m gift_contamination.data.sampling --trial-source 200
 """
 
 from __future__ import annotations
@@ -531,6 +532,116 @@ def build_trial(cfg: Config, roles: list[str], n: int, *, force: bool = False) -
     return dest
 
 
+# ------------------------------------------- deneme setinin LLM'e verilecek hali
+TRIAL_SOURCE_NAME = "prompt_trial_{n}_source.parquet"
+
+# CSV'de olmayan `stratum_id` disinda SAMPLE_COLUMNS ile ayni; ustune `trial_id`.
+# Ayni sekle sadik kalmak, `llm_annotate`in ayni kolon secicilerini kullanmasini
+# ve deneme kosusunun gercek kosudan farkli bir yol izlememesini sagliyor.
+TRIAL_SOURCE_COLUMNS = [
+    "trial_id", "row_id", "category", "sample_frame",
+    "month", "rating", "n_words",
+    "parent_asin", "product_title", "product_category",
+    "title", "text",
+]
+
+
+def trial_source_path(cfg: Config, n: int) -> Path:
+    return cfg.path("interim", TRIAL_SOURCE_NAME.format(n=n))
+
+
+def build_trial_source(cfg: Config, n: int, *, force: bool = False) -> Path:
+    """Elle etiketlenen deneme CSV'sini LLM'e verilebilir parquet'e cevirir.
+
+    NEDEN AYRI BIR ADIM: deneme satirlari annotation orneginin ICINDE DEGIL.
+    `build_trial` onlari 2026-08-26 tarihli ornekten cekmisti; ornek ertesi gun
+    `boost_received` cercevesi eklenince yeniden cekildi ve 200 satirin hicbiri
+    yeni cekiliste kalmadi (olculdu: 50 Toys satirinin 0'i). Bu bir hata degil -
+    16M satirlik korpustan 11.800 cekiliste 50 satirin beklenen kesisimi 0,04.
+    Ama Kapi 1'in dorduncu olcutu insan etiketiyle LLM etiketini karsilastirdigi
+    icin bu 200 satirin AYRICA etiketlenmesi gerekiyor.
+
+    CSV `product_title` TASIMIYOR - etiketleyiciye gosterilmemisti. LLM uretimde
+    urun adini goruyor, o yuzden korpustan geri getiriliyor: aksi halde uyum
+    sayisi prompt'un gercekte kostugu girdiyi olcmezdi.
+    """
+    dest = trial_source_path(cfg, n)
+    if should_skip(dest, force, log):
+        return dest
+
+    src = trial_path(cfg, n)
+    if not src.exists():
+        raise FileNotFoundError(f"Once deneme CSV'sini uretin: {src} yok")
+
+    # ETIKETSIZ dosya okunuyor. Etiketli olan ayni satirlari tasiyor ama insan
+    # etiketini bu boru hattina hic sokmamak "LLM etiketi gordu mu" sorusunu
+    # bastan ortadan kaldiriyor.
+    trial = pl.read_csv(src)
+    slug_to_role = {cfg.category_slug(r): r for r in cfg.get("dataset.categories")}
+
+    frames = []
+    for key, group in sorted(trial.group_by("category"), key=lambda kv: kv[0]):
+        slug = key[0]
+        role = slug_to_role.get(slug)
+        if role is None:
+            raise ValueError(
+                f"Deneme CSV'sindeki '{slug}' kategorisi config'te yok. "
+                f"Tanimli olanlar: {sorted(slug_to_role)}"
+            )
+        wanted = group.select("trial_id", "row_id", "sample_frame", "text")
+        corpus = (
+            pl.scan_parquet(clean_parquet_path(cfg, role))
+            .select("row_id", "title", "text", "parent_asin",
+                    "rating", "month", "n_words")
+            .join(wanted.lazy().select("row_id"), on="row_id", how="semi")
+            .collect()
+        )
+        if corpus.height != group.height:
+            raise RuntimeError(
+                f"{slug}: deneme CSV'sinde {group.height} satir var, korpusta "
+                f"{corpus.height} eslesti. `row_id` kaymis olabilir - deneme "
+                "CSV'si ile clean parquet ayni surumden gelmiyor."
+            )
+
+        joined = wanted.rename({"text": "csv_text"}).join(
+            corpus, on="row_id", how="inner"
+        )
+        # BUTUNLUK KONTROLU: `row_id` korpus capinda kararli olmali. Metin birebir
+        # tutmuyorsa join dogru satiri getirmemis demektir ve insan etiketi baska
+        # bir review'a bagli kalir - uyum sayisi anlamsizlasir.
+        drift = int(
+            (joined["csv_text"].fill_null("") != joined["text"].fill_null("")).sum()
+        )
+        if drift:
+            raise RuntimeError(
+                f"{slug}: {drift}/{joined.height} satirda korpus metni deneme "
+                "CSV'siyle tutmuyor. `row_id` eslesmesi guvenilir degil."
+            )
+
+        meta = load_join_frame(cfg, role)
+        frames.append(
+            joined.join(meta, on="parent_asin", how="left")
+            .with_columns(
+                pl.col("product_title").fill_null(""),
+                pl.col("product_category").fill_null(""),
+                pl.lit(slug).alias("category"),
+            )
+            .select(TRIAL_SOURCE_COLUMNS)
+        )
+
+    out = pl.concat(frames).sort("trial_id")
+    n_missing = int(out["product_title"].str.strip_chars().eq("").sum())
+    if n_missing:
+        log.warning("%s/%s satirda urun adi bos", n_missing, out.height)
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    out.write_parquet(dest)
+    log_output(log, dest, n_rows=out.height,
+               note=f"{out['category'].n_unique()} kategori")
+    log.info("GIZLILIK: bu dosya birebir review metni tasir ve git'e GIRMEZ.")
+    return dest
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     add_standard_args(parser)
@@ -540,6 +651,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="N",
         help="Ornek yerine N satirlik prompt gelistirme CSV'si uret",
     )
+    parser.add_argument(
+        "--trial-source",
+        type=int,
+        metavar="N",
+        help="Elle etiketlenmis deneme CSV'sini LLM'e verilebilir parquet'e cevir "
+             "(Kapi 1'in dorduncu olcutu icin)",
+    )
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
@@ -547,6 +665,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.trial:
         build_trial(cfg, roles, args.trial, force=args.force)
+        return 0
+
+    if args.trial_source:
+        build_trial_source(cfg, args.trial_source, force=args.force)
         return 0
 
     for role in roles:

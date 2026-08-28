@@ -823,3 +823,80 @@ cevabı sözcüksel tahminin iki katından fazla demektir.
 
 **Etkilediği bölüm:** `CLAUDE.md` §6, `detection/llm_annotate.py`
 **Kim:** Ekip
+
+### 2026-08-28 — Toys tam koşusu: Kapı 1 sonucu ve ölçülen özellikler
+**Karar:** Kapı 1 Toys_and_Games'te **INCOMPLETE**. Üç ölçüt geçti, dördüncüsü
+(deneme setiyle uyum) henüz koşulmadı. 3/3 görüp "PASS" demek reddedildi.
+
+**Gerekçe:** Kapının dört ölçütü koşudan **önce** sabitlendi. Sonucu gördükten sonra
+ölçüt sayısını düşürmek, kapıyı kurmamış olmakla aynı şey. Atlanan ölçüt `passed:
+null` + `skipped: true` olarak raporlanıyor ve karar beklemede.
+
+Koşu: 11.800 satır, 2× T4, 57 dakika (kurulum 196 sn ayrı raporlandı), üretim 3,64
+satır/sn, 516K çıktı token. Kod sürümü `add95f3` rapora yazıldı.
+
+| Ölçüt | Ölçülen | Eşik | |
+|---|---|---|---|
+| 1 mevsimsellik | 1,576 · GA [1,434 – 1,730] | ≥ 1,25 | ✅ |
+| 2 vekil ötesi | %18,0 | ≥ %1 | ✅ |
+| 3 şema sağlığı | parse %0,03 · span %2,77 | < %1 · < %10 | ✅ |
+| 4 deneme uyumu | ölçülmedi | ≥ %70 | ⏳ |
+
+**Dördüncü ölçüt neden ayrı bir koşu istiyor:** 200 deneme satırı annotation
+örneğinin **içinde değil**. `build_trial` onları 2026-08-26 tarihli örnekten
+çekmişti; örnek ertesi gün `boost_received` çerçevesi eklenince yeniden çekildi ve
+200 satırın hiçbiri yeni çekilişte kalmadı (ölçüldü: 50 Toys satırının 0'ı). Bu bir
+hata değil — 16M satırlık korpustan 11.800 çekilişte 50 satırın beklenen kesişimi
+0,04. Çözüm: `sampling --trial-source 200` satırları korpustan geri kurar (`row_id`
+eşleşmesi metin birebir karşılaştırılarak doğrulanıyor), `llm_annotate --trial 200`
+onları **gerçek koşuyla aynı** prompt/parse yolundan geçirir (`_label_chunk` iki
+akışta da ortak; ayrı bir kopya zamanla üretimden sapardı ve bunu fark etmenin yolu
+olmazdı).
+
+**Kapatılan açık:** `trial_agreement` backend'i kontrol etmiyordu. Kuru koşu
+çıktısıyla denendi ve kapı gerçek görünen bir **FAIL** üretti. Taklit etiketler
+rastgele olduğu için ölçüt her iki yöne de kayabilirdi. `load_joined` ile aynı
+koruma eklendi.
+
+---
+
+**Ölçülen üç özellik — kod kusuru değil, veriye ve modele dair:**
+
+1. **Sözcüksel vekil sanılandan çok daha zayıf.** LLM'i referans alırsak `main`
+   çerçevesinde vekilin **recall'ı %31,3**, **precision'ı %64,5**. Yani hediyelerin
+   üçte ikisini kaçırıyor ve işaretlediklerinin üçte biri hediye değil. Hediye oranı:
+   vekil %11,07 → LLM **%23,25** (2,1 kat). 200 satırlık duman testindeki %27,1
+   tahmini tam koşuda %23,25'e oturdu.
+
+   Kaçırılanların kaynağı ölçüldü: `gift_given` satırlarının **%43,6'sı torun**
+   (`grandchild`), ve bu satırlarda çoğunlukla hiç hediye kelimesi geçmiyor
+   ("great game for my grandson"). Şema v2'de `grandchild`'ı ayrı sınıf yapma kararı
+   ilk kez veriyle doğrulandı. **RQ1 için sonuç:** kontaminasyon oranı sözcüksel
+   tahminin iki katından fazla; RQ2'nin doz ekseni de bu sayılarla çizilmeli.
+
+2. **`confidence` alanı bağımsız bilgi taşımıyor.** `low` ile `unclear` **birebir
+   örtüşüyor** (870/870, her iki yönde %100); `medium` yalnızca 551 satırda. Prompt
+   confidence için bir *kural* vermiyor, yalnızca örnek veriyor ve model alanı
+   etiketin yeniden yazımına indirgemiş. **Sonucu:** DECISIONS 2026-08-27'de Hafta 5
+   için not edilen "sınıf dengesi gerekirse `confidence` filtre olarak kullanılabilir"
+   planı işe yaramaz — `confidence != low` filtresi `unclear`'ı atmakla aynı şey.
+   Prompt **şimdi değiştirilmedi**: tamamlanmış 11.800 satırlık koşuyu ve onunla
+   birlikte Kapı 1'i geçersiz kılardı. Hafta 4 kararı.
+
+3. **`kw_gift_received` precision'ı tam koşuda %11.** `boost_received` çerçevesindeki
+   300 satırın **%82'si `gift_given`** (veren tarafı), yalnızca %11'i gerçekten
+   `received`. Duman testindeki 2/8 bulgusu ölçekte doğrulandı. `main` çerçevesinde
+   `received` yaygınlığı **%0,60** (60 satır). **Sonucu:** Hafta 4'ün 500'lük setinde
+   `received` katmanına ayrılan %15 (~75 satır) gerçekte ~8 alıcı-tarafı satır
+   getirecek — önceki ~19 beklentisinden de düşük. κ eşiği tartışılırken bu sınıfın
+   neredeyse boş kalacağı hesaba katılmalı. Desen yine **bilerek düzeltilmedi**
+   (aynı gerekçe: 2026-08-26, `stocking stuffer`).
+
+**Bir doğrulama:** `span_downgraded` satırlarının **%100'ü `unclear`** (327/923).
+Mekanizma tam tasarlandığı gibi çalışıyor: modelin metinde birebir bulunmayan bir
+`evidence_span` uydurduğu satırlar `unclear`'a düşürülüyor. Diğer dört sınıfta
+downgrade oranı %0 — yani düşürülen hiçbir satır etiketini korumuyor.
+
+**Etkilediği bölüm:** `analysis/gate1.py`, `detection/llm_annotate.py`,
+`data/sampling.py`, `docs/GENEL_BAKIS.md` §6, `CLAUDE.md` §13
+**Kim:** Ekip

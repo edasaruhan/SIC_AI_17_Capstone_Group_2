@@ -17,7 +17,12 @@ import pytest
 
 from gift_contamination.analysis.keyword_scan import scan_category
 from gift_contamination.config import Config
-from gift_contamination.data.sampling import annotation_sample_path, build_sample
+from gift_contamination.data.sampling import (
+    annotation_sample_path,
+    build_sample,
+    build_trial,
+    build_trial_source,
+)
 from gift_contamination.detection.llm_annotate import (
     FAILED_ROW,
     KEY_COLUMNS,
@@ -25,6 +30,7 @@ from gift_contamination.detection.llm_annotate import (
     MAX_REVIEW_CHARS,
     StubBackend,
     annotate,
+    annotate_trial,
     annotation_path,
     annotation_stats_path,
     _worker_slice,
@@ -34,6 +40,7 @@ from gift_contamination.detection.llm_annotate import (
     run_worker,
     shard_dir,
     shared_prefix_len,
+    trial_stats_path,
 )
 from gift_contamination.detection.prompting import load_prompt
 from gift_contamination.detection.schema import PurchaseType
@@ -464,3 +471,73 @@ def test_report_records_the_code_version(sampled: Config):
     if meta["code_version"] is not None:
         assert 6 <= len(meta["code_version"]) <= 12
         assert meta["code_version"].isalnum()
+
+
+# ------------------------------------------------- deneme kosusu (Kapi 1 / 4)
+@pytest.fixture
+def trial_ready(cfg: Config) -> Config:
+    scan_category(cfg, "pilot")
+    build_sample(cfg, "pilot")
+    build_trial(cfg, ["pilot"], 4)
+    build_trial_source(cfg, 4)
+    return cfg
+
+
+def test_trial_run_keeps_the_trial_id(trial_ready: Config):
+    """`trial_id` insan etiketiyle LLM etiketini baglayan TEK anahtar.
+
+    `row_id` yetmez: kategoriler arasinda cakisiyor (bkz. test_sampling).
+    """
+    out = pl.read_parquet(
+        annotate_trial(trial_ready, 4, backend_name="stub")
+    )
+
+    assert out.height == 4
+    assert out["trial_id"].to_list() == [1, 2, 3, 4]
+    assert set(LABEL_COLUMNS) <= set(out.columns)
+
+
+def test_trial_run_is_marked_with_its_backend(trial_ready: Config):
+    """Taklit cikti gercekten AYIRT EDILEBILIR olmali - Kapi 1 buna bakiyor."""
+    out = pl.read_parquet(annotate_trial(trial_ready, 4, backend_name="stub"))
+
+    assert out["backend"].unique().to_list() == ["stub"]
+
+
+def test_trial_run_refuses_to_overwrite_a_real_run(trial_ready: Config):
+    """Gercek kosunun ustune kuru kosu yazmak kapiyi sessizce bozar.
+
+    `--force` bu korumanin bilinen ve belgelenmis kacis yolu (`annotate` ile
+    ayni sozlesme); sinanan sey, ISTENMEDEN gecilememesi.
+    """
+    dest = annotate_trial(trial_ready, 4, backend_name="stub")
+    pl.read_parquet(dest).with_columns(
+        pl.lit("vllm").alias("backend")
+    ).write_parquet(dest)
+
+    with pytest.raises(RuntimeError, match="backend'iyle uretilmis"):
+        annotate_trial(trial_ready, 4, backend_name="stub")
+
+
+def test_trial_run_uses_the_same_prompt_as_the_real_run(trial_ready: Config):
+    """Uyum sayisi URETIMDEKI boru hattini olcmeli, ayri bir kopyayi degil."""
+    annotate(trial_ready, "pilot", backend_name="stub")
+    real = pl.read_parquet(annotation_path(trial_ready, "pilot"))
+    trial = pl.read_parquet(annotate_trial(trial_ready, 4, backend_name="stub"))
+
+    assert trial["prompt_version"][0] == real["prompt_version"][0]
+    assert trial["model"][0] == real["model"][0]
+
+
+def test_trial_report_separates_startup_from_generation(trial_ready: Config):
+    """Kurulum suresi uretim hizina karismamali (duman testi bulgusu, 2026-08-28)."""
+    annotate_trial(trial_ready, 4, backend_name="stub")
+
+    report = json.loads(
+        trial_stats_path(trial_ready, 4).read_text(encoding="utf-8")
+    )
+
+    assert report["meta"]["backend"] == "stub"
+    assert "startup_s" in report["throughput"]
+    assert "generation_s" in report["throughput"]
+    assert report["meta"]["n_rows"] == 4

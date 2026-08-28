@@ -55,11 +55,12 @@ src/gift_contamination/
     metadata.py          # ürün metadata jsonl -> parquet, parent_asin join'i
     preprocess.py        # filtreleme, 5-core, sekans kurma
     sampling.py          # katmanlı örnekleme (main + boost çerçeveleri)
+                         #   + deneme setinin LLM kaynağı (--trial-source)
     labelsheet.py        # elle etiketleme sayfası: CSV <-> xlsx gidiş dönüşü
   detection/
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render
-    llm_annotate.py      # vLLM batch annotation
+    llm_annotate.py      # vLLM batch annotation (veri paralel) + deneme koşusu
     distill.py           # ModernBERT fine-tune
     inference.py         # tam korpus inference
   analysis/
@@ -230,20 +231,25 @@ Kaggle kotası boşa gider.
 - Review metni `str.format` ile değil düz `replace` ile yerleştirilir: gerçek bir review'da
   `{LOOSE}` geçiyor ve `format` bunu yer tutucu sanıp koşunun ortasında patlıyordu.
 
-> ✅ **Ölçüldü 2026-08-28** (Kaggle 2× T4, 200 satır, Toys). Buradaki sayılar artık
-> tahmin değil:
+> ✅ **Ölçüldü 2026-08-28** (Kaggle 2× T4, Toys). Buradaki sayılar artık tahmin değil.
+> Sağdaki sütun **11.800 satırlık tam koşu**; soldaki 200 satırlık duman testi:
 >
-> | | ölçüm |
-> |---|---|
-> | SYSTEM prompt'u | **2.277 token** (9.859 karakter) — tahmin 2.450'ydi |
-> | Üretim | **2,8 satır/sn** toplam · 1,4 satır/sn/GPU |
-> | Çıktı | **133 token/sn** toplam — tahmin 1.000–2.000'di, **5–15× iyimserdi** |
-> | Motor kurulumu | ~181 sn, satır sayısından bağımsız tek seferlik |
-> | parse hatası | %0 · span düşürme %1 |
+> | | 200 satır | **11.800 satır (tam)** |
+> |---|---|---|
+> | SYSTEM prompt'u | 2.277 token | **2.277 token** (9.859 karakter) — tahmin 2.450'ydi |
+> | Üretim | 2,8 satır/sn | **3,64 satır/sn** · 1,82 satır/sn/GPU |
+> | Çıktı | 133 token/sn | **159 token/sn** — tahmin 1.000–2.000'di, **6–13× iyimserdi** |
+> | Motor kurulumu | ~181 sn | **196 sn**, satır sayısından bağımsız tek seferlik |
+> | parse hatası | %0 | **%0,03** (4 satır) · span düşürme **%2,77** |
 >
-> **Uzatma:** Toys'un 11.800 satırı ≈ **73 dk**; dört kategori (47.200) ≈ **4,9 saat**.
-> Kaggle'ın 30 sa/hafta kotasına rahat sığıyor. Darboğaz T4'te decode: FlashAttention
-> yok (compute capability 7.5 → `TRITON_ATTN`), KV cache 4,45 GiB → aynı anda ~8 istek.
+> Küçük koşu **%30 karamsar** çıktı: prefix cache ve batch doluluğu uzun koşuda
+> oturuyor. Kurulum ayrı raporlanmasa 200 satırlık test 0,79 satır/sn gösterecekti —
+> gerçeğin 4,6 katı yanlış.
+>
+> **Gerçekleşen:** Toys 11.800 satır = **57 dk** (tahmin 73'tü). Dört kategori
+> (47.200) ≈ **3,8 saat**, Kaggle'ın 30 sa/hafta kotasının %13'ü. Darboğaz T4'te
+> decode: FlashAttention yok (compute capability 7.5 → `TRITON_ATTN`), KV cache
+> 4,45 GiB → aynı anda ~8 istek.
 
 
 **Kaggle iki T4 veriyor — GPU isteyen her adım ikisini de kullanmalı.**
@@ -295,6 +301,9 @@ python -m gift_contamination.data.download      --config configs/base.yaml --cat
 python -m gift_contamination.data.preprocess    --config configs/base.yaml --category pilot
 python -m gift_contamination.data.sampling      --config configs/base.yaml --category pilot --n 10000
 python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --category high
+# Kapı 1'in 4. ölçütü: deneme satırları örneğin İÇİNDE DEĞİL, ayrıca etiketlenir
+python -m gift_contamination.data.sampling          --config configs/base.yaml --trial-source 200
+python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --trial 200
 python -m gift_contamination.analysis.gate1         --config configs/base.yaml --category high
 python -m gift_contamination.detection.distill  --config configs/base.yaml
 python -m gift_contamination.detection.inference --config configs/base.yaml --category high
@@ -407,7 +416,15 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
   karara bağlanmalı
 - [ ] **TBD** **κ eşiği 5 sınıfta hâlâ 0.60 mı?** Fleiss' κ sınıf sayısı arttıkça düşme
   eğilimindedir — anlaşmazlık için daha çok yol var. Hafta 4 **öncesinde** gözden
-  geçirilmeli; düşürülecekse gerekçesi sonuç görülmeden yazılmalı
+  geçirilmeli; düşürülecekse gerekçesi sonuç görülmeden yazılmalı.
+  **Yeni veri (2026-08-28):** `received` `main` çerçevesinde %0,60, `boost_received`
+  çerçevesinde %11. 500'lük sette bu sınıf ~8 satır olacak — κ'nın o sınıftaki değeri
+  neredeyse anlamsız. Sınıfı κ hesabına katmak mı, ayrı raporlamak mı?
+- [ ] **TBD** **`confidence` alanı ne işe yarayacak?** Tam koşuda ölçüldü: `low` ile
+  `unclear` birebir örtüşüyor (%100, iki yönde), yani alan bağımsız bilgi taşımıyor.
+  Hafta 5'in "sınıf dengesi için `confidence` filtresi" planı bu haliyle işlemez.
+  Ya prompt v4'te kural verilir ya alan düşürülür — ikisi de Hafta 4 kararı
+  (şimdi değiştirmek tamamlanmış koşuyu ve Kapı 1'i geçersiz kılar)
 - [x] ~~**TBD** Kapı 1'in sayısal geçme ölçütü~~ → **KARARLAŞTI 2026-08-28.** Dört
   ölçüt, `configs/base.yaml` → `gate1:` altında, koşudan önce sabitlendi.
   Gerekçe: `docs/DECISIONS.md`

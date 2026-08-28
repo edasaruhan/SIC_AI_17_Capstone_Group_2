@@ -1,0 +1,58 @@
+{
+  "meta": {
+    "category": "Toys_and_Games",
+    "n_main": 10000,
+    "prompt_version": "v3",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "thresholds_fixed": "2026-08-28, configs/base.yaml -> gate1"
+  },
+  "criteria": {
+    "1_seasonality": {
+      "peak_months": [
+        12,
+        1
+      ],
+      "trough_months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "peak_rate": 0.311079,
+      "trough_rate": 0.197354,
+      "ratio": 1.5762,
+      "ci95": [
+        1.4344,
+        1.7302
+      ],
+      "threshold": 1.25,
+      "passed": true
+    },
+    "2_beyond_keyword": {
+      "n_unflagged": 8873,
+      "n_gift_in_unflagged": 1598,
+      "rate": 0.180097,
+      "rate_in_flagged": 0.645075,
+      "threshold": 0.01,
+      "passed": true
+    },
+    "3_schema_health": {
+      "parse_fail_rate": 0.000339,
+      "parse_fail_rate_max": 0.01,
+      "span_downgrade_rate": 0.027712,
+      "span_downgrade_rate_max": 0.1,
+      "passed": true
+    },
+    "4_trial_smoke_test": {
+      "skipped": true,
+      "passed": null,
+      "reason": "deneme kosusu yok (prompt_trial_200_llm.parquet) veya insan etiketi yok"
+    }
+  },
+  "n_passed": 3,
+  "n_decided": 3,
+  "skipped": [
+    "4_trial_smoke_test"
+  ],
+  "verdict": "INCOMPLETE"
+}

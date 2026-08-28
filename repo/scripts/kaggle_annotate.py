@@ -26,6 +26,12 @@ oturumu tamamen sifirlanirsa parcalar da gider; o yuzden uzun kosularda ara ara
 DUMAN TESTINDEN TAM KOSUYA GECERKEN: LIMIT=None **ve** FORCE=True. Aksi halde
 diskte kalan 200 satirlik parquet yuzunden kod kosuyu reddeder (dogru davranis;
 sessizce atlamaktansa hata vermeyi tercih ediyoruz).
+
+IKI KOSU MODU VAR:
+  TRIAL=None  -> kategori kosusu (11.800 satir, ~57 dk). Kapi 1'in 1-3. olcutleri.
+  TRIAL=200   -> deneme kosusu (200 satir, ~1 dk). Kapi 1'in 4. olcutu: elle
+                 etiketlenmis satirlarla uyum. Bu satirlar annotation orneginin
+                 ICINDE DEGIL, o yuzden ayri bir kosu gerekiyor.
 """
 
 # ---------------------------------------------------------------- ayarlar
@@ -39,6 +45,12 @@ LIMIT = None               # duman testi icin ornegin 200; tam kosu icin None
 # kod onu dogru sekilde reddediyor. Yarim kalmis bir kosuya DEVAM etmek
 # istiyorsaniz False birakin - parcalar korunur ve bitmis satirlar atlanir.
 FORCE = False
+# Kapi 1'in DORDUNCU olcutu: elle etiketlenmis 200 satirlik deneme seti.
+# Sayi verilirse KATEGORI KOSUSU YERINE o kosar (~200 satir, ~1 dakika uretim).
+# Onkosul: kaynak dosya yerelde uretilip dataset'e eklenmis olmali -
+#   python -m gift_contamination.data.sampling --trial-source 200
+# Bu satirlar annotation orneginin ICINDE DEGIL; ayrica etiketlenmeleri sart.
+TRIAL = None               # kategori kosusu icin None; deneme kosusu icin 200
 
 # ------------------------------------------------------------------ kurulum
 import os  # noqa: E402
@@ -92,6 +104,9 @@ dest_dir = REPO_DIR / "data" / "interim"
 dest_dir.mkdir(parents=True, exist_ok=True)
 
 found = sorted(src_dir.rglob("*_annotation_sample.parquet"))
+# Deneme kaynagi da ayni klasore gidiyor: `trial_source_path` onu
+# data/interim altinda ariyor.
+found += sorted(src_dir.rglob("prompt_trial_*_source.parquet"))
 if not found:
     raise SystemExit(
         f"Ornekleme dosyasi bulunamadi: {src_dir}\n"
@@ -100,14 +115,22 @@ if not found:
     )
 for f in found:
     shutil.copy(f, dest_dir / f.name)
-print(f"{len(found)} ornekleme dosyasi kopyalandi -> {dest_dir}")
+print(f"{len(found)} girdi dosyasi kopyalandi -> {dest_dir}")
+if TRIAL and not any(p.name.startswith("prompt_trial_") for p in found):
+    raise SystemExit(
+        f"""TRIAL={TRIAL} istendi ama dataset'te prompt_trial_{TRIAL}_source.parquet yok.
+Yerelde uretip dataset'e ekleyin (dosya ~40 KB):
+  python -m gift_contamination.data.sampling --trial-source {TRIAL}"""
+    )
 
 # ------------------------------------------------------------------- kosu
 from gift_contamination.config import Config  # noqa: E402
 from gift_contamination.detection.llm_annotate import (  # noqa: E402
     annotate,
+    annotate_trial,
     annotation_path,
     annotation_stats_path,
+    trial_stats_path,
 )
 
 import torch  # noqa: E402
@@ -121,14 +144,21 @@ print("gorunen GPU   :", torch.cuda.device_count(),
 if torch.cuda.device_count() < 2:
     print("!! UYARI: tek GPU gorunuyor. Settings > Accelerator = GPU T4 x2 mi?")
 
-print("force  :", FORCE, "| limit:", LIMIT)
+print("force  :", FORCE, "| limit:", LIMIT, "| trial:", TRIAL)
 
-out = annotate(cfg, CATEGORY, backend_name="vllm", limit=LIMIT, force=FORCE)
+# Deneme kosusu TEK SURECTE koşar: 200 satir icin surec cogaltmanin kazanci
+# kurulum maliyetinin altinda kalir (kurulum ~200 sn, uretim ~55 sn).
+if TRIAL:
+    out = annotate_trial(cfg, TRIAL, backend_name="vllm", force=FORCE)
+    stats_file = trial_stats_path(cfg, TRIAL)
+else:
+    out = annotate(cfg, CATEGORY, backend_name="vllm", limit=LIMIT, force=FORCE)
+    stats_file = annotation_stats_path(cfg, CATEGORY)
 
 # ------------------------------------------------------------------- cikti
 import json  # noqa: E402
 
-report = json.loads(annotation_stats_path(cfg, CATEGORY).read_text(encoding="utf-8"))
+report = json.loads(stats_file.read_text(encoding="utf-8"))
 print(json.dumps(report, ensure_ascii=False, indent=2))
 
 # Gerceklesen throughput: dokumanlardaki tahminin yerine bu sayi gecer.
@@ -136,9 +166,9 @@ print(json.dumps(report, ensure_ascii=False, indent=2))
 # yuzden alanlar `.get()` ile okunuyor.
 tp = report.get("throughput", {})
 meta = report.get("meta", {})
-print(f"\nuretim     : {tp.get('rows_per_s_generating')} satir/sn "
-      f"({meta.get('n_workers')} GPU, {tp.get('rows_per_s_per_gpu')} satir/sn/GPU) "
-      f"· {tp.get('output_tokens_per_s')} cikti-token/sn")
+gpus = f"{meta.get('n_workers')} GPU, {tp.get('rows_per_s_per_gpu')} satir/sn/GPU" if not TRIAL else "tek surec"
+print(f"\nuretim     : {tp.get('rows_per_s_generating')} satir/sn ({gpus})"
+      f" · {tp.get('output_tokens_per_s')} cikti-token/sn")
 print(f"kurulum    : {tp.get('startup_s')} sn (tek seferlik, satir sayisindan bagimsiz)")
 print(f"duvar saati: {tp.get('elapsed_s')} sn")
 print(f"ortak onek : {tp.get('shared_prefix_chars')} karakter "
@@ -155,5 +185,5 @@ if "rows_per_s_generating" not in tp:
 dl = WORK / "out"
 dl.mkdir(exist_ok=True)
 shutil.copy(out, dl / out.name)
-shutil.copy(annotation_stats_path(cfg, CATEGORY), dl / annotation_stats_path(cfg, CATEGORY).name)
+shutil.copy(stats_file, dl / stats_file.name)
 print(f"\nindirilecek dosyalar: {sorted(p.name for p in dl.iterdir())}")

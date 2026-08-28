@@ -31,6 +31,7 @@ from gift_contamination.data.sampling import (
     annotation_sample_path,
     build_sample,
     build_trial,
+    build_trial_source,
     proportional_allocation,
     trial_ids_path,
 )
@@ -464,3 +465,60 @@ def test_exclusion_key_is_scoped_by_category(cfg: Config):
     assert "row_ids" not in meta, "duz row_id listesi geri gelmis - anahtar belirsiz"
     assert set(meta["excluded"]) == {cfg.category_slug("pilot")}
     assert "(category, row_id)" in meta["note"]
+
+
+# ------------------------------------- deneme setinin LLM'e verilecek hali
+def test_trial_source_recovers_the_product_title(cfg: Config):
+    """Deneme CSV'si urun adi TASIMIYOR; LLM uretimde onu goruyor.
+
+    Getirilmezse Kapi 1'in uyum sayisi, prompt'un gercekte kostugu girdiden
+    farkli bir girdiyi olcerdi.
+    """
+    scan_category(cfg, "pilot")
+    build_sample(cfg, "pilot")
+    build_trial(cfg, ["pilot"], 4)
+
+    out = pl.read_parquet(build_trial_source(cfg, 4))
+
+    assert out.height == 4
+    assert "product_title" in out.columns
+    assert "trial_id" in out.columns
+    # Fixture metadata'sinda `i5`in basligi kasitli olarak bos; digerleri dolu.
+    assert (out["product_title"].str.strip_chars() != "").any()
+
+
+def test_trial_source_text_matches_the_labeled_csv(cfg: Config):
+    """`row_id` korpus capinda kararli olmali.
+
+    Insan etiketi bir review'a bagli; join baska bir satiri getirirse etiket
+    baska bir metne baglanir ve uyum sayisi sessizce anlamsizlasir.
+    """
+    scan_category(cfg, "pilot")
+    build_sample(cfg, "pilot")
+    csv = pl.read_csv(build_trial(cfg, ["pilot"], 4))
+
+    out = pl.read_parquet(build_trial_source(cfg, 4))
+
+    joined = csv.select("trial_id", pl.col("text").alias("csv_text")).join(
+        out.select("trial_id", "text"), on="trial_id", how="inner"
+    )
+    assert joined.height == 4
+    assert (joined["csv_text"] == joined["text"]).all()
+
+
+def test_trial_source_refuses_a_row_id_that_drifted(cfg: Config):
+    """Kaymis bir `row_id` SESSIZCE gecmemeli."""
+    scan_category(cfg, "pilot")
+    build_sample(cfg, "pilot")
+    csv_path = build_trial(cfg, ["pilot"], 4)
+    # Tek satirin metnini boz: korpusla artik tutmuyor.
+    bozuk = pl.read_csv(csv_path).with_columns(
+        pl.when(pl.col("trial_id") == 1)
+        .then(pl.lit("baska bir review metni"))
+        .otherwise(pl.col("text"))
+        .alias("text")
+    )
+    bozuk.write_csv(csv_path)
+
+    with pytest.raises(RuntimeError, match="tutmuyor"):
+        build_trial_source(cfg, 4, force=True)

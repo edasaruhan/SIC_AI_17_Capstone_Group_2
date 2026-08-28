@@ -43,7 +43,11 @@ import polars as pl
 
 from ..config import Config, add_standard_args, resolve_roles
 from ..data.sampling import annotation_sample_path
-from ..detection.llm_annotate import annotation_path, annotation_stats_path
+from ..detection.llm_annotate import (
+    annotation_path,
+    annotation_stats_path,
+    trial_annotation_path,
+)
 from ..detection.schema import PurchaseType
 from ..utils.io import read_json, write_json
 from ..utils.logging import get_logger
@@ -174,7 +178,7 @@ def trial_agreement(cfg: Config) -> dict:
     Atlanan olcut GECMIS sayilmaz: raporda `passed: null` ve `skipped: true`
     goründuğu icin genel karar da beklemeye alinir.
     """
-    llm = cfg.path("annotations", "prompt_trial_200_llm.parquet")
+    llm = trial_annotation_path(cfg)
     human = cfg.path("human", "prompt_trial_200_labeled.csv")
     if not llm.exists() or not human.exists():
         return {
@@ -183,22 +187,36 @@ def trial_agreement(cfg: Config) -> dict:
             "reason": f"deneme kosusu yok ({llm.name}) veya insan etiketi yok",
         }
 
+    labels = pl.read_parquet(llm)
+    # `load_joined` ile AYNI koruma. Bu olcut icin ayrica gerekli: kuru kosu
+    # etiketleri rastgele oldugu icin uyum sayisi da rastgele cikar ve olcut
+    # HER IKI YONE de kayabilir - taklit bir kosu Kapi 1'i gecirebilir de,
+    # bosuna dusurebilir de.
+    if "backend" in labels.columns and labels["backend"][0] != "vllm":
+        raise RuntimeError(
+            f"{llm.name} '{labels['backend'][0]}' backend'iyle uretilmis. "
+            "Kuru kosu ciktisi Kapi 1'e giremez."
+        )
+
     joined = (
         pl.read_csv(human).select("trial_id", pl.col("label").alias("human"))
         .join(
-            pl.read_parquet(llm).select("trial_id", pl.col("purchase_type").alias("llm")),
+            labels.select("trial_id", pl.col("purchase_type").alias("llm")),
             on="trial_id", how="inner",
         )
     )
-    # v2 rehberi `received`i bilmiyordu; deneme setinde alici-tarafi satir YOK
-    # (olculdu, 0/200) ama LLM yine de uretebilir. O vakayi uyusmazlik saymak
-    # yaniltir - insanin secebilecegi bir etiket degildi.
+    # BIREBIR esitlik. v2 rehberi `received`i bilmiyordu (insan etiketlerinde
+    # 0/200) ama sema v3 altinda LLM onu uretebiliyor; o satirlar burada
+    # UYUSMAZLIK sayiliyor. Kasitli secim: olcutu yalnizca ZORLASTIRAN bir
+    # sayim guvenli taraftadir, disarida birakmak ise uyumu sisirir. Kac tane
+    # oldugu asagida ayrica raporlaniyor ki sayi seffaf kalsin.
     agree = float((joined["human"] == joined["llm"]).mean()) if joined.height else 0.0
     threshold = cfg.get("gate1.trial_agreement_min")
     return {
         "skipped": False,
         "n_compared": joined.height,
         "agreement": round(agree, 4),
+        "n_llm_received": int((joined["llm"] == "received").sum()),
         "threshold": threshold,
         "passed": bool(agree >= threshold),
         "note": "DOGRULAMA DEGIL: prompt bu satirlar okunarak yazildi (DECISIONS 2026-08-26)",

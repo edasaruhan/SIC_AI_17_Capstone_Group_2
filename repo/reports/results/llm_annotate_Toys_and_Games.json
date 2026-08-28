@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "category": "Toys_and_Games",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "prompt_version": "v3",
+    "backend": "vllm",
+    "code_version": "add95f3",
+    "n_rows": 11800,
+    "n_workers": 2,
+    "limit": null,
+    "is_partial": false
+  },
+  "throughput": {
+    "elapsed_s": 3441.6,
+    "generation_s": 3245.5,
+    "startup_s": 196.1,
+    "rows_per_s": 3.43,
+    "rows_per_s_generating": 3.64,
+    "rows_per_s_per_gpu": 1.82,
+    "output_tokens": 516008,
+    "output_tokens_per_s": 159.0,
+    "shared_prefix_chars": 9859,
+    "system_prompt_tokens": 2277
+  },
+  "quality": {
+    "parse_fail_rate": 0.000339,
+    "n_parse_fail": 4,
+    "n_retried": 4,
+    "span_downgrade_rate": 0.027712,
+    "n_span_downgraded": 327,
+    "n_truncated_reviews": 0
+  },
+  "by_purchase_type": {
+    "gift_given": 3525,
+    "household": 2480,
+    "received": 94,
+    "self": 4778,
+    "unclear": 923
+  },
+  "by_frame": {
+    "boost": {
+      "gift_given": 954,
+      "household": 461,
+      "received": 1,
+      "self": 36,
+      "unclear": 48
+    },
+    "boost_received": {
+      "gift_given": 246,
+      "household": 2,
+      "received": 33,
+      "self": 14,
+      "unclear": 5
+    },
+    "main": {
+      "gift_given": 2325,
+      "household": 2017,
+      "received": 60,
+      "self": 4728,
+      "unclear": 870
+    }
+  }
+}
