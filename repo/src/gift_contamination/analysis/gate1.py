@@ -212,6 +212,35 @@ def trial_agreement(cfg: Config) -> dict:
     # oldugu asagida ayrica raporlaniyor ki sayi seffaf kalsin.
     agree = float((joined["human"] == joined["llm"]).mean()) if joined.height else 0.0
     threshold = cfg.get("gate1.trial_agreement_min")
+
+    # Uyusmazliklarin NEREDE toplandigi, tek bir uyum sayisindan cok daha
+    # bilgilendirici: esik gecilse bile hatanin yonu Hafta 4'un sinif
+    # kararlarini (CLAUDE.md 13: `household` C1'de `gift_given` ile
+    # eslesecek mi?) dogrudan besliyor. Sayilar burada duruyor ki bulgu
+    # gecici bir betikte kaybolmasin.
+    #
+    # `.len().iter_rows()` DUZ demet veriyor - (insan, llm, adet) - anahtar
+    # demeti degil. Bu depoda tekrarlayan bir tuzak.
+    confusion = {
+        f"{h}->{lbl}": n
+        for h, lbl, n in sorted(
+            joined.group_by(["human", "llm"]).len().iter_rows(),
+            key=lambda r: -r[2],
+        )
+        if h != lbl
+    }
+    per_class = {}
+    for c in sorted(set(joined["human"].unique()) | set(joined["llm"].unique())):
+        tp = int(((joined["human"] == c) & (joined["llm"] == c)).sum())
+        n_h = int((joined["human"] == c).sum())
+        n_l = int((joined["llm"] == c).sum())
+        per_class[c] = {
+            "n_human": n_h,
+            "n_llm": n_l,
+            "precision": round(tp / n_l, 3) if n_l else None,
+            "recall": round(tp / n_h, 3) if n_h else None,
+        }
+
     return {
         "skipped": False,
         "n_compared": joined.height,
@@ -219,6 +248,8 @@ def trial_agreement(cfg: Config) -> dict:
         "n_llm_received": int((joined["llm"] == "received").sum()),
         "threshold": threshold,
         "passed": bool(agree >= threshold),
+        "disagreements": confusion,
+        "per_class": per_class,
         "note": "DOGRULAMA DEGIL: prompt bu satirlar okunarak yazildi (DECISIONS 2026-08-26)",
     }
 

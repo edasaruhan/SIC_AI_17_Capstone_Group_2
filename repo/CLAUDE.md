@@ -409,7 +409,14 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
 - [ ] **TBD** Örnekleme boyutu kesin sayı: 40K mı 60K mı (pilot sonucuna göre)
 - [ ] **TBD** C2'de kullanılacak nihai ağırlık(lar) — üçünü de mi koşacağız yoksa biri mi
 - [ ] **TBD** C3'ün RecBole'da nasıl implement edileceği (feature olarak mı, ayrı token mı)
-- [ ] **TBD** `household` sınıfının C1'de silinip silinmeyeceği (kappa sonucuna bağlı)
+- [ ] **TBD** `household` sınıfının C1'de silinip silinmeyeceği (kappa sonucuna bağlı).
+  **Yeni veri (2026-08-29, deneme seti):** LLM'in en büyük hata kaynağı bu sınıf —
+  33 uyuşmazlığın 14'ü `household → gift_given` yönünde. Precision 1,000, recall
+  0,644: model etiketi yanlış yere koymuyor, **az** koyuyor. Ters yön (`gift_given
+  → household`) sıfır. İki sınıf birleştirilse uyum %83,5 → %90,5. Bu birleştirme
+  için gerekçe **değil** (ölçü iyileşsin diye sınıf birleştirmek, eşiği sonradan
+  düşürmenin başka biçimi) ama ayrı tutmanın maliyetini gösteriyor: `household`
+  gürültüsü Hafta 4'ün κ'sına doğrudan yansıyacak
 - [ ] **TBD** **`received` sınıfının C1'de silinip silinmeyeceği.** Şema v3 (2026-08-27)
   beşinci sınıfı ekledi ama C1'in tanımı hâlâ yalnızca `gift_given` diyor. Aynı soru,
   aynı gerekçe: alan kişi ürünü kullanıyor ama seçmedi. `household` ile birlikte
@@ -427,7 +434,8 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
   (şimdi değiştirmek tamamlanmış koşuyu ve Kapı 1'i geçersiz kılar)
 - [x] ~~**TBD** Kapı 1'in sayısal geçme ölçütü~~ → **KARARLAŞTI 2026-08-28.** Dört
   ölçüt, `configs/base.yaml` → `gate1:` altında, koşudan önce sabitlendi.
-  Gerekçe: `docs/DECISIONS.md`
+  Gerekçe: `docs/DECISIONS.md`. **Sonuç 2026-08-29: PASS (4/4)** — dördü de kendi
+  eşiğini geçti, hiçbiri sonradan değiştirilmedi
 - [ ] **TBD** Kaç seed (3 mü 5 mi) — koşu süresine göre
 - [x] ~~**TBD** GPU: yerel RTX mi Kaggle mı~~ → **KARARLAŞTI 2026-08-26.** Yerel kart
   GTX 1650 Ti (4 GB, Turing). LLM annotation **Kaggle**'da (2× T4, ~30 sa/hafta);

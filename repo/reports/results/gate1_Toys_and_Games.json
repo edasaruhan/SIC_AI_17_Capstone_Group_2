@@ -44,15 +44,53 @@
       "passed": true
     },
     "4_trial_smoke_test": {
-      "skipped": true,
-      "passed": null,
-      "reason": "deneme kosusu yok (prompt_trial_200_llm.parquet) veya insan etiketi yok"
+      "skipped": false,
+      "n_compared": 200,
+      "agreement": 0.835,
+      "n_llm_received": 0,
+      "threshold": 0.7,
+      "passed": true,
+      "disagreements": {
+        "household->gift_given": 14,
+        "unclear->self": 5,
+        "unclear->gift_given": 4,
+        "self->unclear": 4,
+        "household->self": 2,
+        "self->gift_given": 2,
+        "gift_given->unclear": 1,
+        "gift_given->self": 1
+      },
+      "per_class": {
+        "gift_given": {
+          "n_human": 80,
+          "n_llm": 98,
+          "precision": 0.796,
+          "recall": 0.975
+        },
+        "household": {
+          "n_human": 45,
+          "n_llm": 29,
+          "precision": 1.0,
+          "recall": 0.644
+        },
+        "self": {
+          "n_human": 50,
+          "n_llm": 52,
+          "precision": 0.846,
+          "recall": 0.88
+        },
+        "unclear": {
+          "n_human": 25,
+          "n_llm": 21,
+          "precision": 0.762,
+          "recall": 0.64
+        }
+      },
+      "note": "DOGRULAMA DEGIL: prompt bu satirlar okunarak yazildi (DECISIONS 2026-08-26)"
     }
   },
-  "n_passed": 3,
-  "n_decided": 3,
-  "skipped": [
-    "4_trial_smoke_test"
-  ],
-  "verdict": "INCOMPLETE"
+  "n_passed": 4,
+  "n_decided": 4,
+  "skipped": [],
+  "verdict": "PASS"
 }

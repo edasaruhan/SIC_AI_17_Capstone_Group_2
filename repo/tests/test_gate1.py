@@ -289,3 +289,44 @@ def test_stub_trial_run_cannot_enter_the_gate(cfg: Config):
 
     with pytest.raises(RuntimeError, match="Kuru kosu"):
         trial_agreement(cfg)
+
+
+def test_disagreements_are_reported_by_direction(cfg: Config):
+    """Tek bir uyum yuzdesi hatanin YONUNU gizler.
+
+    `household` -> `gift_given` ile `gift_given` -> `household` ayni uyum
+    sayisini verir ama bambaska iki sorundur; ilki C1'in tanimini (CLAUDE.md
+    13) dogrudan ilgilendirir. Uyusanlar listeye GIRMEZ.
+    """
+    _write_trial_pair(
+        cfg,
+        human=["household", "household", "self", "self"],
+        llm=["gift_given", "gift_given", "self", "unclear"],
+    )
+
+    result = trial_agreement(cfg)
+
+    assert result["disagreements"] == {"household->gift_given": 2, "self->unclear": 1}
+    assert "self->self" not in result["disagreements"]
+
+
+def test_per_class_separates_over_calling_from_missing(cfg: Config):
+    """Az cagirmak ile yanlis cagirmak ayni sayiya dusmemeli.
+
+    LLM `gift_given`i FAZLA cagiriyorsa recall yuksek precision dusuk cikar;
+    `household`i ATLIYORSA tam tersi. Genel uyum ikisini de gizler.
+    """
+    _write_trial_pair(
+        cfg,
+        human=["household", "household", "gift_given", "self"],
+        llm=["gift_given", "household", "gift_given", "self"],
+    )
+
+    result = trial_agreement(cfg)
+
+    assert result["per_class"]["household"] == {
+        "n_human": 2, "n_llm": 1, "precision": 1.0, "recall": 0.5,
+    }
+    assert result["per_class"]["gift_given"] == {
+        "n_human": 1, "n_llm": 2, "precision": 0.5, "recall": 1.0,
+    }

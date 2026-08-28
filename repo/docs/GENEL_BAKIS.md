@@ -223,7 +223,7 @@ sonuçlarından `prompts/gift_detection_v2.md` yazıldı.
 |:---:|---|---|
 | 1 | Veri indirme, ön işleme, sözcüksel vekil, derin EDA | ✅ bitti |
 | 2 | Katmanlı örnekleme, etiket şeması, prompt v2, 200 deneme etiketi | ✅ bitti |
-| 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ koşu bitti (57 dk, 2× T4) · Kapı 1'in 4. ölçütü bekliyor |
+| 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
 | 4 | 500 satır insan etiketleme (3 kişi), Fleiss κ ve sınıf bazlı F1, duyarlılık analizi | ⏳ |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ⏳ |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | ⏳ |
@@ -249,23 +249,40 @@ tekrar ediyorsa bütün damıtma yığını gereksizdir.
 
 Çalıştırma: `python -m gift_contamination.analysis.gate1 --category high`
 
-**Toys_and_Games sonucu (2026-08-28, 11.800 satır, kod `add95f3`):**
+**Toys_and_Games sonucu (2026-08-28, 11.800 satır, kod `add95f3` · 4. ölçüt
+2026-08-29, 200 satır, kod `b9d8664`):**
 
 | # | Ölçüt | Ölçülen | Eşik | |
 |---|---|---|---|---|
 | 1 | Mevsimsellik oranı | **1,576** · GA [1,434 – 1,730] | ≥ 1,25 | ✅ |
 | 2 | Vekil ötesi `gift_given` | **%18,0** | ≥ %1 | ✅ |
 | 3 | parse hatası · span düşürme | **%0,03** · **%2,77** | < %1 · < %10 | ✅ |
-| 4 | Deneme setiyle uyum | — | ≥ %70 | ⏳ koşu bekliyor |
+| 4 | Deneme setiyle uyum | **%83,5** (167/200) | ≥ %70 | ✅ |
 
-Karar **INCOMPLETE**: üç ölçüt geçti, dördüncüsü henüz ölçülmedi. Atlanan ölçüt
-geçmiş sayılmaz — 3/3 görüp "geçti" demek, kapıyı koşudan sonra gevşetmek olurdu.
+Karar **PASS (4/4)**. Tam annotation'a geçilebilir.
 
 4. ölçütün ayrı bir koşu gerektirmesinin sebebi: 200 deneme satırı annotation
 örneğinin **içinde değil**. Örnek 2026-08-27'de `boost_received` çerçevesi
 eklenince yeniden çekildi ve 200 satırın hiçbiri yeni çekilişte kalmadı (ölçüldü:
 50 Toys satırının 0'ı — 16M'lik korpustan 11.800 çekilişte beklenen kesişim 0,04).
-Bu satırlar `--trial 200` ile ayrıca etiketlenir.
+Bu satırlar `--trial 200` ile ayrıca etiketlendi.
+
+**4. ölçüt geçti ama sayı bir uyarı taşıyor.** 33 uyuşmazlığın **14'ü** tek bir
+yönde: insan `household` demiş, LLM `gift_given`. `household` recall'ı 0,644,
+precision'ı 1,000 — LLM bu sınıfı yanlış yere koymuyor, **az** koyuyor ve boşluğu
+`gift_given` ile dolduruyor. Sonuç olarak `gift_given` recall 0,975 ama precision
+0,796: model hediyeyi **fazla çağırıyor**.
+
+Bu, tam koşudaki **%23,25**'lik hediye oranının muhtemelen bir **üst sınır**
+olduğu anlamına gelir. Üstelik bu 200 satır prompt'un yazılırken okunduğu
+satırlar (DECISIONS 2026-08-26) — yani sayı iyimser tarafta; görülmemiş veride
+fazla çağırma daha kötü olabilir, daha iyi değil. Gerçek ölçüm Hafta 4'ün bağımsız
+500 satırı. Ayrıntı: `reports/results/gate1_Toys_and_Games.json` → `disagreements`,
+`per_class`.
+
+Ölçüt bu yüzden **duman testi** diye anılıyor, doğrulama diye değil: prompt'un
+gördüğü satırlarda %83,5 uyum, detektörün çalıştığını gösterir — ne kadar iyi
+çalıştığını değil.
 
 Geçemezse prompt v4 yazılır veya model değiştirilir (`secondary_model` config'te hazır).
 **Tam annotation'a geçilmez** — 47.200 satırı bozuk bir detektörle etiketlemek hem

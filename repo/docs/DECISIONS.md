@@ -900,3 +900,59 @@ downgrade oranı %0 — yani düşürülen hiçbir satır etiketini korumuyor.
 **Etkilediği bölüm:** `analysis/gate1.py`, `detection/llm_annotate.py`,
 `data/sampling.py`, `docs/GENEL_BAKIS.md` §6, `CLAUDE.md` §13
 **Kim:** Ekip
+
+---
+
+### 2026-08-29 — Kapı 1 kapandı: PASS (4/4). Dördüncü ölçüt bir yanlılık gösterdi
+**Karar:** 200 satırlık deneme seti `--trial 200` ile etiketlendi (kod `b9d8664`,
+tek süreç, 122 sn üretim). Uyum **%83,5** (167/200), eşik %70 → **geçti**. Kapı 1
+kararı **PASS (4/4)**; tam annotation'a geçilebilir.
+
+**Gerekçe:** Dört ölçüt de koşudan önce sabitlenmişti ve dördü de kendi eşiğini
+kendi başına geçti. Hiçbir eşik sonuç görüldükten sonra değiştirilmedi.
+
+**Ama sayı bir uyarı taşıyor — geçme kararından ayrı tutulmalı:**
+
+33 uyuşmazlığın **14'ü** (%42) tek bir yönde toplanıyor: insan `household` demiş,
+LLM `gift_given`. Sınıf bazında:
+
+| sınıf | insan | LLM | precision | recall |
+|---|---:|---:|---:|---:|
+| `gift_given` | 80 | 98 | 0,796 | 0,975 |
+| `household` | 45 | 29 | **1,000** | **0,644** |
+| `self` | 50 | 52 | 0,846 | 0,880 |
+| `unclear` | 25 | 21 | 0,762 | 0,640 |
+
+`household` precision'ı 1,000: LLM bu etiketi **yanlış yere koymuyor**, yalnızca
+**az koyuyor** ve boşluğu `gift_given` ile dolduruyor. Yön tek taraflı —
+`gift_given → household` hatası **sıfır**. Yani model, ev halkı için alınmış
+ürünleri sistematik olarak hediye sayıyor.
+
+**Üç sonucu var:**
+
+1. **Tam koşudaki %23,25'lik hediye oranı bir ÜST SINIR sayılmalı.** `gift_given`
+   precision'ı 0,796; model hediyeyi fazla çağırıyor. Üstelik bu 200 satır
+   prompt'un **yazılırken okunduğu** satırlar (2026-08-26) — sayı iyimser tarafta.
+   Görülmemiş veride fazla çağırma daha kötü olabilir, daha iyi değil.
+2. **`household`/`gift_given` TBD'si artık veriye dayanıyor.** İki sınıf C1'de
+   birleştirilirse uyum %83,5 → **%90,5** olur. Bu, birleştirme için bir gerekçe
+   *değil* — ölçüyü iyileştirmek için sınıf birleştirmek, ölçütü sonradan
+   gevşetmenin başka bir biçimi. Ama kararın maliyetini gösteriyor: ayrı tutulurlarsa
+   `household` sınıfının etiket gürültüsü Hafta 4'ün κ'sına doğrudan yansıyacak.
+3. **Ölçüt "duman testi", doğrulama değil.** Prompt'un gördüğü satırlarda %83,5,
+   detektörün *çalıştığını* gösterir — *ne kadar iyi* çalıştığını değil. Gerçek
+   ölçüm Hafta 4'ün bağımsız 500 satırı.
+
+**Rapora eklenen:** `trial_agreement` artık yalnızca tek bir uyum yüzdesi değil,
+`disagreements` (yön yön uyuşmazlık sayıları) ve `per_class` (sınıf bazında
+precision/recall) da yazıyor. Tek bir yüzde hatanın yönünü gizliyordu:
+`household → gift_given` ile `gift_given → household` aynı uyum sayısını verir
+ama bambaşka iki sorundur ve yalnızca ilki C1'in tanımını ilgilendirir.
+
+**Bir yan bulgu:** `received` deneme setinde **hiç üretilmedi** (0/200) — insan
+etiketlerinde de 0. Şema v3'ün beşinci sınıfını uyuşmazlık sayma kararı (bkz.
+`test_llm_only_received_label_counts_as_disagreement`) bu koşuda bir maliyet
+doğurmadı; koruma yine de yerinde kalıyor.
+
+**Etkilediği bölüm:** `analysis/gate1.py`, `docs/GENEL_BAKIS.md` §6, `CLAUDE.md` §13
+**Kim:** Ekip

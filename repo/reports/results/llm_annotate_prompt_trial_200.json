@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "n": 200,
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "prompt_version": "v3",
+    "backend": "vllm",
+    "code_version": "b9d8664",
+    "n_rows": 200
+  },
+  "throughput": {
+    "generation_s": 121.9,
+    "startup_s": 167.0,
+    "rows_per_s_generating": 1.64,
+    "output_tokens": 8546,
+    "shared_prefix_chars": 9859,
+    "system_prompt_tokens": 2277
+  },
+  "quality": {
+    "parse_fail_rate": 0.0,
+    "n_parse_fail": 0,
+    "n_retried": 0,
+    "span_downgrade_rate": 0.02,
+    "n_span_downgraded": 4,
+    "n_truncated_reviews": 0
+  },
+  "by_purchase_type": {
+    "gift_given": 98,
+    "household": 29,
+    "self": 52,
+    "unclear": 21
+  }
+}
