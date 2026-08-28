@@ -46,6 +46,15 @@ from ..utils.logging import get_logger, log_output
 
 log = get_logger("data.labelsheet")
 
+# Etiketin NEREDEN geldigini kayda geciren damga. `ingest` disinda bir yoldan
+# uretilmis (elle yazilmis, sentetik, bir betikle doldurulmus) bir dosya
+# Hafta 4 olcumune giremez: `analysis.validation.load_labels` bu degeri arar.
+# Gerekce deneyimle sabit - 2026-08-28'de taklit LLM ciktisi gercek gorunen bir
+# Kapi 1 karari uretmisti; ayni tuzak insan etiketi tarafinda da var ve orada
+# uc kisinin saatleri soz konusu.
+LABEL_SOURCE_COLUMN = "label_source"
+LABEL_SOURCE = "xlsx_ingest"
+
 # Kimlik kolonu: deneme setinde `trial_id`, dogrulama setinde `val_id`.
 # Kolon adini sabitlemek yerine tespit ediyoruz - iki akis ayni koddan gecsin.
 ID_COLUMNS = ("trial_id", "val_id")
@@ -238,6 +247,7 @@ def ingest(
 
     if annotators == 1:
         merged = merged.select(source.columns)
+    merged = merged.with_columns(pl.lit(LABEL_SOURCE).alias(LABEL_SOURCE_COLUMN))
 
     report = reports["tek"] if annotators == 1 else {"by_annotator": reports}
     dest = labeled_path(csv_path)

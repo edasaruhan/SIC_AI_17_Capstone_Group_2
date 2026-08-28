@@ -56,7 +56,10 @@ src/gift_contamination/
     preprocess.py        # filtreleme, 5-core, sekans kurma
     sampling.py          # katmanlı örnekleme (main + boost çerçeveleri)
                          #   + deneme setinin LLM kaynağı (--trial-source)
+                         #   + Hafta 4 doğrulama seti (--validation)
     labelsheet.py        # elle etiketleme sayfası: CSV <-> xlsx gidiş dönüşü
+                         #   körleme: vekil VE LLM'in cevabı sayfaya girmez
+                         #   --annotators N ile üç ayrı sayfa (Hafta 4)
   detection/
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render
@@ -70,7 +73,8 @@ src/gift_contamination/
     deep_eda.py          # varsayım sınama, T5-T14 / F9-F16
     gate1.py             # Kapı 1: dört ölçüt + LLM/vekil aylık eğri (F17)
     viz.py               # ortak grafik stili
-    validation.py        # kappa, F1, mevsimsellik, duyarlılık  (Hafta 4)
+    validation.py        # Fleiss kappa (kapı) + sınıf bazlı F1 + vekilin ilk
+                         #   bağımsız ölçümü. Hafta 4.
   recsys/
     atomic_files.py      # RecBole .inter/.item/.user üretimi
     conditions.py        # C0–C4 kurulumu
@@ -308,6 +312,11 @@ python -m gift_contamination.analysis.gate1         --config configs/base.yaml -
 python -m gift_contamination.detection.distill  --config configs/base.yaml
 python -m gift_contamination.detection.inference --config configs/base.yaml --category high
 python -m gift_contamination.analysis.descriptive --config configs/base.yaml
+# Hafta 4 - insan doğrulaması. Etiketleyen kişi LLM'in cevabını GÖRMEZ.
+python -m gift_contamination.data.sampling   --config configs/base.yaml --validation
+python -m gift_contamination.data.labelsheet --validation --export --annotators 3
+#   ... üç kişi kendi xlsx'ini doldurur ...
+python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
 python -m gift_contamination.analysis.validation  --config configs/base.yaml
 python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
        --category high --condition C0 --model SASRec --seed 42

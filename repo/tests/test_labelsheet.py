@@ -25,6 +25,8 @@ import pytest
 from gift_contamination.data.labelsheet import (
     BLIND_COLUMNS,
     EXPORT_COLUMNS,
+    LABEL_SOURCE,
+    LABEL_SOURCE_COLUMN,
     export,
     export_columns,
     ingest,
@@ -138,7 +140,10 @@ def test_round_trip_keeps_the_blind_columns(trial_csv: Path):
     dest, _ = ingest(trial_csv)
     out = pl.read_csv(dest)
 
-    assert out.columns == pl.read_csv(trial_csv).columns
+    # Kaynak kolonlarin HEPSI ayni sirada geri gelmeli; sonuna `ingest`in
+    # bastigi kaynak damgasi ekleniyor.
+    assert out.columns == [*pl.read_csv(trial_csv).columns, LABEL_SOURCE_COLUMN]
+    assert out[LABEL_SOURCE_COLUMN].to_list() == [LABEL_SOURCE] * 4
     assert out["kw_gift_proxy"].to_list() == [True, False, True, False]
     assert out["row_id"].to_list() == [11, 22, 33, 44]
 
