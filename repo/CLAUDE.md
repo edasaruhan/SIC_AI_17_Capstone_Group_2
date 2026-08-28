@@ -76,10 +76,11 @@ src/gift_contamination/
     validation.py        # Fleiss kappa (kapı) + sınıf bazlı F1 + vekilin ilk
                          #   bağımsız ölçümü. Hafta 4.
   recsys/
-    atomic_files.py      # RecBole .inter/.item/.user üretimi
-    conditions.py        # C0–C4 kurulumu
-    run_experiment.py    # deney koşucusu
-    marketing_metrics.py # M1, M2, M3
+    atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
+                         #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu)
+    conditions.py        # C0–C4 + C1b (gift+household, sağlamlık kontrolü)
+    run_experiment.py    # deney koşucusu            (Hafta 6, RecBole gerekir)
+    marketing_metrics.py # M1, M2, M3                (Hafta 8)
   utils/
     seeding.py, io.py, logging.py
 ```
@@ -318,6 +319,11 @@ python -m gift_contamination.data.labelsheet --validation --export --annotators 
 #   ... üç kişi kendi xlsx'ini doldurur ...
 python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
 python -m gift_contamination.analysis.validation  --config configs/base.yaml
+# Hafta 6 — deney. Atomic dosya ve koşullar RecBole GEREKTİRMEZ; yalnızca
+# run_experiment gerektirir. Etiket verilmezse sözcüksel vekil kullanılır ve
+# çıktı `reportable: false` damgası taşır — sonuç tablosuna giremez.
+python -m gift_contamination.recsys.atomic     --config configs/base.yaml --category mid
+python -m gift_contamination.recsys.conditions --config configs/base.yaml --category mid --condition all
 python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
        --category high --condition C0 --model SASRec --seed 42
 ```
@@ -372,7 +378,8 @@ Kurallar:
   C4 tam olarak C1 kadar etkileşim mi çıkarıyor
 - `test_no_leakage.py` — **kritik**: test item'ı eğitim setinde geçmiyor;
   split zaman bazlı; test item'ları `self` etiketli
-- `test_atomic_files.py` — RecBole atomic file formatı doğru mu
+- `test_no_leakage.py` — **kritik**: bölme zaman bazlı mı; test item'ı eğitimde
+  geçmiyor mu; test item'ları `self` etiketli mi
 
 Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte kullanılmaz.
 
