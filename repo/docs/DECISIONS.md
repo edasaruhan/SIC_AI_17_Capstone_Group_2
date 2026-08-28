@@ -956,3 +956,94 @@ doğurmadı; koruma yine de yerinde kalıyor.
 
 **Etkilediği bölüm:** `analysis/gate1.py`, `docs/GENEL_BAKIS.md` §6, `CLAUDE.md` §13
 **Kim:** Ekip
+
+---
+
+### 2026-08-29 — Hafta 4 öncesi üç karar + denetimden çıkan ölçümler
+
+Kapı 1 geçtikten sonra proje baştan gözden geçirildi. Üç açık TBD karara bağlandı ve
+hiçbiri sonuç görüldükten sonra ayarlanmadı. Ayrıca denetim sırasında ilk kez ölçülen
+üç şey aşağıda kayda geçiyor — o güne kadar hiçbir belgede yoktu.
+
+**1 — `confidence` alanı v3'te bırakılıyor, analizden düşürülüyor.**
+Ölçüm: `low` ile `unclear` **birebir örtüşüyor** (870/870, her iki yönde %100).
+Alan bağımsız bilgi taşımıyor; model onu etiketin yeniden yazımına indirmiş. Kök
+neden: prompt `confidence` için bir *kural* vermiyor, yalnızca *örnek* veriyor.
+Şemaya alan eklerken amacını yazmak yetmiyor — prompt'ta bir karar kuralı yoksa alan
+boş çıkıyor.
+
+Prompt v4 yazılıp koşu tekrarlanabilirdi (~4 saat Kaggle, Kapı 1 baskıdan sonra
+yeniden koşulurdu) ama yapılmıyor. Alanın tek amacı distillation eğitim setini
+sınıf dengesi için filtrelemekti; o iş zaten `boost` çerçevesiyle karşılanıyor.
+Bedeli olmayan bir kayıp. **Limitasyon olarak raporlanacak**, sessizce
+düşürülmeyecek: "öz-beyan güven alanı kalibre çıkmadı" kendi başına raporlanabilir
+bir bulgudur.
+
+**2 — Fleiss' κ eşiği beş sınıfta da 0,60'ta kalıyor.**
+κ sınıf sayısı arttıkça düşme eğilimindedir. Bunu bilerek eşiği peşinen düşürmek,
+kapıyı koşudan önce gevşetmenin başka bir biçimi olurdu. Bunun yerine iki kural
+yazıldı — ikisi de sonuç görülmeden:
+
+- **Sınıf bazlı κ ayrıca raporlanır** (bire-karşı-hepsi). Tek bir toplu sayı,
+  sınıflar arasında çok farklı uyum varsa yanıltıcıdır.
+- **`n < 20` olan sınıf genel κ'ya KATILMAZ**, ayrıca listelenir
+  (`validation.min_class_n_for_kappa`). Öngörülen vaka `received`: `main`
+  çerçevesinde %0,60, orantılı çekilseydi 500'lük sette **3 satır** düşerdi.
+  Üç satırda κ da F1 de anlamsızdır.
+
+**3 — RecBole iskelesi Hafta 6'yı beklemeden şimdi kuruluyor.**
+`src/gift_contamination/recsys/` tamamen boştu ve RQ2/RQ3/RQ4 ile M1–M3'ün hepsi
+orada yaşıyor. CLAUDE.md §10'un **kritik** dediği iki test (`test_conditions`,
+`test_no_leakage`) de yazılmamıştı. Atomic file üretimi ve C0 baseline dil modeli
+etiketi **gerektirmiyor** — sözcüksel vekille uçtan uca koşturulabilir. Etiketler
+gelince yalnızca sütun değişir.
+
+Asıl gerekçe zamanlama değil, öğrenme sırası: **C0 ile C4 arasında fark çıkmamalı.**
+Çıkarsa deney kurulumunda hata var demektir ve bunu Hafta 6'da öğrenmek, Hafta 5'te
+öğrenmekten pahalıdır. Duman koşusunun çıktısı `label_source: proxy` taşıyacak ve
+modül vekil kaynaklı girdiden raporlanabilir sonuç üretmeyi reddedecek (`gate1`'in
+backend guard'ıyla aynı desen).
+
+---
+
+**Denetimde ilk kez ölçülenler.** Üçü de Toys'un `main` çerçevesinden (10.000 satır),
+dil modeli etiketleriyle:
+
+**A — Gerçek sınıf dağılımı.** `self` %47,28 · `gift_given` **%23,25** ·
+`household` **%20,17** · `unclear` %8,70 · `received` %0,60.
+
+`household` korpusun **beşte biri**. Bu sayı C1'in tanımını doğrudan ilgilendiriyor:
+projenin kendi kontaminasyon tanımı *"alan kişi ürünü kendisi için seçmedi"* ve bu
+tanıma göre kendi çocuğuna alınan oyuncak da kontaminasyondur. C1 ya **%23,3** ya
+**%43,4** etkileşim çıkarıyor — iki kat fark.
+
+**B — İki sınıfın zaman imzası bambaşka.** (Aralık+Ocak) ÷ (Haziran–Eylül):
+
+| sınıf | oran |
+|---|---:|
+| `gift_given` | **1,58×** |
+| `household` | **1,09×** |
+| `self` | 0,76× |
+
+`household` mevsimsel **değil**. Bu iki yönlü bir bulgu: bir yandan sınıfın gerçek
+olduğunu gösteriyor (uydurma olsaydı, yani yanlış etiketlenmiş hediyelerden ibaret
+olsaydı, Aralık tepesi çıkardı); öte yandan **farklı türde** bir kontaminasyon
+olduğunu — kategoriye göre yapısal ama zamana göre düz.
+
+**C — Sınırı çizen şey vesile.** `recipient=child` olan 2.499 satırda:
+`household`'un **%99'unda** `occasion=none`; `gift_given`'ın %31'i doğum günü,
+%27'si Noel. Model keyfi bölmüyor, *vesile var mı* diye bölüyor. Bu, etiketleme
+rehberi §3.4'ün ("önce hane sınırını çizin") kurduğu kuralın veriyle karşılığı.
+
+**Sonucu — `household` TBD'sinin bağımlılığı değişti.** Kayıt bu kararı "kappa
+sonucuna bağlı" diyordu. Yanlış bağımlılık: κ sınıfın *ayırt edilebilir* olup
+olmadığını söyler, *kontaminasyon sayılıp sayılmayacağını* değil. İkincisi kavramsal
+bir karar. Karar Hafta 6 öncesine bırakılıyor ama **kod ikisini de koşabilir hale
+getirilecek**: C1 (yalnızca `gift_given`) birincil, C1b (`gift_given` + `household`)
+sağlamlık kontrolü. Aynı kod yolu, farklı süzgeç. Rapordaki cümle her iki sonuçta da
+güçlenir — *"iki tanım altında da aynı yönde"* ya da *"sonuç tanıma duyarlı"*.
+
+**Etkilediği bölüm:** `configs/base.yaml` (`validation:` bölümü), CLAUDE.md §13,
+`data/sampling.py`, `data/labelsheet.py`, `analysis/validation.py` (yeni),
+`recsys/` (yeni)
+**Kim:** Ekip

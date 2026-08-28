@@ -167,6 +167,37 @@ gate1:
   peak_months: [12, 1]
   trough_months: [6, 7, 8, 9]
 
+# Hafta 4 — insan doğrulaması. Projenin TEK gerçek referansı: damıtma ve bütün
+# öneri deneyi bu ölçümün üstüne kuruluyor. Eşikler 2026-08-29'da, HİÇBİR SONUÇ
+# GÖRÜLMEDEN sabitlendi (Kapı 1'in eşikleriyle aynı disiplin).
+validation:
+  n: 500
+  n_annotators: 3
+  # LLM ETİKETİNE göre katmanlı — sözcüksel vekile göre değil. Bu bir yaygınlık
+  # örneği DEĞİL: `household` ve `received` bilerek fazla temsil ediliyor.
+  # Gerekçe ölçüldü (2026-08-29 deneme koşusu): uyuşmazlıkların %42'si tek yönde,
+  # insan `household` / model `gift_given`. Sınır orası, örnek de oraya bakmalı.
+  # `received` `main` çerçevesinde %0,60 — orantılı çekilse 3 satır düşerdi ve
+  # o sınıfın F1'i de κ'sı da anlamsız olurdu.
+  strata:
+    gift_given: 150
+    household: 150
+    self: 100
+    unclear: 60
+    received: 40
+  # Kategori ağırlıkları. Toys iki kat: birincil deney kategorisi ve k-core'da
+  # hediye oranını koruyan tek kategori (T8).
+  role_weights: {high: 2, mid: 1, low: 1, pilot: 1}
+  # Fleiss' kappa eşiği. BEŞ SINIFTA DA 0,60'ta BIRAKILDI. κ sınıf sayısı arttıkça
+  # düşme eğilimindedir ve bunu bilerek eşiği peşinen düşürmek, kapıyı koşudan
+  # önce gevşetmenin başka bir biçimi olurdu. Bunun yerine iki kural yazıldı:
+  # sınıf bazlı κ ayrıca raporlanır, ve az örnekli sınıf genel κ'ya girmez.
+  kappa_min: 0.60
+  # Genel κ'ya girmek için gereken en az örnek. Altında kalan sınıf hesaba
+  # KATILMAZ ve ayrıca listelenir. Öngörülen: `received` (~40 çekiliyor ama
+  # uzlaşı sonrası düşebilir). Kural sonuç görülmeden yazıldı.
+  min_class_n_for_kappa: 20
+
 keywords:
   path: configs/gift_keywords.yaml
   precision_sample_n: 100         # elle dogrulanacak eslesme sayisi (T4)

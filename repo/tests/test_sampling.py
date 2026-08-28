@@ -18,6 +18,7 @@ from gift_contamination.data.sampling import (
     FRAME_BOOST,
     FRAME_MAIN,
     FRAME_RECEIVED,
+    LABELS,
     SUPPORTED_STRATA,
     TRIAL_STRATA,
     _check_strata,
@@ -32,9 +33,13 @@ from gift_contamination.data.sampling import (
     build_sample,
     build_trial,
     build_trial_source,
+    build_validation,
     proportional_allocation,
     trial_ids_path,
+    validation_ids_path,
 )
+from gift_contamination.detection.llm_annotate import annotation_path
+from gift_contamination.utils.io import read_json, write_json
 
 SEED = 42
 
@@ -522,3 +527,151 @@ def test_trial_source_refuses_a_row_id_that_drifted(cfg: Config):
 
     with pytest.raises(RuntimeError, match="tutmuyor"):
         build_trial_source(cfg, 4, force=True)
+
+
+# ------------------------------------------------ Hafta 4: dogrulama seti
+
+
+def _fake_annotations(
+    cfg: Config, role: str = "pilot", *, backend: str = "vllm",
+    labels: list[str] | None = None,
+) -> pl.DataFrame:
+    """Ornekten sahte bir LLM cikti parquet'i uretir.
+
+    Gercek annotation ciktisi review METNINI tasimiyor (boyut icin dusuruldu);
+    fixture de o sozlesmeyi taklit etmeli, yoksa `build_validation`in ornege
+    geri join atmasi test edilmemis kalir.
+    """
+    sample = pl.read_parquet(annotation_sample_path(cfg, role))
+    n = sample.height
+    labels = labels or [LABELS[i % len(LABELS)] for i in range(n)]
+    out = sample.select(
+        "row_id", "category", "sample_frame", "month", "rating", "n_words",
+    ).with_columns(
+        pl.Series("purchase_type", labels[:n]),
+        pl.lit("high").alias("confidence"),
+        pl.lit("child").alias("recipient"),
+        pl.lit("none").alias("occasion"),
+        pl.lit("kanit").alias("evidence_span"),
+        pl.lit(backend).alias("backend"),
+    )
+    dest = annotation_path(cfg, role)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    out.write_parquet(dest)
+    return out
+
+
+def _prepare(cfg: Config, **kw) -> pl.DataFrame:
+    scan_category(cfg, "pilot")
+    build_sample(cfg, "pilot")
+    return _fake_annotations(cfg, **kw)
+
+
+def test_validation_strata_come_from_the_llm_label(cfg: Config):
+    """Katmanlar sozcuksel vekilden degil, modelin KENDI etiketinden cikmali.
+
+    Olculecek sey detektorun dogrulugu; katman da onun kararlarini kapsamali.
+    Vekile gore katmanlarsak modelin vekilden ayrildigi yerleri hic gormeyiz -
+    ki tam olarak orasi olculmek istenen yer.
+    """
+    ann = _prepare(cfg)
+    hedef = {k: v for k, v in cfg.get("validation.strata").items() if v}
+
+    out = pl.read_csv(build_validation(cfg, ["pilot"], 5))
+
+    cekilen = dict(out.group_by("val_stratum").len().iter_rows())
+    assert cekilen == hedef
+    # Katman etiketi gercekten modelin etiketi mi
+    eslesme = out.join(
+        ann.select("row_id", "purchase_type"), on="row_id", how="inner"
+    )
+    assert (eslesme["val_stratum"] == eslesme["purchase_type"]).all()
+
+
+def test_validation_excludes_the_prompt_trial_rows(cfg: Config):
+    """Prompt o satirlar okunarak yazildi; ayni satirlarla dogrulamak,
+    prompt'u kendi test setine fit etmek olur."""
+    _prepare(cfg)
+    trial = pl.read_csv(build_trial(cfg, ["pilot"], 4))
+    yasak = set(trial["row_id"].to_list())
+
+    out = pl.read_csv(build_validation(cfg, ["pilot"], 5))
+
+    assert not (set(out["row_id"].to_list()) & yasak)
+    rapor = read_json(validation_ids_path(cfg))
+    assert rapor["n_dropped_as_trial_rows"]["pilot"] == len(yasak)
+
+
+def test_validation_reports_the_drop_it_computed_not_the_one_it_claims(cfg: Config):
+    """Hesaplanmamis bir iddia, kod degisince sessizce yalan soyler.
+
+    2026-08-27 denetiminin 7. bulgusu aynen buydu (`frames_disjoint`).
+    Deneme setinin satirlari ornegin ICINDE olmayabilir - o zaman DUSEN sayi
+    sifirdir, mevcut ID sayisi degil.
+    """
+    _prepare(cfg)
+    # Deneme kaydini elle kur: hicbiri ornekte olmayan row_id'ler.
+    write_json(
+        {"excluded": {"Test_Cat": [90001, 90002, 90003]}},
+        trial_ids_path(cfg),
+        None,
+    )
+
+    build_validation(cfg, ["pilot"], 5)
+
+    rapor = read_json(validation_ids_path(cfg))
+    assert rapor["trial_ids_available"] == 3
+    # Bakildi ve SIFIR dustu - anahtarin yoklugu bunu soyleyemezdi.
+    assert rapor["n_dropped_as_trial_rows"] == {"pilot": 0}
+
+
+def test_validation_exclusion_is_scoped_by_category(cfg: Config):
+    """`row_id` her kategoride 0'dan basliyor - dislama CIFT anahtarli olmali.
+
+    Duz bir row_id listesi baska kategorilerde masum satirlari da atardi
+    (olculdu: dort kategori arasinda 78 ortak deger).
+    """
+    ann = _prepare(cfg)
+    baska = sorted(ann["row_id"].to_list())[:2]
+    write_json({"excluded": {"Baska_Kategori": baska}}, trial_ids_path(cfg), None)
+
+    out = pl.read_csv(build_validation(cfg, ["pilot"], 5))
+
+    # Baska kategoride dislanan id'ler BURADA masum
+    assert read_json(validation_ids_path(cfg))["n_dropped_as_trial_rows"] == {"pilot": 0}
+    assert out.height == 5
+
+
+def test_stub_annotations_cannot_seed_the_validation_set(cfg: Config):
+    """Kuru kosu etiketleri RASTGELE.
+
+    Onlardan cekilmis bir set uc kisinin saatlerini cope atar ve bunu ancak
+    etiketleme bittikten sonra fark ederiz.
+    """
+    _prepare(cfg, backend="stub")
+
+    with pytest.raises(RuntimeError, match="Kuru kosu"):
+        build_validation(cfg, ["pilot"], 5)
+
+
+def test_validation_strata_must_cover_every_label(cfg: Config):
+    """Semaya sinif eklenip config'e eklenmezse o sinif hic olculmez - sessizce."""
+    _prepare(cfg)
+    cfg._data["validation"]["strata"].pop("received")
+
+    with pytest.raises(ValueError, match="ayrisiyor"):
+        build_validation(cfg, ["pilot"], 5)
+
+
+def test_validation_carries_the_review_text(cfg: Config):
+    """Annotation ciktisi metni tasimiyor; etiketleyen kisi metni okuyacak.
+
+    Ornege geri join atilmazsa sayfa bos metinle uretilir ve bu ancak
+    etiketleme baslayinca fark edilir.
+    """
+    _prepare(cfg)
+
+    out = pl.read_csv(build_validation(cfg, ["pilot"], 5))
+
+    assert (out["text"].str.strip_chars().str.len_chars() > 0).all()
+    assert PROXY_COL in out.columns  # vekil karsilastirmasi icin lazim

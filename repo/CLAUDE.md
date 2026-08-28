@@ -409,29 +409,35 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
 - [ ] **TBD** Örnekleme boyutu kesin sayı: 40K mı 60K mı (pilot sonucuna göre)
 - [ ] **TBD** C2'de kullanılacak nihai ağırlık(lar) — üçünü de mi koşacağız yoksa biri mi
 - [ ] **TBD** C3'ün RecBole'da nasıl implement edileceği (feature olarak mı, ayrı token mı)
-- [ ] **TBD** `household` sınıfının C1'de silinip silinmeyeceği (kappa sonucuna bağlı).
-  **Yeni veri (2026-08-29, deneme seti):** LLM'in en büyük hata kaynağı bu sınıf —
-  33 uyuşmazlığın 14'ü `household → gift_given` yönünde. Precision 1,000, recall
-  0,644: model etiketi yanlış yere koymuyor, **az** koyuyor. Ters yön (`gift_given
-  → household`) sıfır. İki sınıf birleştirilse uyum %83,5 → %90,5. Bu birleştirme
-  için gerekçe **değil** (ölçü iyileşsin diye sınıf birleştirmek, eşiği sonradan
-  düşürmenin başka biçimi) ama ayrı tutmanın maliyetini gösteriyor: `household`
-  gürültüsü Hafta 4'ün κ'sına doğrudan yansıyacak
+- [ ] **TBD** **`household` C1'e girecek mi — KAVRAMSAL karar, Hafta 6 öncesi.**
+  Kayıt eskiden "kappa sonucuna bağlı" diyordu; 2026-08-29'da bağımlılık değişti.
+  κ sınıfın *ayırt edilebilir* olduğunu söyler, *kontaminasyon sayılacağını* değil.
+  Projenin kendi tanımı *"alan kişi ürünü kendisi için seçmedi"* — bu tanıma göre
+  kendi çocuğuna alınan oyuncak da kontaminasyondur.
+  **Ölçüldü (2026-08-29):** `household` `main` çerçevesinin **%20,17'si**. C1 ya
+  %23,3 ya %43,4 etkileşim çıkarıyor — iki kat fark. İki sınıfın zaman imzası ayrı:
+  `gift_given` 1,58× mevsimsel, `household` **1,09×** yani düz. Sınırı çizen şey
+  vesile (`recipient=child`'da `household`'un %99'u `occasion=none`).
+  **Kod ikisini de koşabilir olacak:** C1 (yalnızca `gift_given`) birincil,
+  C1b (+`household`) sağlamlık kontrolü. Aynı kod yolu, farklı süzgeç — karar
+  sonuca göre değil, sonuç her iki tanım altında raporlanır
 - [ ] **TBD** **`received` sınıfının C1'de silinip silinmeyeceği.** Şema v3 (2026-08-27)
   beşinci sınıfı ekledi ama C1'in tanımı hâlâ yalnızca `gift_given` diyor. Aynı soru,
   aynı gerekçe: alan kişi ürünü kullanıyor ama seçmedi. `household` ile birlikte
   karara bağlanmalı
-- [ ] **TBD** **κ eşiği 5 sınıfta hâlâ 0.60 mı?** Fleiss' κ sınıf sayısı arttıkça düşme
-  eğilimindedir — anlaşmazlık için daha çok yol var. Hafta 4 **öncesinde** gözden
-  geçirilmeli; düşürülecekse gerekçesi sonuç görülmeden yazılmalı.
-  **Yeni veri (2026-08-28):** `received` `main` çerçevesinde %0,60, `boost_received`
-  çerçevesinde %11. 500'lük sette bu sınıf ~8 satır olacak — κ'nın o sınıftaki değeri
-  neredeyse anlamsız. Sınıfı κ hesabına katmak mı, ayrı raporlamak mı?
-- [ ] **TBD** **`confidence` alanı ne işe yarayacak?** Tam koşuda ölçüldü: `low` ile
-  `unclear` birebir örtüşüyor (%100, iki yönde), yani alan bağımsız bilgi taşımıyor.
-  Hafta 5'in "sınıf dengesi için `confidence` filtresi" planı bu haliyle işlemez.
-  Ya prompt v4'te kural verilir ya alan düşürülür — ikisi de Hafta 4 kararı
-  (şimdi değiştirmek tamamlanmış koşuyu ve Kapı 1'i geçersiz kılar)
+- [x] ~~**TBD** κ eşiği 5 sınıfta hâlâ 0.60 mı?~~ → **KARARLAŞTI 2026-08-29.**
+  **0,60'ta kaldı.** κ sınıf sayısıyla düşme eğiliminde diye eşiği peşinen düşürmek,
+  kapıyı koşudan önce gevşetmenin başka bir biçimi olurdu. Bunun yerine iki kural,
+  ikisi de sonuç görülmeden yazıldı: sınıf bazlı κ ayrıca raporlanır, ve `n < 20`
+  olan sınıf genel κ'ya **katılmaz**, ayrıca listelenir
+  (`validation.min_class_n_for_kappa`). Öngörülen vaka `received`. Gerekçe: DECISIONS
+- [x] ~~**TBD** `confidence` alanı ne işe yarayacak?~~ → **KARARLAŞTI 2026-08-29.**
+  **Prompt v3'te kalındı, alan analizden düşürüldü.** `low` ile `unclear` birebir
+  örtüşüyor (870/870, iki yönde %100) — alan bağımsız bilgi taşımıyor. Kök neden:
+  prompt bir *kural* değil yalnızca *örnek* veriyor. v4 yazmak ~4 saat Kaggle ve
+  Kapı 1'in yeniden koşulması demekti; alanın tek amacı (sınıf dengesi) zaten
+  `boost` çerçevesiyle karşılanıyor. **Limitasyon olarak raporlanacak**, sessizce
+  düşürülmeyecek. Gerekçe: DECISIONS
 - [x] ~~**TBD** Kapı 1'in sayısal geçme ölçütü~~ → **KARARLAŞTI 2026-08-28.** Dört
   ölçüt, `configs/base.yaml` → `gate1:` altında, koşudan önce sabitlendi.
   Gerekçe: `docs/DECISIONS.md`. **Sonuç 2026-08-29: PASS (4/4)** — dördü de kendi

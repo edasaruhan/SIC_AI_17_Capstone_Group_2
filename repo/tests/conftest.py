@@ -119,6 +119,21 @@ def cfg(tmp_path: Path) -> Config:
             "peak_months": [12, 1],
             "trough_months": [6, 7, 8, 9],
         },
+        # Hafta 4. `n` ve `strata` fixture'in kucuklugune gore olceklendi;
+        # `kappa_min` ve `min_class_n_for_kappa` ise configs/base.yaml ile
+        # AYNI - gate1'deki gerekce: testin isi esigin baglayici olup
+        # olmadigini sinamak, farkli bir deger uydurmak degil.
+        "validation": {
+            "n": 5,
+            "n_annotators": 3,
+            "strata": {
+                "gift_given": 2, "household": 1,
+                "self": 1, "unclear": 1, "received": 0,
+            },
+            "role_weights": {"pilot": 1},
+            "kappa_min": 0.60,
+            "min_class_n_for_kappa": 20,
+        },
     }
     conf = Config(data, tmp_path / "test.yaml")
 

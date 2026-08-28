@@ -8,6 +8,11 @@ silinen/siralanan satir). Ucu de burada test ediliyor.
 Dorduncusu daha ince: `kw_gift_proxy` kolonu sayfada gorunurse etiketleyen kisi
 vekilin karari ne ise ona yaslanir, insan-vekil karsilastirmasi da tautoloji
 haline gelir. `test_export_hides_the_bias_columns` bunu kilitliyor.
+
+Besincisi Hafta 4'un ta kendisi: LLM'in cevabi (`purchase_type` ve arkadaslari)
+sayfaya sizarsa olculen sey detektorun DOGRULUGU olmaktan cikar, telkine uyum
+olur - ve o rakam raporda "insan dogrulamasi" diye gecer.
+`test_export_hides_the_llm_answer` bunu kilitliyor.
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from gift_contamination.data.labelsheet import (
     BLIND_COLUMNS,
     EXPORT_COLUMNS,
     export,
+    export_columns,
     ingest,
     labeled_path,
     sheet_path,
@@ -100,7 +106,9 @@ def test_export_offers_only_valid_labels(trial_csv: Path):
 
 
 def test_export_is_idempotent(trial_csv: Path):
-    first = export(trial_csv)
+    # `export` her zaman liste doner - tek etiketleyicide de, uc kisilik
+    # Hafta 4 akisinda da ayni imza.
+    (first,) = export(trial_csv)
     stamp = first.stat().st_mtime_ns
 
     export(trial_csv)
@@ -191,3 +199,130 @@ def test_report_compares_the_human_against_the_keyword_proxy(trial_csv: Path):
 def test_ingest_without_export_fails_loudly(trial_csv: Path):
     with pytest.raises(FileNotFoundError, match="once --export"):
         ingest(trial_csv)
+
+
+# ------------------------------------------- Hafta 4: uc etiketleyici + korleme
+
+
+@pytest.fixture()
+def validation_csv_file(tmp_path: Path) -> Path:
+    """`sampling.build_validation` ciktisiyla ayni kolon duzenine sahip kucuk CSV."""
+    path = tmp_path / "validation_4.csv"
+    pl.DataFrame(
+        {
+            "val_id": [1, 2, 3, 4],
+            "category": ["Toys_and_Games", "All_Beauty", "Toys_and_Games", "Video_Games"],
+            "row_id": [11, 22, 33, 44],
+            "title": ["Perfect", "Nice", "Harika", "Five Stars"],
+            "text": TEXTS,
+            "label": ["", "", "", ""],
+            "notes": ["", "", "", ""],
+            "val_stratum": ["gift_given", "self", "household", "unclear"],
+            "sample_frame": ["boost", "main", "main", "main"],
+            "kw_gift_proxy": [True, False, True, False],
+            # LLM'in kendi cevabi - sayfaya GECMEMELI
+            "purchase_type": ["gift_given", "self", "household", "unclear"],
+            "confidence": ["high", "high", "medium", "low"],
+            "recipient": ["grandchild", "unknown", "child", "unknown"],
+            "occasion": ["birthday", "none", "none", "unknown"],
+            "evidence_span": ["for my grandson", "", "my kids", ""],
+        }
+    ).write_csv(path)
+    return path
+
+
+def _fill_tagged(path: Path, tag: str, labels: list[str | None]) -> None:
+    import openpyxl
+
+    book = openpyxl.load_workbook(sheet_path(path, tag))
+    sheet = book.active
+    col = export_columns("val_id").index("label") + 1
+    for row, value in enumerate(labels, start=2):
+        sheet.cell(row=row, column=col, value=value)
+    book.save(sheet_path(path, tag))
+
+
+def test_export_hides_the_llm_answer(validation_csv_file: Path):
+    """Hafta 4'un TEK isi detektorun dogrulugunu olcmek.
+
+    Etiketleyen kisi modelin cevabini gorurse olculen sey doğruluk degil
+    telkine uyum olur - ve o rakam raporda "insan dogrulamasi" diye gecer.
+    `evidence_span` etiketlemeyi hizlandirirdi ama modelin gerekcesini de
+    gosterir; bagimsizlik hiza tercih ediliyor.
+    """
+    import openpyxl
+
+    export(validation_csv_file, annotators=1)
+
+    sheet = openpyxl.load_workbook(sheet_path(validation_csv_file)).active
+    header = [c.value for c in next(sheet.iter_rows(max_row=1))]
+    assert header == export_columns("val_id")
+    for sizinti in (
+        "purchase_type", "confidence", "recipient", "occasion",
+        "evidence_span", "val_stratum", "kw_gift_proxy",
+    ):
+        assert sizinti not in header
+        assert sizinti in BLIND_COLUMNS
+
+
+def test_three_annotators_get_identical_sheets(validation_csv_file: Path):
+    """Uc dosya AYNI satirlari AYNI sirada tasimali - kappa hizalamasi buna bagli."""
+    import openpyxl
+
+    written = export(validation_csv_file, annotators=3)
+
+    assert [p.name for p in written] == [
+        "validation_4_A.xlsx", "validation_4_B.xlsx", "validation_4_C.xlsx",
+    ]
+    goruntuler = []
+    for tag in ("A", "B", "C"):
+        sheet = openpyxl.load_workbook(sheet_path(validation_csv_file, tag)).active
+        goruntuler.append([r[:5] for r in sheet.iter_rows(values_only=True)])
+    assert goruntuler[0] == goruntuler[1] == goruntuler[2]
+
+
+def test_ingest_keeps_the_three_label_columns_apart(validation_csv_file: Path):
+    """Uc etiketleyicinin cevabi AYRI kolonlarda gelmeli.
+
+    Tek bir `label` kolonuna katlamak uyusmazligi yok eder ve Fleiss kappa
+    hesaplanamaz hale gelir.
+    """
+    export(validation_csv_file, annotators=3)
+    _fill_tagged(validation_csv_file, "A", ["gift_given", "self", "household", "self"])
+    _fill_tagged(validation_csv_file, "B", ["gift_given", "self", "gift_given", "self"])
+    _fill_tagged(validation_csv_file, "C", ["gift_given", "self", "household", "unclear"])
+
+    dest, report = ingest(validation_csv_file, annotators=3)
+    out = pl.read_csv(dest)
+
+    assert out["label_A"].to_list() == ["gift_given", "self", "household", "self"]
+    assert out["label_B"].to_list() == ["gift_given", "self", "gift_given", "self"]
+    assert out["label_C"].to_list() == ["gift_given", "self", "household", "unclear"]
+    # Kor kolonlar geri gelmis olmali - analiz onlari kullaniyor
+    assert out["purchase_type"].to_list() == ["gift_given", "self", "household", "unclear"]
+    assert set(report["by_annotator"]) == {"A", "B", "C"}
+    assert report["by_annotator"]["A"]["n_labeled"] == 4
+
+
+def test_a_missing_annotator_sheet_fails_loudly(validation_csv_file: Path):
+    """Iki kisi doldurup ucuncusu unutursa kappa yanlis hesaplanir.
+
+    Sessizce iki kisiyle devam etmek yerine hata veriyoruz.
+    """
+    export(validation_csv_file, annotators=3)
+    sheet_path(validation_csv_file, "C").unlink()
+
+    with pytest.raises(FileNotFoundError, match="_C.xlsx"):
+        ingest(validation_csv_file, annotators=3)
+
+
+def test_id_column_must_be_unambiguous(tmp_path: Path):
+    """Iki kimlik kolonu birden varsa hangisinin anahtar oldugu belirsizdir."""
+    path = tmp_path / "karisik.csv"
+    pl.DataFrame({
+        "trial_id": [1], "val_id": [1], "category": ["x"],
+        "title": ["t"], "text": ["metin metin"], "label": [""], "notes": [""],
+    }).write_csv(path)
+
+    with pytest.raises(ValueError, match="belirsiz"):
+        export(path)

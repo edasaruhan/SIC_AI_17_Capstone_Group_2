@@ -31,6 +31,7 @@ Kullanim:
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import zlib
 from pathlib import Path
@@ -642,6 +643,231 @@ def build_trial_source(cfg: Config, n: int, *, force: bool = False) -> Path:
     return dest
 
 
+# ------------------------------------------------ Hafta 4: dogrulama seti
+
+VALIDATION_NAME = "validation_{n}.csv"
+VALIDATION_IDS_NAME = "validation_ids.json"
+
+# Dogrulama CSV'sinin kolonlari. LLM'in kendi cevabi da TASINIYOR - analiz onu
+# insan uzlasisiyla karsilastiracak - ama etiketleme sayfasina GECMEZ:
+# `labelsheet.BLIND_COLUMNS` hepsini gizliyor.
+VALIDATION_COLUMNS = [
+    "val_id", "category", "row_id", "title", "text", "label", "notes",
+    "val_stratum", "sample_frame", PROXY_COL,
+    "purchase_type", "confidence", "recipient", "occasion", "evidence_span",
+]
+
+
+def validation_path(cfg: Config, n: int) -> Path:
+    return cfg.path("human", VALIDATION_NAME.format(n=n))
+
+
+def validation_ids_path(cfg: Config) -> Path:
+    return cfg.path("human", VALIDATION_IDS_NAME)
+
+
+def _excluded_pairs(cfg: Config) -> dict[str, set[int]]:
+    """Deneme setinin (kategori, row_id) ciftleri. Dosya yoksa bos sozluk.
+
+    Anahtar CIFTTIR: `row_id` her kategoride 0'dan basliyor ve kategoriler
+    arasinda cakisiyor (2026-08-27 denetimi: dort kategori arasinda 78 ortak
+    deger). Duz bir row_id listesiyle dislama yapmak baska kategorilerde masum
+    satirlari da atardi.
+    """
+    path = trial_ids_path(cfg)
+    if not path.exists():
+        log.warning("%s yok - deneme seti dislanmiyor", path.name)
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8")).get("excluded", {})
+    return {cat: set(ids) for cat, ids in raw.items()}
+
+
+def _validation_strata(cfg: Config) -> dict[str, float]:
+    """Config'teki katman sayilarini paya cevirir; sinif kumesini de dogrular.
+
+    Semaya bir sinif eklenip buraya eklenmezse o sinif dogrulama setine hic
+    girmez ve F1'i hic olculmez - sessizce. `_check_strata` ile ayni gerekce:
+    config ile kod ayrisirsa gurultulu hata versin.
+    """
+    strata = dict(cfg.get("validation.strata"))
+    if set(strata) != set(LABELS):
+        eksik = sorted(set(LABELS) - set(strata))
+        fazla = sorted(set(strata) - set(LABELS))
+        raise ValueError(
+            "validation.strata etiket sozlugu ile ayrisiyor. "
+            f"eksik={eksik} fazla={fazla}. Sema degistiyse config de degismeli."
+        )
+    total = sum(strata.values())
+    if total <= 0:
+        raise ValueError("validation.strata toplami sifir")
+    return {k: v / total for k, v in strata.items()}
+
+
+def build_validation(
+    cfg: Config, roles: list[str], n: int | None = None, *, force: bool = False
+) -> Path:
+    """Hafta 4'un insan dogrulama seti. Projenin TEK gercek referansi.
+
+    `build_trial`'dan uc noktada AYRILIYOR ve ucu de kasitli:
+
+    1. Katmanlar sozcuksel vekilden degil, LLM ETIKETINDEN (`purchase_type`)
+       cikiyor. Olculecek sey detektorun dogrulugu; katman da onun kararlarini
+       kapsamali.
+    2. `household` bilerek fazla temsil ediliyor. Olculen zayif sinir orasi
+       (2026-08-29: uyusmazliklarin %42'si `household -> gift_given` yonunde,
+       ters yon sifir). `received` de fazla: `main`'de %0,60, orantili cekilse
+       500'luk sette 3 satir duserdi ve o sinifin ne F1'i ne kappasi olculebilirdi.
+    3. Deneme setinin 200 satiri DISLANIYOR. Prompt o satirlar okunarak yazildi;
+       ayni satirlarla dogrulamak prompt'u kendi test setine fit etmek olur.
+
+    Bu bir YAYGINLIK ORNEGI DEGIL. Buradan oran okunmaz - `main` cercevesi okunur.
+    """
+    # Fonksiyon ici import: `llm_annotate` bu modulden `annotation_sample_path`
+    # aliyor, modul basinda geri import etmek dairesel olurdu. Yol sozlesmesi
+    # tek yerde kalsin diye kopyalamiyoruz.
+    from ..detection.llm_annotate import annotation_path  # noqa: PLC0415
+
+    n = int(n if n is not None else cfg.get("validation.n"))
+    dest = validation_path(cfg, n)
+    if should_skip(dest, force, log):
+        return dest
+
+    seed = int(cfg.get("seed"))
+    shares = _validation_strata(cfg)
+    weights = dict(cfg.get("validation.role_weights"))
+    excluded = _excluded_pairs(cfg)
+
+    # -------------------------------------------------- havuzlar: (katman, rol)
+    pools: dict[tuple[str, str], pl.DataFrame] = {}
+    n_dropped: dict[str, int] = {}
+    for role in roles:
+        src = annotation_path(cfg, role)
+        if not src.exists():
+            raise FileNotFoundError(
+                f"Once LLM annotation'i kosun: {src.name} yok. "
+                "Kaggle hucresinde CATEGORY'yi degistirip kosturun."
+            )
+        df = pl.read_parquet(src)
+        # `gate1.load_joined` ile AYNI koruma. Kuru kosu etiketleri rastgele;
+        # onlardan cekilmis bir dogrulama seti insan emegini cope atar.
+        if "backend" in df.columns and df["backend"][0] != "vllm":
+            raise RuntimeError(
+                f"{src.name} '{df['backend'][0]}' backend'iyle uretilmis. "
+                "Kuru kosu ciktisindan dogrulama seti cekilemez."
+            )
+        # Annotation ciktisi review METNINI tasimıyor (dosya boyutu icin bilerek
+        # dusuruldu) ama etiketleyen kisi metni okuyacak. Ornek parquet'inden
+        # geri bagliyoruz; `kw_gift_proxy` de yalnizca orada.
+        sample = pl.read_parquet(annotation_sample_path(cfg, role)).select(
+            "row_id", "title", "text", PROXY_COL
+        )
+        before = df.height
+        df = df.join(sample, on="row_id", how="inner")
+        if df.height != before:
+            raise RuntimeError(
+                f"{role}: etiket ile ornek satirlari eslesmiyor "
+                f"({before} -> {df.height}). row_id kaymis olabilir."
+            )
+        # Her rol icin HER ZAMAN yaziliyor - sifir da bir bilgi. Anahtarin
+        # olmamasi "bakildi, bir sey dusmedi" ile "hic bakilmadi"yi ayirt
+        # edilemez kilardi.
+        skip = excluded.get(cfg.category_slug(role), set())
+        n_before = df.height
+        if skip:
+            df = df.filter(~pl.col("row_id").is_in(list(skip)))
+        n_dropped[role] = n_before - df.height
+        log.info("%s: deneme setinden %d satir dislandi", role, n_dropped[role])
+        for label in LABELS:
+            pools[(label, role)] = df.filter(pl.col("purchase_type") == label)
+
+    # ------------------------------------------------------------- tahsis
+    # Iki asamali, ikisi de en buyuk kalan yontemiyle ve KAPASITELI: bir sinif
+    # ya da kategori istenen kadar satir veremezse pay otomatik digerlerine
+    # kayar ve toplam n'de kalir. Eksik kalirsa rapora YAZILIR, gizlenmez.
+    caps_by_label = {
+        label: sum(pools[(label, r)].height for r in roles) for label in LABELS
+    }
+    per_label = allocate_by_share(shares, n, caps=caps_by_label)
+
+    frames: list[pl.DataFrame] = []
+    shortfall: dict[str, int] = {}
+    total_weight = sum(weights.get(r, 1) for r in roles)
+    for label in LABELS:
+        want = per_label[label]
+        caps_by_role = {r: pools[(label, r)].height for r in roles}
+        takes = allocate_by_share(
+            {r: weights.get(r, 1) / total_weight for r in roles},
+            want,
+            caps=caps_by_role,
+        )
+        got = sum(takes.values())
+        if got < want:
+            shortfall[label] = want - got
+            log.warning("%s: %d istendi, %d bulundu", label, want, got)
+        for role in roles:
+            take = takes[role]
+            if take == 0:
+                continue
+            frames.append(
+                pools[(label, role)]
+                .sample(take, seed=_stratum_seed(seed, f"val|{label}|{role}"), shuffle=True)
+                .with_columns(pl.lit(label).alias("val_stratum"))
+            )
+
+    out = (
+        pl.concat(frames, how="diagonal")
+        # Katmanlari karistir: siralamanin kendisi etiketleyiciye ipucu vermesin.
+        # Uc etiketleyici de AYNI sirayi gorecek - kappa hizalamasi satir
+        # sirasina bagli, `labelsheet` uc dosyayi tek kaynaktan uretiyor.
+        .sample(fraction=1.0, seed=seed, shuffle=True)
+        .with_row_index("val_id", offset=1)
+        .with_columns(pl.lit("").alias("label"), pl.lit("").alias("notes"))
+        .select(VALIDATION_COLUMNS)
+    )
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    out.write_csv(dest)
+    log_output(log, dest, n_rows=out.height)
+
+    write_json(
+        {
+            "n_requested": n,
+            "n_drawn": out.height,
+            "seed": seed,
+            "by_stratum": dict(sorted(out.group_by("val_stratum").len().iter_rows())),
+            "by_category": dict(sorted(out.group_by("category").len().iter_rows())),
+            "by_frame": dict(sorted(out.group_by("sample_frame").len().iter_rows())),
+            "shortfall": shortfall,
+            # HESAPLANAN sayi, iddia edilen degil. Deneme setinin 200 satiri
+            # 2026-08-27'de ornek yeniden cekilince buyuk olcude ornegin
+            # DISINDA kaldi; kac tanesinin gercekten dustugunu burada goruyoruz.
+            "n_dropped_as_trial_rows": n_dropped,
+            "trial_ids_available": sum(len(v) for v in excluded.values()),
+            # Hafta 5'in damitma egitim seti bu satirlari DISLAMALI: uzerinde
+            # F1 raporlanan satirlarla egitim yapmak sizintidir.
+            "excluded": {
+                cat[0]: sorted(g["row_id"].to_list())
+                for cat, g in sorted(out.group_by("category"), key=lambda kv: kv[0])
+            },
+            "purpose": "Hafta 4 insan dogrulamasi (Fleiss kappa + sinif bazli F1)",
+            "note": (
+                "YAYGINLIK ORNEGI DEGIL: `household` ve `received` bilerek fazla "
+                "temsil ediliyor. Oran YALNIZCA `main` cercevesinden okunur. "
+                "`val_stratum` LLM'in kendi etiketidir ve etiketleme sayfasina GECMEZ."
+            ),
+        },
+        validation_ids_path(cfg),
+        log,
+    )
+    log.info(
+        "Simdi `labelsheet --export --annotators %s` ile sayfalari uretin. "
+        "Etiketleyen kisi LLM'in cevabini GORMEMELI.",
+        cfg.get("validation.n_annotators"),
+    )
+    log.info("GIZLILIK: bu dosya birebir review metni tasir ve git'e GIRMEZ.")
+    return dest
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     add_standard_args(parser)
@@ -658,10 +884,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Elle etiketlenmis deneme CSV'sini LLM'e verilebilir parquet'e cevir "
              "(Kapi 1'in dorduncu olcutu icin)",
     )
+    parser.add_argument(
+        "--validation",
+        type=int,
+        nargs="?",
+        const=-1,
+        metavar="N",
+        help="Hafta 4'un insan dogrulama setini cek (varsayilan: validation.n)",
+    )
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
     roles = resolve_roles(cfg, args.category)
+
+    if args.validation is not None:
+        n = None if args.validation == -1 else args.validation
+        build_validation(cfg, roles, n, force=args.force)
+        return 0
 
     if args.trial:
         build_trial(cfg, roles, args.trial, force=args.force)

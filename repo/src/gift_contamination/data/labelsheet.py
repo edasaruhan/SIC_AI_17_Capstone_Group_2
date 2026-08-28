@@ -7,43 +7,101 @@ taniyamayip cp1254 ile geri yazar - review metnindeki karakterler bozulur.
 Ikisi de ancak saatler suren etiketleme bittikten sonra fark edilir. xlsx'te
 ayrac ve kodlama diye bir kavram yok.
 
-ONYARGI KONTROLU: `trial_stratum`, `sample_frame` ve `kw_gift_proxy` kolonlari
-sayfaya HIC yazilmaz. Etiketleyen kisi anahtar kelimenin ne dedigini gormeden
-karar verir; aksi halde etiketler vekilin hatalarini tekrarlar ve
-insan-vekil karsilastirmasi anlamini yitirir. Kolonlar `ingest` sirasinda
-`trial_id` uzerinden geri eklenir.
+ONYARGI KONTROLU - `BLIND_COLUMNS`. Iki ayri sizinti kapatiliyor:
+
+  1. Sozcuksel vekilin karari (`kw_gift_proxy`, `trial_stratum`). Gorulurse
+     etiketler vekilin hatalarini tekrarlar ve insan-vekil karsilastirmasi
+     kendi kendini dogrulayan bir olcume doner.
+  2. LLM'in KENDI cevabi (`purchase_type`, `confidence`, `recipient`,
+     `occasion`, `evidence_span`, `val_stratum`). Hafta 4'te olculen sey
+     detektorun DOGRULUGU; etiketleyen kisi modelin cevabini gorurse olculen
+     sey telkine uyum olur. `evidence_span` etiketlemeyi hizlandirirdi ama
+     modelin gerekcesini de gosterir - bagimsizlik hiza tercih ediliyor
+     (ayni gerekce: DECISIONS 2026-08-26, "sorun dogrulukta degil bagimsizlikta").
+
+Kolonlar `ingest` sirasinda kimlik kolonu uzerinden geri eklenir.
 
 Kullanim:
+    # Hafta 2 - tek etiketleyici, prompt gelistirme
     python -m gift_contamination.data.labelsheet --export
-    # ... Excel'de doldur, kaydet ...
     python -m gift_contamination.data.labelsheet --ingest
+
+    # Hafta 4 - uc etiketleyici, dogrulama seti
+    python -m gift_contamination.data.labelsheet --validation --export --annotators 3
+    python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
 """
 
 from __future__ import annotations
 
 import argparse
+import string
 from pathlib import Path
 
 import polars as pl
 
 from ..config import Config
-from ..data.sampling import LABELS
+from ..data.sampling import LABELS, validation_path
 from ..utils.io import should_skip
 from ..utils.logging import get_logger, log_output
 
 log = get_logger("data.labelsheet")
 
-# Etiketleyene GOSTERILEN kolonlar. Liste kasitli olarak kisa.
-EXPORT_COLUMNS = ["trial_id", "category", "title", "text", "label", "notes"]
+# Kimlik kolonu: deneme setinde `trial_id`, dogrulama setinde `val_id`.
+# Kolon adini sabitlemek yerine tespit ediyoruz - iki akis ayni koddan gecsin.
+ID_COLUMNS = ("trial_id", "val_id")
 
-# Sayfaya yazilmayan, ingest'te geri eklenen kolonlar (onyargi kontrolu).
-BLIND_COLUMNS = ["row_id", "trial_stratum", "sample_frame", "kw_gift_proxy"]
+# Etiketleyene GOSTERILEN kolonlar (kimlik kolonu basa eklenir). Kasitli kisa.
+VISIBLE_COLUMNS = ["category", "title", "text", "label", "notes"]
 
-_WIDTHS = {"trial_id": 8, "category": 16, "title": 34, "text": 96, "label": 14, "notes": 30}
+# Deneme akisinin (Hafta 2) kolon duzeni. `export_columns` ile ayni sey; geriye
+# donuk uyumluluk icin sabit olarak da duruyor.
+EXPORT_COLUMNS = ["trial_id", *VISIBLE_COLUMNS]
+
+# Sayfaya yazilmayan, ingest'te geri eklenen kolonlar. Modul docstring'i neden
+# oldugunu anlatiyor; `test_export_hides_the_bias_columns` kilitliyor.
+BLIND_COLUMNS = [
+    "row_id",
+    # sozcuksel vekil
+    "trial_stratum", "sample_frame", "kw_gift_proxy",
+    # LLM'in kendi cevabi - Hafta 4'un olcecegi sey tam olarak bu
+    "val_stratum", "purchase_type", "confidence", "recipient", "occasion",
+    "evidence_span",
+]
+
+_WIDTHS = {
+    "trial_id": 8, "val_id": 8, "category": 16,
+    "title": 34, "text": 96, "label": 14, "notes": 30,
+}
 
 
-def sheet_path(csv_path: Path) -> Path:
-    return csv_path.with_suffix(".xlsx")
+def export_columns(id_col: str) -> list[str]:
+    return [id_col, *VISIBLE_COLUMNS]
+
+
+def _id_column(df: pl.DataFrame) -> str:
+    """CSV'nin kimlik kolonunu tespit eder."""
+    found = [c for c in ID_COLUMNS if c in df.columns]
+    if len(found) != 1:
+        raise ValueError(
+            f"kimlik kolonu belirsiz: {found or 'yok'}. "
+            f"Tam olarak biri bulunmali: {', '.join(ID_COLUMNS)}"
+        )
+    return found[0]
+
+
+def annotator_tags(n: int) -> list[str | None]:
+    """1 -> [None] (tek dosya), 3 -> ['A','B','C'].
+
+    Tek etiketleyicide dosya adi degismiyor: Hafta 2 akisi aynen calisiyor.
+    """
+    if n < 1 or n > len(string.ascii_uppercase):
+        raise ValueError(f"annotators 1..26 arasinda olmali, {n} verildi")
+    return [None] if n == 1 else list(string.ascii_uppercase[:n])
+
+
+def sheet_path(csv_path: Path, tag: str | None = None) -> Path:
+    stem = csv_path.stem if tag is None else f"{csv_path.stem}_{tag}"
+    return csv_path.with_name(stem + ".xlsx")
 
 
 def labeled_path(csv_path: Path) -> Path:
@@ -65,36 +123,73 @@ def default_csv(cfg: Config) -> Path:
     return found[-1]
 
 
+def validation_csv(cfg: Config) -> Path:
+    """Hafta 4'un dogrulama CSV'si. Yol sozlesmesi `sampling`de."""
+    path = validation_path(cfg, int(cfg.get("validation.n")))
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path.name} yok. Once cekin:\n"
+            "  python -m gift_contamination.data.sampling --validation"
+        )
+    return path
+
+
 # --------------------------------------------------------------------- export
-def export(csv_path: Path, *, force: bool = False) -> Path:
-    """CSV'yi acilir menulu, dondurulmus baslikli bir xlsx'e cevirir."""
-    dest = sheet_path(csv_path)
-    if should_skip(dest, force, log):
-        return dest
+def export(csv_path: Path, *, annotators: int = 1, force: bool = False) -> list[Path]:
+    """CSV'yi acilir menulu, dondurulmus baslikli xlsx sayfalarina cevirir.
 
-    df = pl.read_csv(csv_path).select(EXPORT_COLUMNS)
+    Birden fazla etiketleyicide her dosya AYNI satirlari AYNI sirada tasir.
+    Kappa hizalamasi kimlik kolonu uzerinden yapiliyor ama sirayi da sabit
+    tutmak, birinin sayfayi siralayip kaydetmesi halinde farki gorunur kilar.
+    """
+    source = pl.read_csv(csv_path)
+    id_col = _id_column(source)
+    columns = export_columns(id_col)
+    df = source.select(columns)
 
+    written = []
+    for tag in annotator_tags(annotators):
+        dest = sheet_path(csv_path, tag)
+        if should_skip(dest, force, log):
+            written.append(dest)
+            continue
+        _write_sheet(df, columns, dest, tag)
+        written.append(dest)
+        log_output(log, dest, n_rows=df.height)
+
+    log.info("etiket kolonu acilir menulu; onyargi kolonlari sayfada YOK")
+    if annotators > 1:
+        log.info(
+            "%d ayri sayfa: her etiketleyici KENDI dosyasini doldurur, "
+            "birbirininkini gormez", annotators,
+        )
+    return written
+
+
+def _write_sheet(
+    df: pl.DataFrame, columns: list[str], dest: Path, tag: str | None
+) -> None:
     import xlsxwriter
 
     book = xlsxwriter.Workbook(str(dest), {"strings_to_urls": False})
-    sheet = book.add_worksheet("etiketleme")
+    sheet = book.add_worksheet("etiketleme" if tag is None else f"etiketleme_{tag}")
 
     head = book.add_format({"bold": True, "bg_color": "#DDDDDD", "border": 1})
     wrap = book.add_format({"text_wrap": True, "valign": "top"})
     plain = book.add_format({"valign": "top"})
     entry = book.add_format({"valign": "top", "bg_color": "#FFF7CC", "border": 1})
 
-    for col, name in enumerate(EXPORT_COLUMNS):
+    for col, name in enumerate(columns):
         sheet.write(0, col, name, head)
         fmt = wrap if name in ("title", "text") else (entry if name in ("label", "notes") else plain)
         sheet.set_column(col, col, _WIDTHS[name], fmt)
 
     for row, record in enumerate(df.iter_rows(named=True), start=1):
-        for col, name in enumerate(EXPORT_COLUMNS):
+        for col, name in enumerate(columns):
             value = record[name]
             sheet.write(row, col, "" if value is None else value)
 
-    label_col = EXPORT_COLUMNS.index("label")
+    label_col = columns.index("label")
     sheet.data_validation(
         1,
         label_col,
@@ -108,50 +203,43 @@ def export(csv_path: Path, *, force: bool = False) -> Path:
         },
     )
     sheet.freeze_panes(1, 0)
-    sheet.autofilter(0, 0, df.height, len(EXPORT_COLUMNS) - 1)
+    sheet.autofilter(0, 0, df.height, len(columns) - 1)
     book.close()
-
-    log_output(log, dest, n_rows=df.height)
-    log.info("etiket kolonu acilir menulu; onyargi kolonlari sayfada YOK")
-    return dest
 
 
 # --------------------------------------------------------------------- ingest
-def ingest(csv_path: Path, *, force: bool = False) -> tuple[Path, dict]:
-    """Doldurulmus xlsx'i okur, dogrular ve UTF-8 CSV olarak geri yazar."""
-    src = sheet_path(csv_path)
-    if not src.exists():
-        raise FileNotFoundError(f"{src} yok - once --export calistirin")
+def ingest(
+    csv_path: Path, *, annotators: int = 1, force: bool = False
+) -> tuple[Path, dict]:
+    """Doldurulmus xlsx'leri okur, dogrular ve UTF-8 CSV olarak geri yazar.
 
-    import openpyxl
-
-    book = openpyxl.load_workbook(src, data_only=True)
-    rows = list(book.active.iter_rows(values_only=True))
-    header = [str(c) if c is not None else "" for c in rows[0]]
-    if header != EXPORT_COLUMNS:
-        raise ValueError(f"basliklar degismis: {header} != {EXPORT_COLUMNS}")
-
-    records = [dict(zip(header, r)) for r in rows[1:] if r[0] is not None]
-    filled = pl.DataFrame(
-        records,
-        schema={
-            "trial_id": pl.Int64,
-            "category": pl.String,
-            "title": pl.String,
-            "text": pl.String,
-            "label": pl.String,
-            "notes": pl.String,
-        },
-    ).with_columns(pl.col("label").str.strip_chars().replace("", None))
-
+    Tek etiketleyicide cikti `label` / `notes` kolonlarini tasir. Birden
+    fazlada `label_A`, `label_B`, ... olur - Fleiss kappa'nin ihtiyaci bu.
+    """
     source = pl.read_csv(csv_path)
-    report = _validate(filled, source)
+    id_col = _id_column(source)
+    columns = export_columns(id_col)
 
-    merged = (
-        source.drop("label", "notes")
-        .join(filled.select("trial_id", "label", "notes"), on="trial_id", how="left")
-        .select(source.columns)
-    )
+    reports: dict[str, dict] = {}
+    merged = source.drop("label", "notes")
+    for tag in annotator_tags(annotators):
+        filled = _read_sheet(csv_path, columns, id_col, tag)
+        reports["tek" if tag is None else tag] = _validate(filled, source, id_col)
+        suffix = "" if tag is None else f"_{tag}"
+        merged = merged.join(
+            filled.select(
+                id_col,
+                pl.col("label").alias(f"label{suffix}"),
+                pl.col("notes").alias(f"notes{suffix}"),
+            ),
+            on=id_col,
+            how="left",
+        )
+
+    if annotators == 1:
+        merged = merged.select(source.columns)
+
+    report = reports["tek"] if annotators == 1 else {"by_annotator": reports}
     dest = labeled_path(csv_path)
     if should_skip(dest, force, log):
         return dest, report
@@ -160,21 +248,50 @@ def ingest(csv_path: Path, *, force: bool = False) -> tuple[Path, dict]:
     return dest, report
 
 
-def _validate(filled: pl.DataFrame, source: pl.DataFrame) -> dict:
+def _read_sheet(
+    csv_path: Path, columns: list[str], id_col: str, tag: str | None
+) -> pl.DataFrame:
+    src = sheet_path(csv_path, tag)
+    if not src.exists():
+        raise FileNotFoundError(f"{src} yok - once --export calistirin")
+
+    import openpyxl
+
+    book = openpyxl.load_workbook(src, data_only=True)
+    rows = list(book.active.iter_rows(values_only=True))
+    header = [str(c) if c is not None else "" for c in rows[0]]
+    if header != columns:
+        raise ValueError(f"basliklar degismis: {header} != {columns}")
+
+    records = [dict(zip(header, r)) for r in rows[1:] if r[0] is not None]
+    return pl.DataFrame(
+        records,
+        schema={
+            id_col: pl.Int64,
+            "category": pl.String,
+            "title": pl.String,
+            "text": pl.String,
+            "label": pl.String,
+            "notes": pl.String,
+        },
+    ).with_columns(pl.col("label").str.strip_chars().replace("", None))
+
+
+def _validate(filled: pl.DataFrame, source: pl.DataFrame, id_col: str) -> dict:
     """Satir kaybi, tekrar ve sozluk disi etiket arar; ilerleme raporu doner."""
-    missing = set(source["trial_id"]) - set(filled["trial_id"])
-    extra = set(filled["trial_id"]) - set(source["trial_id"])
+    missing = set(source[id_col]) - set(filled[id_col])
+    extra = set(filled[id_col]) - set(source[id_col])
     if missing or extra:
         raise ValueError(
-            "trial_id kumesi degismis - satir silinmis veya eklenmis. "
+            f"{id_col} kumesi degismis - satir silinmis veya eklenmis. "
             f"eksik={sorted(missing)[:5]} fazla={sorted(extra)[:5]}"
         )
-    if filled["trial_id"].n_unique() != filled.height:
-        raise ValueError("tekrar eden trial_id var - satir kopyalanmis")
+    if filled[id_col].n_unique() != filled.height:
+        raise ValueError(f"tekrar eden {id_col} var - satir kopyalanmis")
 
     bad = filled.filter(
         pl.col("label").is_not_null() & ~pl.col("label").is_in(list(LABELS))
-    ).select("trial_id", "label")
+    ).select(id_col, "label")
     if bad.height:
         raise ValueError(
             f"{bad.height} satirda sozluk disi etiket var. Gecerli: {', '.join(LABELS)}\n{bad.head(10)}"
@@ -186,9 +303,10 @@ def _validate(filled: pl.DataFrame, source: pl.DataFrame) -> dict:
         "n_labeled": done.height,
         "by_label": dict(done.group_by("label").len().sort("len", descending=True).iter_rows()),
     }
-    if done.height:
-        # Insan ile sozcuksel vekil nerede ayrisiyor: prompt v2'nin asil girdisi.
-        joined = done.join(source.select("trial_id", "kw_gift_proxy"), on="trial_id")
+    if done.height and "kw_gift_proxy" in source.columns:
+        # Insan ile sozcuksel vekil nerede ayrisiyor: prompt v2'nin asil girdisi,
+        # Hafta 4'te de vekilin ILK bagimsiz precision'i.
+        joined = done.join(source.select(id_col, "kw_gift_proxy"), on=id_col)
         gift = pl.col("label") == "gift_given"
         proxy = pl.col("kw_gift_proxy")
         report["vs_keyword_proxy"] = {
@@ -200,12 +318,37 @@ def _validate(filled: pl.DataFrame, source: pl.DataFrame) -> dict:
     return report
 
 
+def _log_report(name: str, report: dict) -> None:
+    log.info("[%s] etiketlenen: %d / %d", name, report["n_labeled"], report["n_total"])
+    for label, n in report["by_label"].items():
+        log.info("    %-12s %4d", label, n)
+    if "vs_keyword_proxy" in report:
+        log.info("    sozcuksel vekile karsi: %s", report["vs_keyword_proxy"])
+    if report["n_labeled"] < report["n_total"]:
+        log.warning(
+            "    %d satir bos - etiketleme yarim",
+            report["n_total"] - report["n_labeled"],
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", default="configs/base.yaml")
     parser.add_argument("--csv", type=Path, help="Kaynak CSV (varsayilan: en son prompt_trial_*.csv)")
+    parser.add_argument(
+        "--validation",
+        action="store_true",
+        help="Hafta 4'un dogrulama setiyle calis (prompt deneme seti yerine)",
+    )
     parser.add_argument("--export", action="store_true", help="xlsx etiketleme sayfasi uret")
     parser.add_argument("--ingest", action="store_true", help="Doldurulmus xlsx'i CSV'ye geri yaz")
+    parser.add_argument(
+        "--annotators",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Kac ayri sayfa (varsayilan: dogrulamada validation.n_annotators, digerinde 1)",
+    )
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args(argv)
 
@@ -213,20 +356,30 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--export veya --ingest secin")
 
     cfg = Config.load(args.config)
-    csv_path = args.csv or default_csv(cfg)
+    if args.csv:
+        csv_path = args.csv
+    elif args.validation:
+        csv_path = validation_csv(cfg)
+    else:
+        csv_path = default_csv(cfg)
+
+    if args.annotators is not None:
+        annotators = args.annotators
+    elif args.validation:
+        annotators = int(cfg.get("validation.n_annotators"))
+    else:
+        annotators = 1
 
     if args.export:
-        export(csv_path, force=args.force)
+        export(csv_path, annotators=annotators, force=args.force)
         return 0
 
-    _, report = ingest(csv_path, force=args.force)
-    log.info("etiketlenen: %d / %d", report["n_labeled"], report["n_total"])
-    for label, n in report["by_label"].items():
-        log.info("  %-12s %4d", label, n)
-    if "vs_keyword_proxy" in report:
-        log.info("sozcuksel vekile karsi: %s", report["vs_keyword_proxy"])
-    if report["n_labeled"] < report["n_total"]:
-        log.warning("%d satir bos - etiketleme yarim", report["n_total"] - report["n_labeled"])
+    _, report = ingest(csv_path, annotators=annotators, force=args.force)
+    if "by_annotator" in report:
+        for name, sub in report["by_annotator"].items():
+            _log_report(name, sub)
+    else:
+        _log_report("tek", report)
     return 0
 
 
