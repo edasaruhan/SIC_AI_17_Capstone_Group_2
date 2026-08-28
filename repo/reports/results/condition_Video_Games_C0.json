@@ -1,0 +1,17 @@
+{
+  "condition": "C0",
+  "removed_labels": [],
+  "n_before": 368476,
+  "n_after": 368476,
+  "n_removed": 0,
+  "n_train_before": 273150,
+  "removal_share_of_train": 0.0,
+  "n_items_lost_from_training": 0,
+  "share_items_lost": 0.0,
+  "items_lost_sample": [],
+  "universe_is_subset_of_c0": true,
+  "n_users_without_rows": 0,
+  "n_items_without_rows": 0,
+  "label_source": "proxy",
+  "reportable": false
+}
