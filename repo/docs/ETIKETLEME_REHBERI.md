@@ -11,30 +11,53 @@
 
 ## 0. Nasıl çalışılır
 
+İki akış var. **Hafta 4 doğrulaması** (üç kişi, 500 satır) aşağıdaki ikincisidir.
+
 ```bash
 cd repo
 
-# 1. Excel sayfasını üret (zaten üretildiyse atlar)
+# --- Hafta 2: prompt geliştirme, tek kişi, 200 satır (bitti)
 .venv/Scripts/python.exe -m gift_contamination.data.labelsheet --export
-
-# 2. data/annotations/human/prompt_trial_200.xlsx dosyasını aç, `label` kolonunu doldur
-
-# 3. Bitince (ya da ara verirken) geri al ve doğrula
 .venv/Scripts/python.exe -m gift_contamination.data.labelsheet --ingest
+
+# --- Hafta 4: doğrulama, ÜÇ kişi, 500 satır
+# 1. Üç ayrı sayfa üretilir: validation_500_A / _B / _C.xlsx
+.venv/Scripts/python.exe -m gift_contamination.data.labelsheet --validation --export
+
+# 2. Her kişi YALNIZCA kendi harfini açar ve doldurur
+
+# 3. Üçü de bitince (ya da ara verirken)
+.venv/Scripts/python.exe -m gift_contamination.data.labelsheet --validation --ingest
 ```
 
 **CSV'yi değil xlsx'i doldurun.** CSV'yi Excel'de açıp kaydetmek Türkçe Windows'ta ayracı
 `;` yapar ve metni cp1254'e düşürür; ikisi de dosyayı sessizce bozar ve bu ancak saatler
 sonra fark edilir. xlsx'te bu kavramlar yok.
 
-Sayfada `label` ve `notes` kolonları sarı. `label` açılır menülü — dördü dışında bir şey
-yazamazsınız. `notes` çoğu satırda boş kalır; ne zaman doldurulacağı §4'te.
+Sayfada `label` ve `notes` kolonları sarı. `label` açılır menülü — **beş etiketten** başka
+bir şey yazamazsınız. `notes` çoğu satırda boş kalır; ne zaman doldurulacağı §4'te.
 
 **Satır silmeyin, sıralamayı değiştirmeyin, filtrelemek serbest.** `--ingest` satır
 kaybını yakalar ve hata verir.
 
 `--ingest` her an çalıştırılabilir: yarım dosya hata değil, ilerleme raporu verir.
-İş bölerek yapılabilir (örn. günde 50 satır).
+İş bölerek yapılabilir (örn. günde 100 satır).
+
+### Hafta 4'ün üç ek kuralı — bunlar ölçümün kendisi
+
+1. **Kendi dosyanızdan başkasını açmayın.** Üç sayfa aynı 500 satırı aynı sırada taşıyor.
+   Birinin cevabını görmek uyum istatistiğini (Fleiss κ) anlamsız kılar — ölçtüğümüz şey
+   *bağımsız iki insan aynı şeyi görüyor mu* olmaktan çıkar.
+2. **Etiketlerken tartışmayın.** Zor vakaları bitirdikten *sonra* konuşun. Anlaşmazlığın
+   kendisi veridir; erken uzlaşmak onu siler.
+3. **Dil modeline sormayın.** Bu 500 satır projenin **tek gerçek referansı**. Etiketler
+   bir modelden gelirse ölçtüğümüz F1, iki modelin birbirine benzerliği olur — doğruluk
+   değil. (Kural: `GENEL_BAKIS.md` §7, madde 5.)
+
+> **Sayfada model cevabı yok.** LLM'in etiketi, güveni, gerekçe cümlesi ve anahtar kelime
+> kararı sayfaya bilerek yazılmadı. `evidence_span` görünse işiniz hızlanırdı ama modelin
+> kararını da görürdünüz; bağımsızlık hıza tercih edildi. Metni baştan okumanız gerekiyor —
+> satır başına ~30 saniye, 500 satır ≈ 4 saat. Bölerek yapın.
 
 ---
 
@@ -283,5 +306,32 @@ Sonra `prompts/gift_detection_v2.md` açılır — **v1 üzerine yazılmaz**, pr
 versiyonlamayı şart koşuyor (hangi annotation hangi prompt'la üretildi izlenebilsin).
 
 ⚠️ Bu 200 satırın `row_id`'leri `prompt_trial_ids.json`'a yazıldı ve Hafta 4'ün 500'lük
-doğrulama setinden **dışlanacak**. Prompt bu satırlara bakarak yazıldığı için aynı
+doğrulama setinden **dışlandı**. Prompt bu satırlara bakarak yazıldığı için aynı
 satırlarla doğrulamak, modeli kendi test setine fit etmek olur.
+
+### Hafta 4'te ne oluyor
+
+Üç sayfa da toplandıktan sonra:
+
+```bash
+.venv/Scripts/python.exe -m gift_contamination.analysis.validation
+```
+
+Üç ayrı sayı çıkıyor ve **yalnızca birincisi bir kapı**:
+
+| Ölçüm | Ne soruyor | Eşik |
+|---|---|---|
+| **Fleiss κ** | Görev tanımı açık mı — üçünüz birbirinizle uyuşuyor musunuz? | **≥ 0,60** |
+| Sınıf bazlı F1 | Detektör ne kadar doğru? | eşik yok — ölçüm |
+| Vekil karşılaştırması | LLM gerçekten regex'ten iyi mi? | eşik yok — ölçüm |
+
+κ düşük çıkarsa sorun **detektörde değil şemada**: insanlar bile aynı satırı farklı
+etiketliyorsa modelden tutarlılık beklemek anlamsız. O durumda şema sadeleşir
+(muhtemelen `household` ile `gift_given` birleşir) ve gerekçesi `DECISIONS.md`'ye yazılır.
+
+F1 ve vekil sayıları için eşik **bilerek** konmadı: sonucu gördükten sonra eşik uydurmak,
+kapıyı sonradan kurmak olurdu.
+
+Bir de küçük not: `received` sınıfı bu sette az çıkacak (~40 satır çekildi ama uzlaşı
+sonrası düşebilir). 20'nin altına inerse genel κ hesabına **katılmaz** ve ayrı raporlanır —
+bu kural da sonuç görülmeden, 2026-08-29'da yazıldı.
