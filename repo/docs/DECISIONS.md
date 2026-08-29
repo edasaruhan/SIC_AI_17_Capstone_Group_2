@@ -1047,3 +1047,77 @@ güçlenir — *"iki tanım altında da aynı yönde"* ya da *"sonuç tanıma du
 `data/sampling.py`, `data/labelsheet.py`, `analysis/validation.py` (yeni),
 `recsys/` (yeni)
 **Kim:** Ekip
+
+---
+
+### 2026-08-29 — RecBole AYRI bir ortama kuruldu; C0/C1/C4 duman koşusu geçti
+
+**Karar:** RecBole ve torch ana `.venv`'e **kurulmuyor**; `.venv-recbole` altında
+ayrı bir ortamda duruyorlar. Pin'ler `requirements-recbole.txt`'te.
+
+**Gerekçe — ölçülerek bulundu, tahmin değil.** RecBole 1.2.0 numpy 1.x döneminden.
+Ana ortam numpy 2.5 / pandas 3.0 üzerinde ve RecBole `compatibility_settings()`
+içinde `np.float_` kullanıyor — numpy 2.0'da kaldırılmış, ilk satırda çöküyor.
+Ana ortama kurmak zinciri geri çekerdi: `numpy<2` denendiğinde scipy 1.18 kırıldı
+(`np.long` yok), o da scikit-learn'ü kırdı. Üçü birlikte çözülmek zorunda
+(`numpy<2` + `scipy<1.14` + `scikit-learn<1.6` + `pandas 2.x`) ve bu yığın
+polars/statsmodels tarafını riske atardı.
+
+Ayırmanın bedeli yok çünkü **iki taraf zaten dosyayla konuşuyor**: `.inter`
+dosyası arayüz. Ana ortam veriyi hazırlar, RecBole ortamı modeli koşar.
+Ana ortamın sürümleri kurulum sonrası doğrulandı — değişmedi, 253 test geçiyor.
+
+**Üç uyumsuzluk daha kayda geçiyor** (hepsi RecBole 1.2.0 ↔ yeni sürümler):
+
+1. `recbole.quick_start` koşulsuz `ray` import ediyor. Kullanmıyoruz — alt seviye
+   API (`Config` / `create_dataset` / `Trainer`) yeterli ve bölmeyi kontrol etmek
+   için zaten gerekli.
+2. `general_recommender/__init__` bütün modelleri toplu import ediyor;
+   `ldiffrec` `kmeans_pytorch` istiyor. Kuruldu.
+3. torch 2.6'da `torch.load` varsayılanı `weights_only=True` oldu; RecBole
+   checkpoint'e kendi `Config` nesnesini de gömüyor ve dosya reddediliyor.
+   `run_experiment._torch_load_full()` daraltıcı bir context manager ile
+   çözüyor. Güvenli olmasının sebebi dosyanın kaynağının **biz** olmamız —
+   saniyeler önce kendi `saved/` klasörümüze yazıldı.
+
+**Bölmeyi RecBole yapmıyor, biz veriyoruz.** `benchmark_filename` ile üç ayrı
+dosya (train/valid/test) veriliyor. RecBole kendi bölmesini yapsaydı C1'de
+satırlar eksildiği için kullanıcının "son alımı" değişir ve C0 ile C1 **farklı
+test setleri** üzerinde karşılaştırılırdı. Test dosyasına yalnızca `label == self`
+satırları yazılıyor — CLAUDE.md §5 kural 2 böylece **yapısal** olarak uygulanmış
+oluyor, bir kontrol koduna bırakılmıyor.
+
+---
+
+**Duman koşusu sonucu — Video_Games, BPR, 5 epoch, tek seed, CPU:**
+
+| koşul | eğitim satırı | Recall@10 | NDCG@10 | C0'a fark |
+|---|---:|---:|---:|---:|
+| C0 | 273.150 | 0,0321 | 0,0171 | — |
+| C1 | 265.976 | 0,0322 | 0,0172 | +%0,3 |
+| C4 | 265.976 | 0,0310 | 0,0164 | **−%3,4** |
+
+**Kapı 2'nin provası geçti:** boru hattı uçtan uca çalışıyor ve C0 ile C4 arasında
+kurulum hatasına işaret eden bir sıçrama yok. C4 tam olarak C1 kadar (7.174) satır
+çıkardı ve **farklı** 5 ürünü eğitimden düşürdü.
+
+**Bu sayılar BULGU DEĞİL ve sonuç tablosuna giremez.** Üç sebep, çıktıda da
+`reportable: false` olarak duruyor:
+
+1. Etiketler **sözcüksel vekilden** — dil modelinden değil. Vekilin recall'ı
+   %31,3 (2026-08-28), yani C1'in çıkardığı satırların çoğu gerçek hediye değil.
+2. **5 epoch, tek seed, güven aralığı yok.** Recall@10 = 0,032 üzerinde %3'lük
+   bir fark seed gürültüsünün içinde kalır.
+3. Doğrulanmamış bir detektörün etiketleriyle koşuldu; Hafta 4 daha bitmedi.
+
+Gerçek koşu Hafta 6-7'de: LLM etiketleri, tam epoch, 3-5 seed, bootstrap GA.
+
+**Bir yan bulgu — üç bağımsız çapraz doğrulama.** `atomic.py` Video_Games için
+değerlendirilebilir kullanıcı oranını **%97,2** hesapladı; `self` kuralı test
+setinden **%2,77** düşürdü. İkisi de Hafta 1'de bambaşka bir kod yolundan üretilen
+T7 tablosundaki sayılarla birebir aynı. Bölme ve uygunluk kuralı iki yerde aynı
+şekilde uygulanıyor.
+
+**Etkilediği bölüm:** `requirements-recbole.txt` (yeni), `.gitignore`,
+`recsys/run_experiment.py` (yeni), CLAUDE.md §6
+**Kim:** Ekip

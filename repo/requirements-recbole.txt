@@ -1,0 +1,36 @@
+# RecBole deney ortami - AYRI bir venv'e kurulur (.venv-recbole).
+#
+# NEDEN AYRI: RecBole 1.2.0 numpy 1.x doneminden. Ana ortamin numpy 2.5 /
+# pandas 3.0 yigininda `np.float_` yok ve RecBole ilk satirda cokuyor.
+# Ana ortama kurmak numpy/scipy/sklearn'i geri cekerdi ve polars/statsmodels
+# tarafini kirardi. Iki taraf zaten DOSYA ile konusuyor - `.inter` arayuz.
+#
+# Kurulum (repo kokunden):
+#   python -m venv .venv-recbole
+#   .venv-recbole/Scripts/python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   .venv-recbole/Scripts/python.exe -m pip install -r requirements-recbole.txt
+#
+# Kosu (PYTHONPATH sart - paket bu ortama kurulu degil):
+#   PYTHONPATH=src .venv-recbole/Scripts/python.exe -m gift_contamination.recsys.run_experiment \
+#       --category mid --condition C0 --model BPR --epochs 5
+
+recbole==1.2.0
+
+# --- ASAGIDAKI UC PIN OLCULEREK BULUNDU, keyfi degil (2026-08-29)
+# numpy>=2: RecBole `compatibility_settings()` icinde `np.float_` kullaniyor,
+#           numpy 2.0'da kaldirildi -> AttributeError, ilk satirda.
+numpy<2
+# scipy>=1.14 numpy>=2 istiyor; numpy'i geri cekince scipy kirildi
+# (`np.long` yok). Ucu birlikte cozulmeli.
+scipy<1.14
+scikit-learn<1.6
+# pandas 1.x'in Python 3.12 wheel'i yok (kaynaktan derlemeye kalkiyor).
+# 2.x hem py3.12'yi hem numpy 1.26'yi destekliyor.
+pandas>=2,<3
+
+# RecBole butun modelleri toplu import ediyor; `ldiffrec` bunu istiyor.
+kmeans_pytorch
+
+# Kosucunun kendi ihtiyaclari
+polars
+python-dotenv

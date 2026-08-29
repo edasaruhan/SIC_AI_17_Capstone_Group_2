@@ -33,6 +33,7 @@ data/annotations/human/
 __pycache__/
 *.py[cod]
 .venv/
+.venv-recbole/
 venv/
 venv-llm/
 venv-recsys/

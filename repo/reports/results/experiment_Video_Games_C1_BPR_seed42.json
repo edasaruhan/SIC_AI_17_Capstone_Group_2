@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "category": "Video_Games",
+    "condition": "C1",
+    "model": "BPR",
+    "seed": 42,
+    "epochs": 5,
+    "device": "cpu",
+    "label_source": "proxy",
+    "reportable": false
+  },
+  "split": {
+    "train": 265976,
+    "valid": 47663,
+    "test": 46345,
+    "n_test_before_self_rule": 47663,
+    "n_test_dropped_not_self": 1318
+  },
+  "n_users": 47664,
+  "n_items": 14607,
+  "best_valid_score": 0.0225,
+  "best_valid": {
+    "recall@10": 0.0419,
+    "recall@20": 0.0643,
+    "ndcg@10": 0.0225,
+    "ndcg@20": 0.0281,
+    "hit@10": 0.0419,
+    "hit@20": 0.0643
+  },
+  "test": {
+    "recall@10": 0.0322,
+    "recall@20": 0.0499,
+    "ndcg@10": 0.0172,
+    "ndcg@20": 0.0216,
+    "hit@10": 0.0322,
+    "hit@20": 0.0499
+  }
+}

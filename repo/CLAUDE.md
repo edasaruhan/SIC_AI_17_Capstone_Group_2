@@ -206,7 +206,7 @@ Sequential recommendation, leave-one-out.
 | Annotator LLM | **Qwen/Qwen3-4B-Instruct-2507** birincil, **google/gemma-4-E4B** ikincil (5K alt örneklem) | Seçim VRAM'e değil **GPU kuşağına** bağlı: elimizdeki her GPU pre-Ampere (Turing sm75), bfloat16 ve FlashAttention yok. Qwen3.5 ailesi hibrit GDN + VL, Turing'de pratikte koşmuyor. Gerekçe: technology-review §4.2 |
 | Structured output | vLLM guided decoding (JSON schema) | serbest metin parse edilmeyecek |
 | Distillation | **ModernBERT-base** | `AutoModelForSequenceClassification` |
-| Recsys | **RecBole** | kendi implementasyonumuzu yazmıyoruz |
+| Recsys | **RecBole 1.2.0** — **ayrı venv** (`.venv-recbole`, `requirements-recbole.txt`) | kendi implementasyonumuzu yazmıyoruz. RecBole numpy 1.x dönemine ait: ana ortamın numpy 2.5 / pandas 3.0 yığınında ilk satırda çöküyor (`np.float_`). Ana ortama kurmak numpy/scipy/sklearn'i geri çekip polars/statsmodels tarafını kırardı. İki taraf `.inter` dosyasıyla konuşuyor, ayırmanın bedeli yok. Gerekçe: `docs/DECISIONS.md` 2026-08-29 |
 | Deney takibi | **Weights & Biases** | her run config + seed + metrik loglar |
 | Config | **YAML** (`configs/`) | kodda hardcode path/parametre yok |
 | Test | **pytest** | |
