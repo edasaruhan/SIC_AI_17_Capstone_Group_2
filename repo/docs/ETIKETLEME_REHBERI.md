@@ -1,337 +1,417 @@
 # Etiketleme Rehberi
 
-> Bu dosya iki yerde kullanılıyor: **Hafta 2**'de prompt geliştirme denemesinde (200 review,
-> tek kişi) ve **Hafta 4**'te doğrulama setinde (500 review, **3 kişi**). Hafta 4'te herkes
-> aynı kuralları uygulamak zorunda — yoksa ölçtüğümüz κ, gerçek belirsizliği değil
-> rehbersizliği ölçer.
->
-> Aşağıdaki örnekler **uydurmadır**. Gerçek review metni bu depoya girmez.
+**Bu rehber, elinde `validation_500_A.xlsx` (ya da `_B` / `_C`) dosyası olan kişi için
+yazıldı.** Projeyi hiç bilmiyor olabilirsiniz — gerekmiyor, buradaki her şey sıfırdan
+anlatılıyor. Okuması yaklaşık 15 dakika sürüyor; başlamadan önce **§1–§5 arasını
+mutlaka okuyun**, zor vakaları (§6) iş sırasında da açıp bakabilirsiniz.
+
+Sorunuz kalırsa §8'e bakın; orada da yoksa sorun — cevabı buraya ekleyeceğiz.
+
+> Rehberdeki bütün örnek cümleler **uydurmadır**. Gerçek review metinleri gizlilik
+> gereği bu depoya girmiyor.
 
 ---
 
-## 0. Nasıl çalışılır
+## 1. Ne yapıyoruz, siz neden buradasınız
 
-İki akış var. **Hafta 4 doğrulaması** (üç kişi, 500 satır) aşağıdaki ikincisidir.
+### Problem
 
-```bash
-cd repo
+Amazon, Netflix, Spotify — hepsinin öneri motoru aynı sessiz varsayımla çalışır:
+**satın aldıysan beğenmişsindir.** Bu varsayım çoğu zaman işe yarar. Bir yerde
+tamamen çöker: **hediyeler.**
 
-# --- Hafta 2: prompt geliştirme, tek kişi, 200 satır (bitti)
-.venv/Scripts/python.exe -m gift_contamination.data.labelsheet --export
-.venv/Scripts/python.exe -m gift_contamination.data.labelsheet --ingest
+Torununa oyuncak tren alan bir kadın, o siparişten sonra aylarca oyuncak tren
+önerisi alır. Ürünü hiç açmamıştır, zevkini hiç yansıtmaz. Ama sistem için o satın
+alma, kendisi için aldığı her şeyle aynı ağırlıktadır. Biz buna **kontaminasyon**
+(kirlenme) diyoruz.
 
-# --- Hafta 4: doğrulama, ÜÇ kişi, 500 satır
-# 1. Üç ayrı sayfa üretilir: validation_500_A / _B / _C.xlsx
-.venv/Scripts/python.exe -m gift_contamination.data.labelsheet --validation --export
+Literatür bu problemi biliyor ama **ölçmüyor**. Kaç yüzde olduğu, hangi kategoride
+yoğunlaştığı, temizlendiğinde önerinin gerçekten düzelip düzelmediği ölçülmemiş.
+Projemiz tam olarak bunu ölçüyor.
 
-# 2. Her kişi YALNIZCA kendi harfini açar ve doldurur
+### Sizin işiniz neden kritik
 
-# 3. Üçü de bitince (ya da ara verirken)
-.venv/Scripts/python.exe -m gift_contamination.data.labelsheet --validation --ingest
-```
+Bir yapay zekâ modeline 47.200 Amazon yorumunu okuttuk ve her birine "bu kişi
+kendisi için mi aldı, başkasına mı?" diye etiket koydurduk. Model bir cevap üretti:
+örneğin oyuncak kategorisinde alımların **%23'ü hediye**.
 
-**CSV'yi değil xlsx'i doldurun.** CSV'yi Excel'de açıp kaydetmek Türkçe Windows'ta ayracı
-`;` yapar ve metni cp1254'e düşürür; ikisi de dosyayı sessizce bozar ve bu ancak saatler
-sonra fark edilir. xlsx'te bu kavramlar yok.
+Peki modelin doğru söylediğini nereden bileceğiz?
 
-Sayfada `label` ve `notes` kolonları sarı. `label` açılır menülü — **beş etiketten** başka
-bir şey yazamazsınız. `notes` çoğu satırda boş kalır; ne zaman doldurulacağı §4'te.
+**Modele soramayız.** Kendi ödevini kendisi kontrol etmiş olur. Tek yol, birkaç
+insanın aynı yorumları **modelden bağımsız** olarak etiketlemesi ve iki kümeyi
+karşılaştırmak.
 
-**Satır silmeyin, sıralamayı değiştirmeyin, filtrelemek serbest.** `--ingest` satır
-kaybını yakalar ve hata verir.
+İşte o insanlar sizsiniz. Elinizdeki 500 satır **projenin tek gerçek referansı**.
+Raporda yazacak her sayı — hediye oranı, modelin doğruluğu, deneyin sonucu —
+sizin bu 500 satırda verdiğiniz kararların üzerine kurulacak.
 
-`--ingest` her an çalıştırılabilir: yarım dosya hata değil, ilerleme raporu verir.
-İş bölerek yapılabilir (örn. günde 100 satır).
-
-### Hafta 4'ün üç ek kuralı — bunlar ölçümün kendisi
-
-1. **Kendi dosyanızdan başkasını açmayın.** Üç sayfa aynı 500 satırı aynı sırada taşıyor.
-   Birinin cevabını görmek uyum istatistiğini (Fleiss κ) anlamsız kılar — ölçtüğümüz şey
-   *bağımsız iki insan aynı şeyi görüyor mu* olmaktan çıkar.
-2. **Etiketlerken tartışmayın.** Zor vakaları bitirdikten *sonra* konuşun. Anlaşmazlığın
-   kendisi veridir; erken uzlaşmak onu siler.
-3. **Dil modeline sormayın.** Bu 500 satır projenin **tek gerçek referansı**. Etiketler
-   bir modelden gelirse ölçtüğümüz F1, iki modelin birbirine benzerliği olur — doğruluk
-   değil. (Kural: `GENEL_BAKIS.md` §7, madde 5.)
-
-> **Sayfada model cevabı yok.** LLM'in etiketi, güveni, gerekçe cümlesi ve anahtar kelime
-> kararı sayfaya bilerek yazılmadı. `evidence_span` görünse işiniz hızlanırdı ama modelin
-> kararını da görürdünüz; bağımsızlık hıza tercih edildi. Metni baştan okumanız gerekiyor —
-> satır başına ~30 saniye, 500 satır ≈ 4 saat. Bölerek yapın.
+Yani: bu bir "veri girişi" işi değil. Ölçümün kendisi.
 
 ---
 
-## 1. Soru şu: bu ürünü kim kullanacak?
+## 2. Başlamadan önce
 
-Ürünü **değerlendiren kişinin kendi zevkini** yansıtıyor mu, yoksa **başkası için mi**
-alınmış? Projenin tamamı bu ayrımın üzerine kurulu: öneri sistemi her satın almayı
-"bu kişi bunu sevdi" diye okuyor, hediyelerde bu yanlış.
+### Dosyanız
 
-| Etiket | Anlamı |
+Size bir Excel dosyası gönderildi: **`validation_500_A.xlsx`**, `_B` veya `_C`.
+Harf sizin kimliğiniz — üçünüz **aynı 500 satırı** ayrı ayrı etiketliyorsunuz.
+
+Kurulum yok, program yok, komut yok. Excel (ya da LibreOffice, Google Sheets)
+yeter. **Dosya adını değiştirmeyin**, sonunda aynı adla geri gönderin.
+
+### Sayfada ne var
+
+| Kolon | Ne işe yarar |
 |---|---|
-| `self` | Kendisi için almış |
-| `gift_given` | Başkasına hediye olarak vermiş |
-| `household` | Ev halkı için / ortak kullanım. Hediye değil ama kendi zevki de değil |
-| `received` | Kendisi hediye **almış** — ürünü kullanıyor ama seçmemiş |
-| `unclear` | Metinde karar vermeye yetecek kanıt yok |
+| `val_id` | Satır numarası. Dokunmayın. |
+| `category` | Ürünün kategorisi — oyuncak mı, kozmetik mi, oyun mu, gıda mı |
+| `title` | Yorumun başlığı |
+| `text` | Yorumun kendisi. **Asıl okuyacağınız yer burası.** |
+| `label` | **Sizin dolduracağınız kolon.** Açılır menü var. |
+| `notes` | İsteğe bağlı not. Çoğu satırda boş kalacak (§7). |
+
+`label` ve `notes` sarı renkli — doldurulacak yerler onlar.
+
+### Yorumlar İNGİLİZCE
+
+Veri seti Amazon'un ABD mağazasından geliyor; bütün yorumlar İngilizce.
+Anlamadığınız bir cümleyi çevirmekte hiçbir sakınca yok (§8'de detay).
+
+Yorumların çoğu kısa: **%43'ü 20 kelimeden az**, medyan 24 kelime. Uzun olanlar
+(60+ kelime) 500 satırın sadece 76'sı — yani işin büyük kısmı hızlı geçecek.
+
+### Kategoriler
+
+| Kategori | Kaç satır |
+|---|---|
+| Toys and Games (oyuncak) | 200 |
+| Video Games (oyun) | 100 |
+| All Beauty (kozmetik/bakım) | 100 |
+| Grocery and Gourmet Food (gıda) | 100 |
+
+Oyuncak iki katı çünkü hediye oranının en yüksek olduğu kategori orası.
+
+### Ne kadar sürer
+
+**Satır başına 30–60 saniye, toplam 3–4 saat.** Tek oturuşta yapmayın — bölerek
+çalışın (örneğin günde 100 satır). Yorgunken verilen etiketler ölçümü bozar.
+
+Kaydedip kapatın, sonra kaldığınız yerden devam edin. Yarım dosya sorun değil.
 
 ---
 
-## 2. Karar akışı
+## 3. Üç kural — bunlar ölçümün kendisi
 
-Sırayla sorun, ilk "evet"te durun:
+Bu üçü "iyi olur" değil, **zorunlu**. İhlal edilirse 500 satırlık emek ölçüm
+değeri taşımaz.
 
-**1. Metin, ürünün başka birine verildiğini/alındığını söylüyor mu?**
-   Örn. "torunuma aldım", "kızımın doğum günü için", "arkadaşıma hediye ettim"
-   → **`gift_given`**
+**1 · Kendi dosyanızdan başkasını açmayın.**
+Üçünüz aynı satırlara bakıyorsunuz. Ölçtüğümüz şey *"iki bağımsız insan aynı
+yoruma aynı etiketi veriyor mu?"* Birinin cevabını görürseniz o soru anlamsızlaşır.
 
-**2. Ürün, değerlendirenin evindeki biri için veya ortak kullanım için mi?**
-   Örn. "bebeğimizin bezleri", "mutfağımız için aldık", "eşimle ikimiz kullanıyoruz"
-   → **`household`**
+**2 · Etiketlerken birbirinizle tartışmayın.**
+Zor vakaları merak ediyorsanız **bittikten sonra** konuşun. Anlaşmazlığın kendisi
+veridir — hangi durumların gerçekten belirsiz olduğunu bize o gösteriyor. Baştan
+uzlaşırsanız o bilgiyi silmiş olursunuz.
 
-**3. Ürünü kendisi hediye **almış** mı?**
-   Örn. "doğum günümde hediye geldi", "kardeşim yolladı"
-   → **`received`**
+**3 · ChatGPT'ye, Claude'a, herhangi bir yapay zekâya sormayın.**
+Bütün projenin amacı *modelin ne dediğini insanla karşılaştırmak*. Etiketleriniz
+bir modelden gelirse ölçtüğümüz şey iki modelin birbirine benzerliği olur —
+doğruluk değil. Bir cümleyi **çevirmek** için kullanmak serbest (§8), etiketi
+**sormak** yasak.
 
-**4. Metinde ürünün kullanımı/deneyimi hakkında birinci ağızdan bir şey var mı?**
-   Örn. "üç haftadır kullanıyorum", "cildime iyi geldi", "kurulumu kolaydı"
-   → **`self`**
-
-**5. Hiçbiri yoksa** → **`unclear`**
+> **Modelin cevabı sayfada yok — bilerek.** Modelin verdiği etiket, ne kadar emin
+> olduğu, hangi cümleye dayandığı: hiçbiri sayfaya yazılmadı. Görseydiniz işiniz
+> hızlanırdı ama kararınız ona yaslanırdı. Bağımsızlık hıza tercih edildi.
 
 ---
 
-## 3. Tuzaklar — asıl iş burada
+## 4. Tek soru: bu ürünü kim kullanacak?
 
-Kolay satırlar zaten kolay. Etiketleme setleri kasıtlı olarak zor vakalarla
-doldurulur: dört katmandan çekilir — `proxy` (anahtar kelime işaretli, vekilin yanlış
-pozitifleri), `speculative` ("hediye olur" tuzağı), `received` (hediye **alan**, veren
-değil), `unflagged` (vekilin kaçırdıkları). Aşağıdakiler prompt'un kırıldığı yerler.
+Her satırda cevaplamanız gereken tek soru bu:
 
-> Hafta 2'nin 200 satırlık deneme seti `received` katmanı eklenmeden önce çekildi, o
-> yüzden §3.2 vakasını içermiyor. Hafta 4'ün doğrulama seti dördünü de içerecek.
+> Yorumu yazan kişi ürünü **kendi zevkine göre kendisi için mi** aldı,
+> yoksa **başkası için mi**?
 
-### 3.1 "Hediye olur" — üç ayrı durum, üç ayrı etiket
+Beş cevap var:
 
-Hediye sözcüğü üç tamamen farklı bağlamda geçiyor ve üçü farklı etiket alıyor.
-Deneme geçişinin en önemli bulgusu bu: eski kural (hepsine `self`) iki durumu
-birbirine karıştırıyordu.
+| Etiket | Ne demek | Kısa örnek |
+|---|---|---|
+| `self` | Kendisi için almış, kendisi kullanıyor | *"Üç haftadır kullanıyorum, memnunum."* |
+| `gift_given` | Başkasına hediye vermiş | *"Torunuma aldım, bayıldı."* |
+| `household` | Ev halkı için / ortak kullanım. Hediye değil ama tam olarak kendi zevki de değil | *"Mutfağımız için aldık."* |
+| `received` | Kendisi hediye **almış** — kullanıyor ama seçen o değil | *"Doğum günümde hediye geldi."* |
+| `unclear` | Metinde karar vermeye yetecek bilgi yok | *"Harika. Beş yıldız."* |
 
-**(1) Gerçekleşmiş.** Ürün el değiştirmiş. Genelde geçmiş zaman.
+`household` neden ayrı bir sınıf? Çünkü öneri sistemi açısından *"eşimle ortak
+kullandığımız blender"* ile *"kendime aldığım koşu ayakkabısı"* aynı şey değil.
+İkisi de hediye değil ama biri kişinin kendi zevkini yansıtmıyor.
+
+---
+
+## 5. Karar akışı
+
+Sırayla sorun, **ilk "evet"te durun**:
+
+**1 · Ürün başka birine verilmiş mi?**
+*"torunuma aldım"*, *"kızımın doğum günü için"*, *"arkadaşıma hediye ettim"*
+→ **`gift_given`**
+
+**2 · Ürün evdeki biri için veya ortak kullanım için mi?**
+*"bebeğimizin bezleri"*, *"mutfağımız için"*, *"eşimle ikimiz kullanıyoruz"*
+→ **`household`**
+
+**3 · Yorumu yazan kişi ürünü hediye mi almış?**
+*"doğum günümde hediye geldi"*, *"kardeşim yolladı"*
+→ **`received`**
+
+**4 · Kişinin ürünü kendi kullandığına dair bir şey var mı?**
+*"üç haftadır kullanıyorum"*, *"cildime iyi geldi"*, *"kurulumu kolaydı"*
+→ **`self`**
+
+**5 · Hiçbiri yoksa** → **`unclear`**
+
+---
+
+## 6. Zor vakalar — asıl iş burada
+
+Kolay satırlar zaten kolay. Bu 500 satır **bilerek zor vakalarla dolduruldu**:
+sınırda duran, modeli yanıltan örnekler özellikle seçildi. Aşağıdakiler modelin
+en çok yanıldığı yerler.
+
+### 6.1 "Hediye olur" — üç ayrı durum, üç ayrı etiket
+
+"Gift" kelimesi üç tamamen farklı bağlamda geçiyor ve üçü farklı etiket alıyor.
+Bu, denemelerimizin en önemli bulgusuydu.
+
+**(1) Gerçekleşmiş hediye.** Ürün el değiştirmiş. Genelde geçmiş zaman.
 > *"Torunuma harika bir hediye oldu."* · *"Yeğenlerime yolladım."*
 
-→ **`gift_given`**. **Satın alma fiili aranmaz** — *"harika bir hediye oldu"* içinde
-"aldım" geçmese de gerçekleşmiş bir hediyedir.
+→ **`gift_given`**. Dikkat: **"aldım" fiilini aramayın** — *"harika bir hediye
+oldu"* cümlesinde satın alma geçmese de gerçekleşmiş bir hediyedir.
 
-**(2) Önerilmiş + kendi kullanımı da anlatılıyor.**
+**(2) Tavsiye + kendi kullanımı da anlatılıyor.**
 > *"Yirmi yıldır alıyorum, hiç pişman olmadım. Hediye olarak da çok iyi gider."*
 
-→ **`self`**. Kişi ürünü kendisi kullanıyor, ayrıca hediye fikri veriyor.
+→ **`self`**. Kişi ürünü kendisi kullanıyor; ayrıca hediye fikri veriyor.
 
-**(3) Önerilmiş + başka hiçbir kanıt yok.**
+**(3) Tavsiye + başka hiçbir kanıt yok.**
 > *"Bu ürün harika bir hediye olur."* · *"Üniversite öğrencilerine ideal hediye."*
 
 → **`unclear`**. Kimin aldığı, kullandığı, verdiği belli değil.
 
 > **Neden (3) `self` değil?** Hediye kanıtının yokluğu, kendine aldığının kanıtı
-> değildir. Buna `self` demek, metinde olmayan bir şeyi uydurmaktır — ve yaygınlık
-> tahminini `self` yönünde şişirir. §3.7 ile birlikte okuyun: ikisi aynı kuralın
-> iki yüzü.
+> değildir. `self` demek metinde olmayan bir şeyi uydurmaktır. §6.7 ile birlikte
+> okuyun — ikisi aynı kuralın iki yüzü.
 
-Ayırt edici soru sırası: **(a)** ürün el değiştirmiş mi? → `gift_given`.
-**(b)** Değilse, kişinin kendi kullanımına dair bir şey var mı? → `self`.
-**(c)** İkisi de yoksa → `unclear`.
+Ayırt edici sıra: **(a)** ürün el değiştirmiş mi? → `gift_given` · **(b)**
+değilse kendi kullanımına dair bir şey var mı? → `self` · **(c)** ikisi de yoksa
+→ `unclear`.
 
-### 3.2 Hediye **almak** ≠ hediye **vermek** → `received`
+### 6.2 Hediye **almak** ≠ hediye **vermek** → `received`
 
 > *"Bunu doğum günümde hediye aldım ve bayıldım."*
 
-Değerlendiren kişi **alıcı**. Ürün onda, o kullanıyor, yorum onun deneyimi — ama
+Yorumu yazan kişi **alıcı**. Ürün onda, o kullanıyor, yorum onun deneyimi — ama
 ürünü **o seçmedi**. → **`received`**
 
-> **v3'te değişti.** Eskiden bu vaka `self` yazılıyordu. Ama `household` sınıfı zaten
-> *"hediye değil ama kendi tercihi de değil"* diye ayrı tutuluyor ve hediye alan da tam
-> olarak bu durumda. Bir kez `self` yazılırsa bilgi geri gelmez.
+Bu sınıf özellikle önemli, çünkü öneri sistemi açısından bu da bir kirlenme:
+kişi ürünü beğenmiş olabilir ama o tercihi kendisi yapmadı.
 
-`notes` alanına bir şey yazmanız gerekmiyor; `received` etiketi tek başına yeterli.
-`recipient` sorulursa **vereni** gösterir (ör. "kız kardeşim yolladı" → `sibling`).
-
-### 3.3 Torun ≠ ev halkı → `gift_given`
+### 6.3 Torun ≠ ev halkı → `gift_given`
 
 > *"Torunum için aldım, çok sevdi."*
 
-**Bu şemadaki en kritik ayrım.** Torun ayrı hanede yaşar; ona alınan şey hediyedir.
-Toys_and_Games'te adı geçen alıcıların **%26'sı torun** — yani birincil deney
-kategorisinin dörtte biri bu tek karara bağlı.
+**Şemadaki en kritik ayrım.** Torun ayrı hanede yaşar; ona alınan şey hediyedir.
+Oyuncak kategorisinde hediye olarak verilen ürünlerin **%44'ü toruna** gidiyor
+(alıcısı belli olanların yarısı) — yani en büyük kategorimizdeki hediyelerin
+neredeyse yarısı bu tek karara bağlı.
 
-`household` **değil**. Yeğen, kuzen, "arkadaşımın çocuğu" da aynı şekilde `gift_given`.
+`household` **değil**. Yeğen, kuzen, "arkadaşımın çocuğu" da aynı şekilde
+**`gift_given`**.
 
-### 3.4 Kendi çocuğu — en zor vaka
+### 6.4 Kendi çocuğu — en zor vaka
 
-**Önce hane sınırını çizin.** `household` ile `gift_given` arasındaki fark akrabalık
-derecesi değil, **aynı evde yaşanıp yaşanmadığı**:
+**Önce hane sınırını çizin.** `household` ile `gift_given` arasındaki fark
+akrabalık derecesi değil, **aynı evde yaşanıp yaşanmadığı**:
 
-| Aynı evde (→ `household` adayı) | Ayrı evde (→ her zaman `gift_given`) |
+| Aynı evde → `household` adayı | Ayrı evde → her zaman `gift_given` |
 |---|---|
-| "my son", "my daughter", "my kids" | "my grandson", "my granddaughter" |
-| "my 5 year old", "my little one", "my toddler" | "my niece", "my nephew", "my cousin" |
-| "my baby", "our baby" | "my friend's daughter" |
-| "my wife/husband" (ortak kullanım) | "my mom", "my dad", "my sister" (ayrı yaşıyorsa) |
+| "my son", "my daughter", "my kids" (oğlum, kızım, çocuklarım) | "my grandson", "my granddaughter" (torunum) |
+| "my 5 year old", "my little one", "my toddler" (5 yaşındaki, küçüğüm) | "my niece", "my nephew", "my cousin" (yeğenim, kuzenim) |
+| "my baby", "our baby" (bebeğim/bebeğimiz) | "my friend's daughter" (arkadaşımın kızı) |
+| "my wife/husband" — ortak kullanımsa | "my mom", "my sister" — ayrı yaşıyorsa |
 
-Yaşla ifade edilen çocuk ("my 3 and 6 year old" gibi) kendi çocuğudur — torun neredeyse her
-zaman açıkça "grand-" ile yazılır.
+Yaşla anlatılan çocuk ("my 3 and 6 year old") **kendi çocuğudur** — torun
+neredeyse her zaman açıkça "grand-" ile yazılır.
 
-**Sonra kuralı uygulayın.** Burada net bir doğru yok, o yüzden **tutarlılık** doğruluktan
-önemli:
+**Sonra kuralı uygulayın.** Burada tek bir "doğru" cevap yok, o yüzden
+**tutarlılık doğruluktan önemli**. Şu sırayla:
 
-- **Vesile adı geçiyorsa** ("doğum günü", "yılbaşı", "karne hediyesi") → **`gift_given`**
-- **Günlük/ortak kullanımsa** ("okul çantası", "bebeğin maması", "çocuk odasına aldık")
+- **Özel bir gün geçiyorsa** ("birthday", "Christmas", "karne hediyesi")
+  → **`gift_given`**
+- **Günlük / ortak kullanımsa** ("okul çantası", "bebek maması", "çocuk odasına")
   → **`household`**
-- İkisi de yoksa → **`household`**
+- **İkisi de yoksa** → **`household`**
 
-**Güçlü bir ipucu: değerlendiren ürünü kendi eline almış mı?** Kurulumu anlatıyorsa, pil
-taktıysa, çalışmadığını kendi test ettiyse, "biz/we" diye yazıyorsa — ürün evden çıkmamış
-demektir ve puan gerçekten onun yargısıdır. Bu `household` lehine güçlü kanıttır.
+> **Güçlü ipucu: kişi ürünü kendi eline almış mı?** Kurulumu anlatıyorsa, pil
+> taktıysa, çalışmadığını kendi test ettiyse, "we/biz" diye yazıyorsa — ürün
+> evden çıkmamış demektir. Bu `household` lehine güçlü kanıttır.
 
-> **Örnek.** *"2 yaşındaki ve 5 yaşındaki çocuğum için iki tane aldım... pilleri taktım,
-> ikisi de çalışmadı... paranın sayılmasını istiyorduk ama SAYMIYOR."*
-> → `household`. Kendi çocukları (hane içi), vesile yok, ve ürünü kendisi test etmiş.
+> **Örnek.** *"2 ve 5 yaşındaki çocuklarım için iki tane aldım... pilleri taktım,
+> ikisi de çalışmadı..."*
+> → **`household`**. Kendi çocukları (hane içi), özel gün yok, ürünü kendisi test
+> etmiş.
 
-Bu vakaya `notes`'a `KENDI_COCUGU` yazın. Sayısı yüksek çıkarsa kuralı Hafta 4'te
-κ sonucuna göre yeniden tanımlayacağız — ama ancak işaretlerseniz sayabiliriz.
+Bu vakalarda `notes` kolonuna **`KENDI_COCUGU`** yazın. Neden önemli olduğu §7'de.
 
-### 3.5 "Arkadaşım tavsiye etti" → `self`
+### 6.5 "Arkadaşım tavsiye etti" → `self`
 
 > *"Arkadaşım önerdi, ben de aldım."*
 
-Başkası cümlede geçiyor ama **ürünü alan ve kullanan değerlendiren kişi**.
+Cümlede başkası geçiyor ama **ürünü alan ve kullanan yorumu yazan kişi**.
 
-### 3.6 Eşe alınan — ikisi de kullanıyorsa `household`
+### 6.6 Eşe alınan — ikisi de kullanıyorsa `household`
 
-- "Eşime doğum günü hediyesi aldım" → `gift_given`
-- "Eşim için aldım ama ikimiz de kullanıyoruz" → `household`
-- "Mutfağımıza aldık" → `household`
+- *"Eşime doğum günü hediyesi aldım"* → **`gift_given`** (özel gün + ona ait)
+- *"Eşim için aldım ama ikimiz de kullanıyoruz"* → **`household`**
+- *"Mutfağımıza aldık"* → **`household`**
 
-### 3.7 Bilgi vermeyen kısa review → `unclear`
+### 6.7 Bilgi vermeyen kısa yorum → `unclear`
 
 > *"Harika."* · *"Beş yıldız."* · *"Beklediğim gibi."*
 
-Hediye ifadesinin **yokluğu, `self` kanıtı değildir.** Metin hiçbir şey söylemiyorsa
-`unclear` doğru cevaptır; `self` demek uydurmaktır. Bu, §3.1'deki (3) durumunun
-aynısıdır — orada hediye sözcüğü var ama kanıt yok, burada ikisi de yok.
+Hediye ifadesinin **yokluğu, `self` kanıtı değildir.** Metin hiçbir şey
+söylemiyorsa doğru cevap `unclear`; `self` demek uydurmaktır.
 
-Ama: *"Üç haftadır kullanıyorum, memnunum"* kısa olsa da `self` — birinci ağızdan
-kullanım var. Uzunluk değil **kanıt** belirliyor.
+Ama: *"Üç haftadır kullanıyorum, memnunum"* kısa olsa da **`self`** — birinci
+ağızdan kullanım var. Uzunluk değil **kanıt** belirliyor.
 
-### 3.8 İş yeri / komşu → `gift_given`
+### 6.8 İş yeri / komşu → `gift_given`
 
-Meslektaş, komşu, öğretmen — hepsi hane dışı → `gift_given`.
+Meslektaş, komşu, öğretmen, "sınıf hediyesi" — hepsi hane dışı → **`gift_given`**.
 
 ---
 
-## 4. `notes` kolonuna ne yazılır
+## 7. `notes` kolonuna ne yazılır
 
-**Satırların çoğunda boş kalacak, bu normal.** 200 satırın 30-40'ında bir şey yazarsınız.
-
-Ama yazdıklarınız prompt v2'nin yazıldığı yer. Mekanizma şu: etiketleyenin kafasındaki
-tereddüdün LLM'e talimat olarak geçmesinin tek kanalı bu kolon. Bir tuzak 15 satırda
-tekrarlanıyor ama not düşülmediyse, prompt'a girmez ve LLM aynı hatayı **40.000 satırda**
-yapar.
+**Satırların çoğunda boş kalacak — bu normal.** 500 satırın belki 50'sinde bir
+şey yazarsınız.
 
 | Ne zaman | Ne yazılır |
 |---|---|
-| §3.4 kendi çocuğu vakası | `KENDI_COCUGU` |
-| Etiket verildi ama içe sinmedi | `EMIN_DEGIL` |
-| Rehberde olmayan bir durum | Bir cümle, serbest |
+| §6.4'teki "kendi çocuğu" vakası | `KENDI_COCUGU` |
+| Etiketi verdiniz ama içinize sinmedi | `EMIN_DEGIL` |
+| Rehberde hiç geçmeyen bir durum | Bir cümle, serbest |
 
-Uzun yazmayın; etiket başına birkaç kelime yeterli. `KENDI_COCUGU` ve `EMIN_DEGIL`
-etiketleri birebir bu şekilde yazılmalı - sayılabilmeleri için.
+Bu iki etiketi **birebir böyle** yazın (Türkçe karakter yok, alt çizgi var) —
+sayılabilmeleri için.
+
+**`KENDI_COCUGU` neden önemli?** Ekibin vermesi gereken açık bir karar var:
+`household` da kirlenme sayılacak mı? Bu karar hediye oranını oyuncak
+kategorisinde %23 ile %43 arasında değiştiriyor. Sizin işaretlediğiniz satırlar
+o kararın dayanağı olacak — işaretlemezseniz sayamayız.
 
 ---
 
-## 5. Sık sorulanlar
+## 8. Sık sorulanlar
 
-**Ürünün ne olduğunu bilmiyorum, karar veremiyorum.**
-`category` kolonu var. Yetmiyorsa `unclear` + `notes`'a nedenini yazın.
+**İngilizce bilmiyorum / bir cümleyi anlamadım. Çevirebilir miyim?**
+Evet. Google Translate, DeepL, hatta ChatGPT'ye *"bu cümle ne diyor"* diye
+sormak serbest. Yasak olan **etiketi sormak**: *"bu hediye mi?"*, *"hangi etiketi
+vermeliyim?"* Kararı siz vereceksiniz, çeviri sadece metni anlamanız için.
+
+**Ürünün ne olduğunu anlamadım.**
+`category` kolonuna bakın. Yine de anlamadıysanız `unclear` verin ve `notes`'a
+nedenini yazın.
 
 **Hem kendine hem hediye almış.**
 > *"İki tane aldım, biri bana biri anneme."*
 
-`gift_given`. Kirlenme var — öneri sistemi açısından önemli olan bu.
+→ **`gift_given`**. Kirlenme var; öneri sistemi açısından önemli olan bu.
 
-**Emin değilim, %60 hediye gibi.**
-Etiketi verin, `notes`'a `EMIN_DEGIL` yazın. `unclear`'ı **kanıt yokluğu** için saklayın,
-kararsızlık için değil. İkisi farklı şeyler ve karıştırılırsa `unclear` oranı
-detektörün performansı hakkında yanlış bilgi verir.
+**Emin değilim — %60 hediye gibi geldi.**
+Etiketi yine de verin, `notes`'a `EMIN_DEGIL` yazın. `unclear`'ı **kanıt yokluğu**
+için saklayın, kararsızlık için değil. İkisi farklı şeyler: biri "metinde bilgi
+yok", diğeri "bilgi var ama ben emin olamadım".
 
-**Yorum ürünle ilgisiz (kargo şikâyeti vb.).**
-Kim için alındığına dair bir şey yoksa → `unclear`.
+**Yorum ürünle ilgisiz (kargo şikâyeti, satıcıya küfür vb.).**
+Kim için alındığına dair bir şey yoksa → **`unclear`**.
 
-**Ne kadar sürer?**
-200 satır ≈ 2–3 saat. Satır başına 30–60 saniye. Daha hızlı gidiyorsanız muhtemelen
-metni okumuyorsunuz; daha yavaşsanız fazla düşünüyorsunuz — kararsız kalınca
-`notes`'a yazıp geçin.
+**Yanlışlıkla satırları sıraladım / filtreledim. Bozuldu mu?**
+**Hayır.** Etiketler satır numarasına değil `val_id`'ye bağlanıyor; sıralasanız
+bile doğru satıra gider. Filtrelemek de serbest.
+**Ama satır SİLMEYİN** — o yakalanır ve hata verir.
 
-**Kolonların hepsini görmüyorum.**
-Kasıtlı. Hangi satırın anahtar kelimeyle işaretlendiği sayfada **yok**, çünkü görseydiniz
-etiketleriniz o karara yaslanırdı ve insan–algoritma karşılaştırması kendi kendini
-doğrulayan bir ölçüme dönerdi. `--ingest` o kolonları geri ekliyor.
+**Bir satırı boş bıraktım / yarıda kaldım.**
+Sorun değil. Yarım dosya hata değil, ilerleme raporu üretiyor. Kaydedip devam
+edin.
+
+**Etiketi yanlış yazarsam?**
+`label` hücresine tıklayınca açılır menü çıkıyor; oradan seçerseniz yanlış
+yazmanız mümkün değil. Elle yazıp menüyü atlarsanız (ör. kopyala-yapıştır) beş
+etiket dışında bir şey girebilirsiniz — ama toplama adımı bunu yakalıyor ve
+hangi satır olduğunu söylüyor. Yine de menüden seçmek en güvenlisi.
+
+**Excel yerine başka bir program kullanabilir miyim?**
+LibreOffice sorunsuz. Google Sheets'te de açılır ama sonunda **`.xlsx` olarak
+indirmeniz** şart (Sheets'in kendi formatı okunmuyor). Hangi programı
+kullanırsanız kullanın: **kolon adlarını ve sırasını değiştirmeyin** — dosya o
+başlıklara göre okunuyor.
+
+**Kolonların hepsini görmüyorum, eksik mi?**
+Kasıtlı. Modelin cevabı ve hangi satırın anahtar kelimeyle işaretlendiği sayfaya
+**yazılmadı** (§3). Görseydiniz kararınız ona yaslanırdı.
+
+**Ne kadar sürer, hızlı gidiyorum?**
+Satır başına 30–60 saniye normal. Çok daha hızlıysanız muhtemelen metni
+okumuyorsunuz; çok daha yavaşsanız fazla düşünüyorsunuz — kararsız kalınca
+`notes`'a `EMIN_DEGIL` yazıp geçin.
+
+**Bitince ne yapayım?**
+Dosyayı **adını değiştirmeden** kaydedip geri gönderin.
 
 ---
 
-## 6. Bittikten sonra ne oluyor
+## 9. Bittikten sonra ne oluyor
 
-`--ingest` şunu yazdırır:
-
-```
-etiketlenen: 200 / 200
-  self          128
-  gift_given     44
-  household      19
-  unclear         9
-sozcuksel vekile karsi: {'proxy_dogru': 38, 'proxy_yanlis_pozitif': 62,
-                         'proxy_kacirdi': 6, 'ikisi_de_hayir': 94}
-```
-
-İkinci satır prompt v2'nin asıl girdisi:
-
-- **`proxy_yanlis_pozitif`** — anahtar kelime "hediye" dedi, siz demediniz.
-  Çoğu §3.1 (*"hediye olur"*) olacak. Prompt bu ayrımı zaten yazıyor; sayı yüksekse
-  few-shot örneği eklenir.
-- **`proxy_kacirdi`** — siz "hediye" dediniz, anahtar kelime kaçırdı. **En değerli
-  grup**: LLM'in sözcüksel yöntemden fazlasını yapması gereken yer tam olarak burası.
-  Bu satırlar prompt v2'ye few-shot örneği olarak girer.
-
-Sonra `prompts/gift_detection_v2.md` açılır — **v1 üzerine yazılmaz**, prompt dosyası
-versiyonlamayı şart koşuyor (hangi annotation hangi prompt'la üretildi izlenebilsin).
-
-⚠️ Bu 200 satırın `row_id`'leri `prompt_trial_ids.json`'a yazıldı ve Hafta 4'ün 500'lük
-doğrulama setinden **dışlandı**. Prompt bu satırlara bakarak yazıldığı için aynı
-satırlarla doğrulamak, modeli kendi test setine fit etmek olur.
-
-### Hafta 4'te ne oluyor
-
-Üç sayfa da toplandıktan sonra:
-
-```bash
-.venv/Scripts/python.exe -m gift_contamination.analysis.validation
-```
-
-Üç ayrı sayı çıkıyor ve **yalnızca birincisi bir kapı**:
+Üç dosya toplandığında tek bir komut çalışıyor ve üç sayı çıkıyor:
 
 | Ölçüm | Ne soruyor | Eşik |
 |---|---|---|
-| **Fleiss κ** | Görev tanımı açık mı — üçünüz birbirinizle uyuşuyor musunuz? | **≥ 0,60** |
-| Sınıf bazlı F1 | Detektör ne kadar doğru? | eşik yok — ölçüm |
-| Vekil karşılaştırması | LLM gerçekten regex'ten iyi mi? | eşik yok — ölçüm |
+| **Uyum (Fleiss κ)** | Üçünüz birbirinizle ne kadar uyuşuyorsunuz? | **≥ 0,60** |
+| Modelin doğruluğu | Yapay zekâ sizinle ne kadar örtüşüyor? | eşik yok — ölçüm |
+| Anahtar kelime yöntemi | Basit kelime araması sizinle ne kadar örtüşüyor? | eşik yok — ölçüm |
 
-κ düşük çıkarsa sorun **detektörde değil şemada**: insanlar bile aynı satırı farklı
-etiketliyorsa modelden tutarlılık beklemek anlamsız. O durumda şema sadeleşir
-(muhtemelen `household` ile `gift_given` birleşir) ve gerekçesi `DECISIONS.md`'ye yazılır.
+**Birincisi bir kapı, diğer ikisi sadece ölçüm.**
 
-F1 ve vekil sayıları için eşik **bilerek** konmadı: sonucu gördükten sonra eşik uydurmak,
+"Fleiss κ" korkutucu bir isim ama basit bir şey: *üç kişi aynı satırlara aynı
+etiketi ne sıklıkla verdi* — rastgele uyuşma payı düşülmüş hâli. 1,0 tam uyum
+demek, 0 ise "yazı tura atmışsınız kadar" demek.
+
+**κ düşük çıkarsa suç sizde değil.** O durumda sorun görev tanımındadır: demek ki
+kurallar yeterince net değil ve modelden tutarlılık beklemek anlamsız. Şemayı
+sadeleştirir (muhtemelen `household` ile `gift_given` birleşir), gerekçesini
+yazar, devam ederiz.
+
+Diğer iki sayıya **bilerek eşik konmadı**: sonucu gördükten sonra eşik uydurmak,
 kapıyı sonradan kurmak olurdu.
 
-Bir de küçük not: `received` sınıfı bu sette az çıkacak (~40 satır çekildi ama uzlaşı
-sonrası düşebilir). 20'nin altına inerse genel κ hesabına **katılmaz** ve ayrı raporlanır —
-bu kural da sonuç görülmeden, 2026-08-29'da yazıldı.
+> **Küçük not.** Eşikler siz etiketlemeye başlamadan **önce** yazıldı ve
+> `configs/base.yaml` dosyasına kaydedildi. Sonucu görüp eşik değiştirmek bu
+> projede yasak — bulguyu geçersiz kılar.
+
+---
+
+### Teşekkürler
+
+Bu 4 saat, projenin en değerli 4 saati. Geri kalan her şey — modelin doğruluk
+iddiası, hediye oranı, öneri deneyinin sonucu — sizin verdiğiniz 500 karara
+dayanacak.
+
+---
+
+<sub>**Ekip için not.** Bu rehber bilerek etiketleyene göre yazıldı; sayfaları
+üreten ve toplayan komutlar burada değil, `README.md` hızlı başlangıcında ve
+`GENEL_BAKIS.md` §8'de. Etiketleme kurallarının kendisi ölçülerek belirlendi ve
+gerekçeleri `DECISIONS.md`'de — kural değiştirmeden önce oraya bakın.</sub>

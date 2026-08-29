@@ -14,7 +14,7 @@ ediyor, yaygınlığını ölçüyor ve öneri modelini bu etkileşimlerle/onlar
 | `docs/PROJECT_SPEC.md` | Tam proje dokümanı — problem, gap analizi, iş bölümü |
 | `docs/ROADMAP.md` | Teknik roadmap — aşama detayları, hafta planı |
 | `docs/DECISIONS.md` | Spec'ten sapmalar ve gerekçeleri (tarihli) |
-| `docs/ETIKETLEME_REHBERI.md` | Elle etiketleme kuralları — Hafta 4'te 3 annotator da bunu okur |
+| `docs/ETIKETLEME_REHBERI.md` | **Etiketleyene verilecek rehber.** Kendi başına yeterli: projeyi bilmeyen biri sıfırdan okuyup 500 satırı etiketleyebilir. Hafta 4'te üç kişi de bunu okur. |
 
 ## Kurulum
 
