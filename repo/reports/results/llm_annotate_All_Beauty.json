@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "category": "All_Beauty",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "prompt_version": "v3",
+    "backend": "vllm",
+    "code_version": "0384602",
+    "n_rows": 11800,
+    "n_workers": 2,
+    "limit": null,
+    "is_partial": false
+  },
+  "throughput": {
+    "elapsed_s": 3777.8,
+    "generation_s": 3589.6,
+    "startup_s": 188.2,
+    "rows_per_s": 3.12,
+    "rows_per_s_generating": 3.29,
+    "rows_per_s_per_gpu": 1.64,
+    "output_tokens": 570528,
+    "output_tokens_per_s": 158.9,
+    "shared_prefix_chars": 9859,
+    "system_prompt_tokens": 2277
+  },
+  "quality": {
+    "parse_fail_rate": 0.001525,
+    "n_parse_fail": 18,
+    "n_retried": 18,
+    "span_downgrade_rate": 0.017203,
+    "n_span_downgraded": 203,
+    "n_truncated_reviews": 0
+  },
+  "by_purchase_type": {
+    "gift_given": 1716,
+    "household": 649,
+    "received": 169,
+    "self": 8762,
+    "unclear": 504
+  },
+  "by_frame": {
+    "boost": {
+      "gift_given": 1067,
+      "household": 318,
+      "received": 8,
+      "self": 68,
+      "unclear": 39
+    },
+    "boost_received": {
+      "gift_given": 179,
+      "household": 1,
+      "received": 77,
+      "self": 36,
+      "unclear": 7
+    },
+    "main": {
+      "gift_given": 470,
+      "household": 330,
+      "received": 84,
+      "self": 8658,
+      "unclear": 458
+    }
+  }
+}

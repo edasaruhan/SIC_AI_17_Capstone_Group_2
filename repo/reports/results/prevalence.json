@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "frame": "main",
+    "n_per_category": 10000,
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "prompt_version": "v3",
+    "estimator": "flat mean (the main frame is proportionally allocated, hence self-weighting)",
+    "ci": "Wilson score, 95%",
+    "definitions": {
+      "narrow": [
+        "gift_given"
+      ],
+      "broad": [
+        "gift_given",
+        "household"
+      ]
+    }
+  },
+  "categories": {
+    "All_Beauty": {
+      "role": "pilot",
+      "n_main": 10000,
+      "counts": {
+        "gift_given": 470,
+        "household": 330,
+        "received": 84,
+        "self": 8658,
+        "unclear": 458
+      },
+      "share_pct": {
+        "gift_given": 4.7,
+        "household": 3.3,
+        "received": 0.84,
+        "self": 86.58,
+        "unclear": 4.58
+      },
+      "definitions": {
+        "narrow": {
+          "labels": [
+            "gift_given"
+          ],
+          "k": 470,
+          "rate_pct": 4.7,
+          "ci95_pct": [
+            4.3,
+            5.13
+          ]
+        },
+        "broad": {
+          "labels": [
+            "gift_given",
+            "household"
+          ],
+          "k": 800,
+          "rate_pct": 8.0,
+          "ci95_pct": [
+            7.48,
+            8.55
+          ]
+        }
+      },
+      "proxy_rate_pct": 2.13,
+      "llm_over_proxy": 2.21
+    },
+    "Toys_and_Games": {
+      "role": "high",
+      "n_main": 10000,
+      "counts": {
+        "gift_given": 2325,
+        "household": 2017,
+        "received": 60,
+        "self": 4728,
+        "unclear": 870
+      },
+      "share_pct": {
+        "gift_given": 23.25,
+        "household": 20.17,
+        "received": 0.6,
+        "self": 47.28,
+        "unclear": 8.7
+      },
+      "definitions": {
+        "narrow": {
+          "labels": [
+            "gift_given"
+          ],
+          "k": 2325,
+          "rate_pct": 23.25,
+          "ci95_pct": [
+            22.43,
+            24.09
+          ]
+        },
+        "broad": {
+          "labels": [
+            "gift_given",
+            "household"
+          ],
+          "k": 4342,
+          "rate_pct": 43.42,
+          "ci95_pct": [
+            42.45,
+            44.39
+          ]
+        }
+      },
+      "proxy_rate_pct": 11.07,
+      "llm_over_proxy": 2.1
+    },
+    "Video_Games": {
+      "role": "mid",
+      "n_main": 10000,
+      "counts": {
+        "gift_given": 786,
+        "household": 662,
+        "received": 75,
+        "self": 7834,
+        "unclear": 643
+      },
+      "share_pct": {
+        "gift_given": 7.86,
+        "household": 6.62,
+        "received": 0.75,
+        "self": 78.34,
+        "unclear": 6.43
+      },
+      "definitions": {
+        "narrow": {
+          "labels": [
+            "gift_given"
+          ],
+          "k": 786,
+          "rate_pct": 7.86,
+          "ci95_pct": [
+            7.35,
+            8.4
+          ]
+        },
+        "broad": {
+          "labels": [
+            "gift_given",
+            "household"
+          ],
+          "k": 1448,
+          "rate_pct": 14.48,
+          "ci95_pct": [
+            13.8,
+            15.18
+          ]
+        }
+      },
+      "proxy_rate_pct": 4.4,
+      "llm_over_proxy": 1.79
+    },
+    "Grocery_and_Gourmet_Food": {
+      "role": "low",
+      "n_main": 10000,
+      "counts": {
+        "gift_given": 428,
+        "household": 424,
+        "received": 105,
+        "self": 8366,
+        "unclear": 677
+      },
+      "share_pct": {
+        "gift_given": 4.28,
+        "household": 4.24,
+        "received": 1.05,
+        "self": 83.66,
+        "unclear": 6.77
+      },
+      "definitions": {
+        "narrow": {
+          "labels": [
+            "gift_given"
+          ],
+          "k": 428,
+          "rate_pct": 4.28,
+          "ci95_pct": [
+            3.9,
+            4.69
+          ]
+        },
+        "broad": {
+          "labels": [
+            "gift_given",
+            "household"
+          ],
+          "k": 852,
+          "rate_pct": 8.52,
+          "ci95_pct": [
+            7.99,
+            9.08
+          ]
+        }
+      },
+      "proxy_rate_pct": 1.85,
+      "llm_over_proxy": 2.32
+    }
+  },
+  "ordering_narrow": [
+    "Toys_and_Games",
+    "Video_Games",
+    "All_Beauty",
+    "Grocery_and_Gourmet_Food"
+  ],
+  "human_validated": false,
+  "caveats": [
+    "Etiketler LLM'den; insan dogrulamasi HENUZ YOK (Hafta 4).",
+    "Dar tanim UST SINIR: deneme kosusunda household -> gift_given yonunde 14 uyusmazlik, ters yonde 0.",
+    "Oranlar k-core korpusuna aittir, ham korpusa degil.",
+    "Kategoriler arasi HAVUZLANMIS oran raporlanmaz - her kategori esit tahsisle cekildi, korpus paylariyla degil."
+  ]
+}

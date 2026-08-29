@@ -1,6 +1,6 @@
 {
   "meta": {
-    "category": "Toys_and_Games",
+    "category": "Video_Games",
     "n_main": 10000,
     "prompt_version": "v3",
     "model": "Qwen/Qwen3-4B-Instruct-2507",
@@ -18,28 +18,28 @@
         8,
         9
       ],
-      "peak_rate": 0.311079,
-      "trough_rate": 0.197354,
-      "ratio": 1.5762,
+      "peak_rate": 0.123822,
+      "trough_rate": 0.059507,
+      "ratio": 2.0808,
       "ci95": [
-        1.4344,
-        1.7302
+        1.7425,
+        2.4891
       ],
       "threshold": 1.25,
       "passed": true
     },
     "2_beyond_keyword": {
-      "n_unflagged": 8873,
-      "n_gift_in_unflagged": 1598,
-      "rate": 0.180097,
-      "rate_in_flagged": 0.645075,
+      "n_unflagged": 9537,
+      "n_gift_in_unflagged": 463,
+      "rate": 0.048548,
+      "rate_in_flagged": 0.697624,
       "threshold": 0.01,
       "passed": true
     },
     "3_schema_health": {
-      "parse_fail_rate": 0.000339,
+      "parse_fail_rate": 0.00161,
       "parse_fail_rate_max": 0.01,
-      "span_downgrade_rate": 0.027712,
+      "span_downgrade_rate": 0.030847,
       "span_downgrade_rate_max": 0.1,
       "passed": true
     },

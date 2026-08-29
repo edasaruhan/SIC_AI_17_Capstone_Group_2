@@ -75,6 +75,9 @@ src/gift_contamination/
     viz.py               # ortak grafik stili
     validation.py        # Fleiss kappa (kapı) + sınıf bazlı F1 + vekilin ilk
                          #   bağımsız ölçümü. Hafta 4.
+    prevalence.py        # RQ1: kategori bazlı yaygınlık + Wilson GA (F19).
+                         #   YALNIZCA `main` çerçevesi; C1 ve C1b tanımlarının
+                         #   İKİSİNİ de yazar, hiçbirini seçmez.
   recsys/
     atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
                          #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu)
@@ -310,6 +313,8 @@ python -m gift_contamination.detection.llm_annotate --config configs/base.yaml -
 python -m gift_contamination.data.sampling          --config configs/base.yaml --trial-source 200
 python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --trial 200
 python -m gift_contamination.analysis.gate1         --config configs/base.yaml --category high
+# RQ1 tablosu - dört kategori etiketlendikten SONRA
+python -m gift_contamination.analysis.prevalence    --config configs/base.yaml --category all
 python -m gift_contamination.detection.distill  --config configs/base.yaml
 python -m gift_contamination.detection.inference --config configs/base.yaml --category high
 python -m gift_contamination.analysis.descriptive --config configs/base.yaml
@@ -374,12 +379,15 @@ Kurallar:
 
 - `test_schema.py` — Pydantic şeması geçerli/geçersiz JSON'ları doğru ayırıyor mu
 - `test_preprocess.py` — 5-core gerçekten 5-core mu; sekanslar kronolojik mi
-- `test_conditions.py` — **kritik**: C0–C4 arasında user/item evreni aynı mı;
-  C4 tam olarak C1 kadar etkileşim mi çıkarıyor
-- `test_no_leakage.py` — **kritik**: test item'ı eğitim setinde geçmiyor;
-  split zaman bazlı; test item'ları `self` etiketli
+- `test_conditions.py` — **kritik**: hiçbir koşul C0'ın evrenine kullanıcı/ürün
+  EKLEMİYOR mu (tek yönlü kapsama); C4 tam olarak C1 kadar etkileşim mi çıkarıyor
 - `test_no_leakage.py` — **kritik**: bölme zaman bazlı mı; test item'ı eğitimde
   geçmiyor mu; test item'ları `self` etiketli mi
+- `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
+  genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
+- `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık
+  YALNIZCA `main`'den mi okunuyor; iki tanımdan biri sessizce seçilmiyor mu;
+  `human_validated` diskten mi okunuyor (elle iddia edilmiyor)
 
 Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte kullanılmaz.
 

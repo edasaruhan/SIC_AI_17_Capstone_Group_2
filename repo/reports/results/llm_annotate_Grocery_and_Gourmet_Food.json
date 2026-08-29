@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "category": "Grocery_and_Gourmet_Food",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "prompt_version": "v3",
+    "backend": "vllm",
+    "code_version": "efae0ea",
+    "n_rows": 11800,
+    "n_workers": 2,
+    "limit": null,
+    "is_partial": false
+  },
+  "throughput": {
+    "elapsed_s": 3599.1,
+    "generation_s": 3403.1,
+    "startup_s": 196.1,
+    "rows_per_s": 3.28,
+    "rows_per_s_generating": 3.47,
+    "rows_per_s_per_gpu": 1.73,
+    "output_tokens": 542403,
+    "output_tokens_per_s": 159.4,
+    "shared_prefix_chars": 9859,
+    "system_prompt_tokens": 2277
+  },
+  "quality": {
+    "parse_fail_rate": 0.000593,
+    "n_parse_fail": 7,
+    "n_retried": 7,
+    "span_downgrade_rate": 0.024915,
+    "n_span_downgraded": 294,
+    "n_truncated_reviews": 0
+  },
+  "by_purchase_type": {
+    "gift_given": 1559,
+    "household": 731,
+    "received": 216,
+    "self": 8548,
+    "unclear": 746
+  },
+  "by_frame": {
+    "boost": {
+      "gift_given": 980,
+      "household": 305,
+      "received": 17,
+      "self": 135,
+      "unclear": 63
+    },
+    "boost_received": {
+      "gift_given": 151,
+      "household": 2,
+      "received": 94,
+      "self": 47,
+      "unclear": 6
+    },
+    "main": {
+      "gift_given": 428,
+      "household": 424,
+      "received": 105,
+      "self": 8366,
+      "unclear": 677
+    }
+  }
+}

@@ -330,3 +330,26 @@ def test_per_class_separates_over_calling_from_missing(cfg: Config):
     assert result["per_class"]["gift_given"] == {
         "n_human": 1, "n_llm": 2, "precision": 0.5, "recall": 1.0,
     }
+
+
+def test_the_confusion_ordering_is_stable_under_ties(cfg: Config):
+    """Esit sayilar ALFABETIK cozulmeli, `group_by`in kaprisine birakilmamali.
+
+    Sayilar dogru olsa bile sirasiz bir sozluk her kosuda farkli bir dosya
+    uretir; o gurultunun icinde gercek bir degisikligi gormek imkansizlasir.
+    Bu tam olarak 2026-08-29'da yakalandi: Toys raporu yeniden kosuldugunda
+    yalnizca esit sayilarin yeri degisti.
+    """
+    # Uc ayri uyusmazlik, UCU DE tek ornekli - yani tamami beraberlik.
+    _write_trial_pair(
+        cfg,
+        human=["self", "unclear", "gift_given"],
+        llm=["unclear", "gift_given", "self"],
+    )
+
+    confusion = trial_agreement(cfg)["disagreements"]
+
+    assert list(confusion) == [
+        "gift_given->self", "self->unclear", "unclear->gift_given",
+    ]
+    assert set(confusion.values()) == {1}

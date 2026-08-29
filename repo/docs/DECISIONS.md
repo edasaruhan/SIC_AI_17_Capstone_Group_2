@@ -1121,3 +1121,104 @@ T7 tablosundaki sayılarla birebir aynı. Bölme ve uygunluk kuralı iki yerde a
 **Etkilediği bölüm:** `requirements-recbole.txt` (yeni), `.gitignore`,
 `recsys/run_experiment.py` (yeni), CLAUDE.md §6
 **Kim:** Ekip
+
+---
+
+### 2026-08-29 — Dört kategori tamamlandı: RQ1 ölçüldü, doğrulama seti yeniden çekildi
+
+Kalan üç kategori Kaggle'da koştu (All Beauty, Video Games, Grocery). Dört
+kategorinin tamamı artık etiketli: **4 × 11.800 = 47.200 satır**, hepsi
+`backend: vllm`, `prompt v3`, `is_partial: false`, boş kolon yok, çerçeve
+tahsisi dördünde de aynı (main 10.000 / boost 1.500 / boost_received 300).
+
+**Koşular farklı `code_version`'larda yapıldı — bu denetlendi.** Toys `add95f3`,
+All Beauty `0384602`, Video Games ve Grocery `efae0ea`. Aradaki 245 satırlık
+`llm_annotate.py` değişikliği **saf refactor**: üretim yolu (`build_prompts` →
+`generate` → `parse_one` → tekrar deneme → `_attach_labels`) birebir aynı kodla
+`_label_chunk`/`_attach_labels`'a taşındı, üstüne `--trial` girişi eklendi.
+`prompting.py` ve prompt dosyası hiç değişmedi. Bağımsız kanıt: dört koşu da
+`shared_prefix_chars: 9859` ve `system_prompt_tokens: 2277` raporluyor — prompt
+baytı bayta aynı. Dört kategori karşılaştırılabilir.
+
+#### RQ1 — hediye yaygınlığı (`main` çerçevesi, n = 10.000/kategori)
+
+| kategori | rol | dar (C1) % | %95 GA | geniş (C1b) % | vekil % | LLM/vekil |
+|---|---|---:|---|---:|---:|---:|
+| Toys and Games | high | **23,25** | 22,43–24,09 | 43,42 | 11,07 | 2,10× |
+| Video Games | mid | **7,86** | 7,35–8,40 | 14,48 | 4,40 | 1,79× |
+| All Beauty | pilot | **4,70** | 4,30–5,13 | 8,00 | 2,13 | 2,21× |
+| Grocery and Gourmet Food | low | **4,28** | 3,90–4,69 | 8,52 | 1,85 | 2,32× |
+
+**Üç bulgu, üçü de kararı etkiliyor:**
+
+1. **Rol ataması bir ÖNGÖRÜYDÜ ve tuttu.** `high/mid/low/pilot` etiketleri
+   Hafta 1'de sözcüksel vekilden atandı — hiçbir dil modeli veriyi görmeden
+   önce. Ölçülen sıra: Toys ≫ Video Games > {All Beauty, Grocery}. Toys ve
+   Video Games'in güven aralıkları birbirinden ve alt ikiliden **ayrık**.
+   All Beauty ile Grocery'nin aralıkları örtüşüyor — o ikisi **ayrılamaz** ve
+   öyle raporlanacak.
+
+2. **Sözcüksel vekil sistematik olarak ~2,1× kaçırıyor** (1,79–2,32 aralığı,
+   dört kategoride). Sıra korunuyor ama seviye korunmuyor. Bu, alandaki
+   anahtar-kelime temelli çalışmaların hediye oranını yaklaşık **yarı yarıya**
+   eksik saydığı anlamına geliyor ve damıtma yığınının gerekçesi tam olarak bu.
+
+3. **Kontaminasyon tanımı sonucu ikiye katlıyor.** `household` eklenince Toys
+   %23,25 → %43,42'ye çıkıyor. Karar hâlâ **kavramsal** ve ekipte (CLAUDE.md
+   §13). Kod hiçbirini seçmiyor: `analysis/prevalence.py` ikisini de yan yana
+   yazıyor, `recsys/conditions.py` ikisini de koşuyor (C1 / C1b).
+
+**Dar tanım bir ÜST SINIR.** Deneme koşusundaki 33 uyuşmazlığın 14'ü tek yönde
+(insan `household`, model `gift_given`); ters yön sıfır. Rapor bunu `caveats`
+altında taşıyor.
+
+#### Kapı 1 dört kategoride de PASS (4/4)
+
+| kategori | mevsimsellik | GA alt | vekil-ötesi | parse-fail | span-downgrade |
+|---|---:|---:|---:|---:|---:|
+| Toys and Games | 1,58× | 1,43 | %18,01 | %0,03 | %2,77 |
+| Video Games | 2,08× | 1,74 | %4,85 | %0,16 | %3,08 |
+| Grocery and Gourmet Food | 1,71× | 1,33 | %3,10 | %0,06 | %2,49 |
+| All Beauty | 2,06× | 1,61 | %3,27 | %0,15 | %1,72 |
+
+Eşikler değiştirilmedi (mevsimsellik ≥ 1,25, vekil-ötesi ≥ %1, parse-fail
+≤ %1, span-downgrade ≤ %10). Dört kategorinin tamamında Aralık-Ocak tepesi
+güven aralığının alt ucuyla birlikte eşiğin üstünde.
+
+**Ters yönlü bir örüntü:** Toys en DÜŞÜK mevsimselliğe (1,58×) ama en YÜKSEK
+vekil-ötesi orana (%18) sahip. Tutarlı bir okuma: oyuncakta hediye yıl boyu
+(doğum günü) veriliyor, o yüzden Aralık tepesi oransal olarak küçük kalıyor;
+ve hediye o kadar yaygın ki büyük kısmı açık anahtar kelime taşımıyor.
+
+#### Doğrulama seti yeniden çekildi — öncekiler tek kategoridendi
+
+Önceki çekim (2026-08-29 01:47) **500 satırın tamamını Toys'tan** almıştı,
+çünkü o an yalnızca Toys etiketliydi. RQ1 kategorileri karşılaştırdığı için
+tek kategoriden çekilmiş bir doğrulama seti detektörün kategoriler arası
+genellenip genellenmediğini ölçemez. Yeniden çekildi:
+
+- **Toys 200 · Video Games 100 · Grocery 100 · All Beauty 100** (tasarım payı)
+- Katmanlar tasarıma birebir: `gift_given` 150, `household` 150, `self` 100,
+  `unclear` 60, `received` 40
+- Deneme setiyle kesişim: **0** (`(category, row_id)` çifti üzerinden)
+- Üç sayfa (A/B/C) aynı satır sırasında — κ hizalaması buna bağlı
+- Körleme doğrulandı: sayfalarda yalnızca `val_id, category, title, text,
+  label, notes`; `purchase_type`, `kw_gift_proxy` ve diğer önyargı kolonları
+  **yok**
+
+Üzerine yazmadan önce üç sayfanın da **sıfır** dolu etiket taşıdığı kontrol
+edildi — kimsenin emeği kaybolmadı.
+
+#### Yan düzeltme: rapor sırası kararsızdı
+
+Kapı 1 yeniden koşulduğunda Toys raporu değişti — ama **hiçbir sayı
+değişmeden**. Sebep: karışıklık matrisi yalnızca `-adet`e göre sıralanıyordu ve
+eşit sayılar `group_by`'ın rastgele sırasına kalıyordu. Aynı veriden iki farklı
+dosya çıkıyordu; o gürültünün içinde gerçek bir değişikliği görmek imkânsız.
+İkincil anahtar (etiket çifti) eklendi — `gate1.py` ve `validation.py`. İki
+ardışık koşu artık **birebir aynı** dosyayı üretiyor. Testi yazıldı.
+
+**Etkilediği bölüm:** `analysis/prevalence.py` (yeni), `tests/test_prevalence.py`
+(yeni, 14 test), `analysis/gate1.py`, `analysis/validation.py`,
+`tests/test_gate1.py`, CLAUDE.md §2/§6/§10
+**Kim:** Ekip

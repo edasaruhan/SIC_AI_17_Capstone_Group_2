@@ -221,11 +221,15 @@ def trial_agreement(cfg: Config) -> dict:
     #
     # `.len().iter_rows()` DUZ demet veriyor - (insan, llm, adet) - anahtar
     # demeti degil. Bu depoda tekrarlayan bir tuzak.
+    # Ikincil anahtar SART: yalnizca `-adet`e gore siralamak esit sayilari
+    # `group_by`in rastgele siralamasina birakir ve ayni veriden iki farkli
+    # rapor uretir. Sayilar ayni kalir ama dosya her kosuda degisir - yani
+    # gercek bir degisiklikle gurultuyu ayirt edemezsiniz.
     confusion = {
         f"{h}->{lbl}": n
         for h, lbl, n in sorted(
             joined.group_by(["human", "llm"]).len().iter_rows(),
-            key=lambda r: -r[2],
+            key=lambda r: (-r[2], r[0], r[1]),
         )
         if h != lbl
     }

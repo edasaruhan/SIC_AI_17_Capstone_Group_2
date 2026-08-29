@@ -1,0 +1,26 @@
+# Depo kökü. `repo/.gitignore` yalnızca `repo/` altındaki yollara uygulanır;
+# kökteki dosyalar oraya YAKALANMAZ. Bu dosya o boşluğu kapatıyor.
+
+# Kaggle'dan inen çıktıların indiği geçici klasör. İçindeki `*_llm.parquet`
+# dosyaları `evidence_span` kolonunda BİREBİR REVIEW METNİ taşır - concept-note
+# ve implementation-plan "No verbatim review text appears in any published
+# output" diye taahhüt ediyor. Buradan `repo/data/annotations/` altına kopyalanır
+# ve orada da ignore'ludur.
+out/
+
+# Kökte bir yere düşen veri dosyaları için savunma katmanı.
+*.parquet
+*.jsonl
+*.jsonl.gz
+*.arrow
+
+# --- Sırlar ---
+.env
+*.key
+
+# --- Python / araçlar ---
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+Thumbs.db

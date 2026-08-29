@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "category": "Video_Games",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "prompt_version": "v3",
+    "backend": "vllm",
+    "code_version": "efae0ea",
+    "n_rows": 11800,
+    "n_workers": 2,
+    "limit": null,
+    "is_partial": false
+  },
+  "throughput": {
+    "elapsed_s": 3823.2,
+    "generation_s": 3636.0,
+    "startup_s": 187.2,
+    "rows_per_s": 3.09,
+    "rows_per_s_generating": 3.25,
+    "rows_per_s_per_gpu": 1.62,
+    "output_tokens": 564103,
+    "output_tokens_per_s": 155.1,
+    "shared_prefix_chars": 9859,
+    "system_prompt_tokens": 2277
+  },
+  "quality": {
+    "parse_fail_rate": 0.00161,
+    "n_parse_fail": 19,
+    "n_retried": 19,
+    "span_downgrade_rate": 0.030847,
+    "n_span_downgraded": 364,
+    "n_truncated_reviews": 3
+  },
+  "by_purchase_type": {
+    "gift_given": 2092,
+    "household": 1023,
+    "received": 118,
+    "self": 7876,
+    "unclear": 691
+  },
+  "by_frame": {
+    "boost": {
+      "gift_given": 1070,
+      "household": 361,
+      "received": 3,
+      "self": 23,
+      "unclear": 43
+    },
+    "boost_received": {
+      "gift_given": 236,
+      "received": 40,
+      "self": 19,
+      "unclear": 5
+    },
+    "main": {
+      "gift_given": 786,
+      "household": 662,
+      "received": 75,
+      "self": 7834,
+      "unclear": 643
+    }
+  }
+}

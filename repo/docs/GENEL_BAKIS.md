@@ -215,6 +215,42 @@ ve prompt geliştirme için 200 satırlık zor vaka seti — kasıtlı olarak tu
 dolduruldu (%50 anahtar kelime işaretli, %26 spekülatif ifade), etiketlendi, ve
 sonuçlarından `prompts/gift_detection_v2.md` yazıldı.
 
+### Hafta 3–5 — dört kategori etiketlendi, RQ1 ölçüldü
+
+Dört kategorinin tamamı Kaggle'da (2× T4) etiketlendi: **47.200 satır**, kategori
+başına ~57 dakika. Kapı 1 dördünde de **PASS (4/4)**.
+
+**RQ1'in cevabı** — `main` çerçevesi, kategori başına n = 10.000:
+
+| kategori | rol | hediye (C1) | %95 GA | +household (C1b) | sözcüksel vekil |
+|---|---|---:|---|---:|---:|
+| Toys and Games | high | **%23,25** | 22,43–24,09 | %43,42 | %11,07 |
+| Video Games | mid | **%7,86** | 7,35–8,40 | %14,48 | %4,40 |
+| All Beauty | pilot | **%4,70** | 4,30–5,13 | %8,00 | %2,13 |
+| Grocery and Gourmet Food | low | **%4,28** | 3,90–4,69 | %8,52 | %1,85 |
+
+**Doz–yanıt tasarımı kuruldu.** `high/mid/low/pilot` rolleri Hafta 1'de *sözcüksel
+vekilden* atanmıştı — hiçbir dil modeli veriyi görmeden. Ölçüm o sırayı doğruladı.
+Toys ile Video Games'in güven aralıkları birbirinden ve alt ikiliden ayrık; All
+Beauty ile Grocery ise **ayrılamıyor** (aralıklar örtüşüyor) ve öyle raporlanacak.
+
+> **Sözcüksel vekil hediyelerin yaklaşık yarısını kaçırıyor.** LLM/vekil oranı dört
+> kategoride **1,79–2,32×** — dar bir bant. Sıra korunuyor, seviye korunmuyor.
+> Anahtar kelimeyle ölçüm yapan çalışmaların oranı sistematik olarak eksik saydığı
+> anlamına geliyor; damıtma yığınının gerekçesi tam olarak bu.
+
+**İki uyarı, ikisi de raporun içinde:**
+
+1. Bu sayılar **dil modelinin** etiketleri. Bağımsız insan doğrulaması (Hafta 4)
+   henüz bitmedi — `prevalence.json` bunu `human_validated: false` olarak taşıyor
+   ve iddia edilmiyor, **diskten okunuyor**.
+2. `%23,25` bir **üst sınır**. Deneme koşusundaki uyuşmazlıkların 14'ü tek yönde
+   (insan `household`, model `gift_given`); ters yön sıfır.
+
+**Açık kalan karar:** `household` kontaminasyon sayılacak mı? Tablodaki iki sütun
+arasındaki fark bu — Toys'ta %23 ile %43. Karar **kavramsal** ve ekipte; kod
+hiçbirini seçmiyor, ikisini de koşuyor (C1 / C1b).
+
 ---
 
 ## 6. Ne kaldı
@@ -224,9 +260,9 @@ sonuçlarından `prompts/gift_detection_v2.md` yazıldı.
 | 1 | Veri indirme, ön işleme, sözcüksel vekil, derin EDA | ✅ bitti |
 | 2 | Katmanlı örnekleme, etiket şeması, prompt v2, 200 deneme etiketi | ✅ bitti |
 | 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
-| 4 | 500 satır insan etiketleme (3 kişi), Fleiss κ ve sınıf bazlı F1, duyarlılık analizi | ⏳ |
-| 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ⏳ |
-| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | ⏳ |
+| 4 | 500 satır insan etiketleme (3 kişi), Fleiss κ ve sınıf bazlı F1, duyarlılık analizi | 🔄 set çekildi + sayfalar hazır · **etiketleme bekliyor** |
+| 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | 🔄 annotation ✅ (4/4 kategori, Kapı 1 hepsinde PASS) · damıtma ⏳ |
+| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 iskele ✅ + duman koşusu geçti · gerçek koşu ⏳ |
 | 7 | C1/C2/C3 koşulları, bootstrap güven aralıkları, çoklu seed | ⏳ |
 | 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ⏳ |
 

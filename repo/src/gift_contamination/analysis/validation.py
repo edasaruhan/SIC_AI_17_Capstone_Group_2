@@ -268,7 +268,9 @@ def compare(reference: pl.Series, prediction: pl.Series) -> dict:
             float(np.mean([v["f1"] for v in per_class.values() if v["f1"] is not None])), 4
         ) if any(v["f1"] is not None for v in per_class.values()) else None,
         "per_class": per_class,
-        "disagreements": dict(sorted(yanlis.items(), key=lambda kv: -kv[1])),
+        # Ikincil anahtar (etiket cifti) SART - bkz. gate1.trial_agreement:
+        # esit sayilar siralamasiz kalirsa rapor kosudan kosuya degisir.
+        "disagreements": dict(sorted(yanlis.items(), key=lambda kv: (-kv[1], kv[0]))),
     }
 
 
