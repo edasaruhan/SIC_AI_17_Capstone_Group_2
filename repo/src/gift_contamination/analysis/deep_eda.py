@@ -291,7 +291,10 @@ def table_confounds(cfg: Config, roles: list[str]) -> list[dict]:
 
 
 # ---------------------------------- T12/T13/T14: teslimi destekleyen sayilar
-SUMMER = (6, 7, 8, 9)
+#
+# Yaz cukuru aylari `gate1.trough_months`tan okunuyor. Burada ayri bir sabit
+# tutmak iki dogruluk kaynagi demekti: Kapi 1'in esigi bir listeye, teslimin
+# tablosu digerine bakiyordu ve ikisi sessizce ayrisabilirdi.
 
 
 def table_seasonality_summary(cfg: Config, roles: list[str]) -> list[dict]:
@@ -303,13 +306,14 @@ def table_seasonality_summary(cfg: Config, roles: list[str]) -> list[dict]:
     from .keyword_scan import rates_path
     from ..utils.io import read_json
 
+    summer = list(cfg.get("gate1.trough_months"))
     rows = []
     for role in roles:
         by_month = {
             r["month"]: r["proxy_rate"] * 100
             for r in read_json(rates_path(cfg, role))["by_month"]
         }
-        trough = sum(by_month[m] for m in SUMMER) / len(SUMMER)
+        trough = sum(by_month[m] for m in summer) / len(summer)
         rows.append(
             {
                 "category": label(cfg, role),

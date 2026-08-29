@@ -362,7 +362,10 @@ def fig_gift_by_month(cfg: Config, roles: list[str], out: Path) -> Path:
                 label=label(cfg, role))
         viz.direct_label(ax, 12, r[-1], label(cfg, role), viz.ROLE_COLOR[role])
 
-    for m in (12, 1):
+    # Golgelenen aylar config'ten. Once burada (12, 1) yaziliydi ve
+    # `analysis.expected_peaks` hicbir yerden okunmuyordu: birinin o anahtari
+    # duzeltip figurun degismedigini gormesi an meselesiydi (denetim 2026-08-29).
+    for m in cfg.get("analysis.expected_peaks"):
         ax.axvspan(m - 0.4, m + 0.4, color=viz.GRID, alpha=0.55, zorder=0)
     ax.set_xticks(range(1, 13), viz.MONTHS)
     ax.set_xlim(0.4, 13.6)

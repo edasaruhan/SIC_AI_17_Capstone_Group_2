@@ -155,6 +155,14 @@ def _rating_table(rows: list[tuple], classes: list[str]) -> np.ndarray:
     return table
 
 
+KAPPA_DECIMALS = 4
+
+
+def _round(value: float | None) -> float | None:
+    """Rapora yazilan kappa degerleri. `None` gecerli bir sonuc - korunur."""
+    return None if value is None else round(value, KAPPA_DECIMALS)
+
+
 def fleiss(rows: list[tuple], classes: list[str]) -> float | None:
     """Fleiss' kappa. Satir yoksa veya tek sinif kullanildiysa None.
 
@@ -198,6 +206,11 @@ def kappa_report(
     tutulan = [c for c in classes if c not in seyrek]
     kalan = [r for r in rows if not (set(r) & set(seyrek))]
 
+    # Rapora YUVARLANMIS, kapiya HAM deger gidiyor. Ikisini ayirmanin sebebi
+    # tek basina kozmetik degil: 0,59996 gibi bir deger yuvarlanmis haliyle
+    # 0,60 esigini GECERDI. Rapor okunabilir olsun diye yapilan bir islem,
+    # kapinin kararini degistiremez.
+    ham = fleiss(kalan, tutulan)
     return {
         "n_rows": len(rows),
         "n_incomplete_rows": df.height - len(rows),
@@ -205,16 +218,18 @@ def kappa_report(
         "ratings_by_class": kullanim,
         "min_class_n": min_class_n,
         # KAPI degeri bu: seyrek siniflarin gectigi satirlar disarida.
-        "kappa": fleiss(kalan, tutulan),
+        "kappa": _round(ham),
+        # Kapinin karsilastirdigi deger. Yuvarlanmamis.
+        "kappa_exact": ham,
         "n_rows_in_kappa": len(kalan),
         "sparse_classes": seyrek,
         "n_rows_dropped_as_sparse": len(rows) - len(kalan),
         # Seffaflik icin: hicbir sey dislanmadan hesaplanan deger.
-        "kappa_unrestricted": fleiss(rows, classes),
+        "kappa_unrestricted": _round(fleiss(rows, classes)),
         # Bire-karsi-hepsi. Seyrek sinif da burada gorunur - dislanmasi
         # KAPI kararindan, raporlamadan degil.
         "kappa_per_class": {
-            c: fleiss([tuple(x == c for x in r) for r in rows], [True, False])
+            c: _round(fleiss([tuple(x == c for x in r) for r in rows], [True, False]))
             for c in classes
             if kullanim[c] > 0
         },
@@ -334,10 +349,12 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
         df, cols, min_class_n=int(cfg.get("validation.min_class_n_for_kappa"))
     )
     threshold = float(cfg.get("validation.kappa_min"))
+    # Karsilastirma YUVARLANMAMIS deger uzerinden. Bkz. `kappa_report`.
+    exact = kappa["kappa_exact"]
     agreement = {
         **kappa,
         "threshold": threshold,
-        "passed": None if kappa["kappa"] is None else bool(kappa["kappa"] >= threshold),
+        "passed": None if exact is None else bool(exact >= threshold),
     }
 
     df = df.with_columns(consensus(df, cols))
@@ -386,7 +403,8 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
 
     log.info("HAFTA 4 -> %s", report["verdict"])
     log.info("  Fleiss kappa      %s (esik %.2f, %d satir)",
-             kappa["kappa"], threshold, kappa["n_rows_in_kappa"])
+             "hesaplanamadi" if kappa["kappa"] is None else f"{kappa['kappa']:.4f}",
+             threshold, kappa["n_rows_in_kappa"])
     if kappa["sparse_classes"]:
         log.info("  kappa disi sinif  %s (n < %d) - %d satir dusuruldu",
                  ", ".join(kappa["sparse_classes"]), kappa["min_class_n"],

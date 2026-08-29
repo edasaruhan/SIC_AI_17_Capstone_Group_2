@@ -269,3 +269,33 @@ def test_unstamped_labels_cannot_enter_the_measurement(cfg: Config):
 
     with pytest.raises(RuntimeError, match="damgasi tasiyor"):
         load_labels(cfg, 8)
+
+
+def test_the_reported_kappa_is_rounded_but_the_gate_uses_the_exact_value():
+    """Rapor okunabilir olmali; kapi yuvarlamadan ETKILENMEMELI.
+
+    Yuvarlanmis bir deger esigi gecirebilir: 0,59996 -> 0,60. Rapordaki sayi
+    kisa dursun diye yapilan bir islem kapinin kararini degistiremez, o yuzden
+    iki deger ayri tutuluyor.
+
+    Ayrica commit edilen JSON'da 17 basamakli float durmasin: `gate1`in
+    karisiklik siralamasiyla ayni gerekce - diff'te gercek degisiklik gorunsun.
+    """
+    g, s = "gift_given", "self"
+    satirlar = [(g, g, s), (g, s, s), (s, s, g), (g, g, g)]
+
+    rapor = kappa_report(
+        pl.DataFrame(satirlar, schema=["label_A", "label_B", "label_C"], orient="row"),
+        ["label_A", "label_B", "label_C"],
+        min_class_n=0,
+    )
+
+    ham = rapor["kappa_exact"]
+    assert ham is not None
+    assert rapor["kappa"] == pytest.approx(round(ham, 4))
+    # Rapor degeri en fazla 4 basamak; ham deger kirpilmamis olmali
+    assert len(str(rapor["kappa"]).split(".")[-1]) <= 4
+    # Sinif bazli degerler de yuvarlanmis
+    for v in rapor["kappa_per_class"].values():
+        if v is not None:
+            assert len(str(v).split(".")[-1]) <= 4

@@ -2,8 +2,13 @@
 
 **Başlık:** *Bu Benim İçin Değildi: Hediye Alımlarının Öneri Sistemlerindeki Tercih Sinyalini Bozması ve LLM Tabanlı Gürültü Giderme*
 
-**Durum:** Öneri aşaması — ekip onayı bekliyor
 **Kapsam:** AI in Marketing Capstone — Literature Review + Data Research + Technology Review
+
+> **Bu belge PLANDIR, durum raporu değildir.** Öneri aşamasında yazıldı ve o hâliyle
+> duruyor. Uygulama sırasında plandan sapıldığı her yer `DECISIONS.md`'de tarihiyle
+> kayıtlı. **Projenin şu anki durumu ve sıradaki adımlar için
+> [`GENEL_BAKIS.md` §8](GENEL_BAKIS.md)** — bu belgedeki hiçbir cümleyi "bugün böyle
+> çalışıyor" diye okumayın.
 
 ---
 

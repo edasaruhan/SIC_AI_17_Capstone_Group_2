@@ -1,7 +1,19 @@
-# AYRI VENV: venv-llm
-# vLLM + transformers. RecBole ile aynı ortama KURMAYIN.
+# AYRI VENV. vLLM + transformers; RecBole ile ayni ortama KURMAYIN.
+#
+# DIKKAT: Projenin urettigi etiketlerin HICBIRI bu dosyadan kurulmus bir
+# ortamdan gelmedi. LLM annotation Kaggle'da iki T4 uzerinde kosuyor ve orada
+# ortami `scripts/kaggle_annotate.py` kendisi kuruyor (`pip install 'vllm>=0.7'
+# polars pydantic pyyaml ...`). Bu dosya yalnizca yerelde uygun bir GPU'su olan
+# birinin ayni kosuyu denemesi icin duruyor.
+#
+# Yerel kartlar Turing (sm75): bfloat16 ve FlashAttention yok. `detection.dtype`
+# float16 olmak ZORUNDA - bkz. configs/base.yaml.
+
 -r requirements.txt
+
 torch>=2.3
 transformers>=4.48
 accelerate>=0.30
-vllm>=0.6
+# Kaggle betigi ile ayni alt sinir. Ayrisirsa iki taraf farkli vLLM
+# davranisi gorur ve `llm_annotate`in olctugu throughput karsilastirilamaz.
+vllm>=0.7

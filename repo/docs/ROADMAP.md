@@ -2,6 +2,10 @@
 
 **Çalışma başlığı:** *Bu Benim İçin Değildi: Hediye Alımlarının Öneri Sistemlerindeki Tercih Sinyalini Bozması ve LLM Tabanlı Gürültü Giderme*
 
+> **Bu belge PLANDIR, durum raporu değildir.** Öneri aşamasında yazıldı. Uygulamada
+> plandan sapılan yerler `DECISIONS.md`'de tarihiyle kayıtlı; **hangi aşamanın bugün
+> gerçekten çalıştığı [`GENEL_BAKIS.md` §8](GENEL_BAKIS.md)'de.**
+
 ---
 
 ## 1. Düzeltilmiş Gap Analizi (önce bunu okuyun)

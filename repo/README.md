@@ -30,18 +30,29 @@ pip install -e .                                    # python -m gift_contaminati
 cp .env.example .env    # HF_TOKEN ve WANDB_API_KEY (ikisi de opsiyonel)
 ```
 
-LLM ve recsys aşamaları geldiğinde (Hafta 3 ve 6) ayrı ortamlar kurulur:
+**LLM annotation (Hafta 3–5) yerelde koşmuyor.** Kaggle'da iki T4 üzerinde
+koşuyor ve ortamı `scripts/kaggle_annotate.py` kendi kuruyor (vLLM dahil). Elinde
+uygun bir GPU olan biri yerelde denemek isterse `requirements-llm.txt` var, ama
+projenin ürettiği etiketlerin hepsi Kaggle'dan geldi.
+
+**RecBole deneyi (Hafta 6–7) ayrı bir venv istiyor** — `.venv-recbole`. Ayırmak
+tercih değil zorunluluk: RecBole 1.2.0 `np.float_` kullanıyor, numpy 2.0'da o ad
+kaldırıldı; ana ortam numpy 2.5 üzerinde. Pin'lerin her biri ölçülerek bulundu,
+gerekçeleri dosyanın içinde yazıyor.
 
 ```bash
-python -m venv venv-llm    && venv-llm/Scripts/activate    && pip install -r requirements-llm.txt
-python -m venv venv-recsys && venv-recsys/Scripts/activate && pip install -r requirements-recsys.txt
+python -m venv .venv-recbole
+.venv-recbole/Scripts/python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv-recbole/Scripts/python.exe -m pip install -r requirements-recbole.txt
 ```
+
+İki ortam birbirine **dosyayla** bağlı: `data/processed/recbole/…/*.inter`. Ortak
+kod import edilmiyor, o yüzden çakışma da yok.
 
 > **Disk uyarısı.** Dört kategori ham hâlde ~16.3 GB. Proje bir bulut-senkron klasörü
 > (OneDrive/Dropbox) altındaysa `data/raw`'ı senkron dışına alın — Windows'ta bir junction
 > yeterlidir ve config'i değiştirmez:
-> `mklink /J data
-aw D:mazon-reviews-2023`
+> `mklink /J data\raw D:\amazon-reviews-2023`
 
 ## Hızlı başlangıç
 
@@ -49,19 +60,43 @@ Her komut idempotent: çıktı varsa `--force` olmadan yeniden hesaplamaz.
 `--category` değerleri: `pilot` · `high` · `mid` · `low` · `all`.
 
 ```bash
+# Hafta 1-2 — veri, vekil, EDA, örneklem
 python -m gift_contamination.data.download          --category pilot
 python -m gift_contamination.data.preprocess        --category pilot
 python -m gift_contamination.analysis.keyword_scan  --category pilot
 python -m gift_contamination.analysis.eda
+python -m gift_contamination.analysis.deep_eda
+# Örneklem boyutu config'ten gelir (`sampling.n_annotate`) — CLI bayrağı yok
 python -m gift_contamination.data.sampling          --category all
+
+# Hafta 3-5 — etiketleme Kaggle'da koşar (scripts/kaggle_annotate.py),
+# çıktısı data/annotations/ altına indirilir. Sonra:
+python -m gift_contamination.analysis.gate1         --category all
+python -m gift_contamination.analysis.prevalence    --category all
+
+# Hafta 4 — insan doğrulaması (etiketleyen kişi LLM'in cevabını GÖRMEZ)
+python -m gift_contamination.data.sampling   --validation --category all
+python -m gift_contamination.data.labelsheet --validation --export --annotators 3
+#   ... üç kişi kendi xlsx'ini bağımsız doldurur ...
+python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
+python -m gift_contamination.analysis.validation
+
+# Hafta 6 — deney iskelesi (bugün SÖZCÜKSEL VEKİL etiketiyle; çıktı
+# `reportable: false` damgalı). run_experiment .venv-recbole altında koşar.
+python -m gift_contamination.recsys.atomic     --category mid
+python -m gift_contamination.recsys.conditions --category mid --condition all
+PYTHONPATH=src .venv-recbole/Scripts/python.exe \
+  -m gift_contamination.recsys.run_experiment --category mid --condition C0 --model BPR
 ```
 
 Örneklem **üç ayrı çerçeve** üretir ve bu ayrım korunmak zorundadır:
 `sample_frame == 'main'` orantılı katmanlı örnektir ve yaygınlık oranı **yalnızca**
 onun üzerinden hesaplanır. `boost` (anahtar kelimeyle işaretlenmiş havuzdan ek
 pozitifler) ve `boost_received` ("hediye aldım" satırları, zor negatifler) orana
-**katılmaz**. Pilot kategoride karıştırmanın bedeli ölçüldü: gerçek oran %2.13 iken
-havuzlanmış oran %14.42 görünüyor — yedi kat şişme.
+**katılmaz**. Pilot kategoride karıştırmanın bedeli ölçüldü: aynı örneklem içinde
+`main` çerçevesi %2,02 verirken havuzlanmış hâli %14,42 görünüyor — **7,1 kat**
+şişme. (`main`'in kendisi korpusun gerçek oranı %2,13'e yakınsıyor; doğru
+karşılaştırma bu ikisi değil, örneklem içindeki `main` ile havuzlanmış hâlidir.)
 
 Elle doğrulama örneklemi (üretilen CSV birebir review metni taşır, git'e **girmez**):
 
@@ -83,12 +118,18 @@ pytest tests -q
 
 ## Çıktılar
 
+Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış sonuçlar girer.
+
 | Yol | İçerik |
 |---|---|
 | `data/interim/<kategori>_clean.parquet` | verified + min_words + dedup — annotation ve EDA korpusu |
 | `data/interim/<kategori>_kcore.parquet` | + iteratif 5-core — recsys deneyinin korpusu |
-| `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları |
-| `reports/figures/` | F1–F8 figürleri |
+| `data/interim/<kategori>_annotation_sample.parquet` | üç çerçeveli örneklem (main / boost / boost_received) |
+| `data/annotations/<kategori>_llm.parquet` | LLM etiketleri — `evidence_span` birebir metin taşır, **git'e girmez** |
+| `data/annotations/human/` | elle etiketleme sayfaları — birebir metin, **git'e girmez** |
+| `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları ve koşullar (C0–C4) |
+| `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, yaygınlık, deney raporları |
+| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, henüz üretilmedi) |
 | `../data-research/data-research.md` | Data Research teslimi |
 
 ## Veri

@@ -131,7 +131,8 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 
 ## 5. Nerede duruyoruz
 
-**Hafta 1 ve 2 bitti, planın 6 gün önündeyiz.**
+**Hafta 1–3 bitti; Hafta 5'in etiketlemesi de bitti. Hafta 4 (insan doğrulaması)
+insan emeği bekliyor.** Ayrıntılı durum ve sıradaki adımlar için **§8**.
 
 | | |
 |---|---|
@@ -139,7 +140,10 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 | Hediye vekil oranı — Toys_and_Games | **%11,07** |
 | Hediye vekil oranı — Grocery (kontrol) | **%1,85** |
 | Çekilmiş örnek | **47.200** (180 katman) |
-| Geçen test | **136** |
+| LLM ile etiketlenmiş | **47.200** (4 × 11.800) |
+| Ölçülen hediye oranı — Toys / Grocery | **%23,25** / **%4,28** |
+| Kapı 1 | 4 kategoride **PASS (4/4)** |
+| Geçen test | **271** |
 
 ### Hangi veri, ne kadar
 
@@ -205,7 +209,7 @@ hesaplanır), `boost` anahtar kelimeyle işaretlenmiş havuzdan ek pozitifler, v
 `boost_received` "hediye aldım" satırlarından ek zor negatifler. Son ikisi eğitim
 verisini zenginleştirir, **orana girmez**.
 
-> **Ölçülen bedel.** İki çerçeve karıştırılırsa hediye oranı **%2,13 yerine %15,01**
+> **Ölçülen bedel.** Üç çerçeve karıştırılırsa hediye oranı **%2,02 yerine %14,42**
 > görünüyor — yedi kat şişme. Kod hatasız çalışır, sayı makul görünür, tahmin sessizce
 > yanlış çıkar. Bu yüzden ayrım bir testle kilitlendi
 > (`tests/test_sampling.py::test_pooling_the_frames_inflates_the_rate`).
@@ -356,7 +360,101 @@ yayınlanamaz.
 
 ---
 
-## 8. Nereden devam etmeli
+## 8. Şu an ne çalışıyor, sırada ne var
+
+> Bu bölüm **2026-08-29 denetiminde** dosya dosya doğrulandı. "Çalışıyor" yazan
+> her satır ya bir testle ya da o gün gerçekten koşturulmuş bir komutla
+> kontrol edildi; koşturulamayanlar aşağıda ayrıca yazıyor.
+
+### Çalışıyor — doğrulandı
+
+| Aşama | Durum | Nasıl doğrulandı |
+|---|---|---|
+| İndirme, ön işleme (verified → min_words → dedup → 5-core) | 4 kategori | huni sayaçları `reports/results/preprocess_funnel_*.json` |
+| Sözcüksel vekil + EDA (T1–T14, F1–F16) | tamam | `deep_eda` yeniden koşuldu, tablolar **ve** figürler bit düzeyinde aynı çıktı |
+| Üç çerçeveli örnekleme (main / boost / boost_received) | tamam | çerçeve ayrımı testle kilitli; havuzlama bedeli ölçüldü (7,1×) |
+| LLM annotation (Kaggle, 2× T4, vLLM, prompt v3) | 4 × 11.800 satır | dördü de `backend: vllm`, `is_partial: false`, boş kolon yok |
+| **Kapı 1** | 4 kategoride de **PASS (4/4)** | eşikler koşudan önce sabit; `reports/results/gate1_*.json` |
+| **RQ1 yaygınlık tablosu** + F19 | tamam | `prevalence.json`, Wilson GA, iki tanım yan yana |
+| Hafta 4 makinesi (set çekimi → körleme → 3 sayfa → ingest → Fleiss κ) | uçtan uca koştu | 500 gerçek satırda, **sentetik** etiketle, geçici klasörde denendi |
+| RecBole iskelesi (atomic, C0–C4 + C1b) | tamam | `test_conditions`, `test_no_leakage` |
+| Deney koşucusu (BPR, C0/C1/C4) | duman testi geçti | `.venv-recbole`, 5 epoch, tek seed |
+| Test paketi | **271 test geçiyor** | `pytest tests -q` |
+
+### Kısmi
+
+- **Öneri deneyi yalnızca sözcüksel vekille koşuyor.** `build_atomic` bir
+  `labels` parametresi taşıyor ama onu dolduran CLI yolu yok ve hiçbir çağıran
+  vermiyor. Bütün deney çıktıları bu yüzden `label_source: proxy` ve
+  `reportable: false` damgalı — bilinçli bir kilit, arıza değil.
+- **Hafta 4'ün makinesi hazır, insanı yok.** Üç sayfa doldurulmadı; bu
+  yüzden F18 üretilmedi ve `prevalence.json` `human_validated: false` taşıyor.
+
+### Yazılmadı
+
+`detection/distill.py` · `detection/inference.py` · `recsys/marketing_metrics.py`
+Config'te bu aşamalara ait anahtarlar duruyor ve **"⚠️ HENÜZ OKUNMUYOR"** diye
+işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
+
+C2/C3 koşullarının kodu var ama hiç koşulmadı. Çoklu seed ve bootstrap güven
+aralıkları da Hafta 7'de.
+
+### Bilinen sınırlar
+
+- `data/raw` **boş** (~16 GB temizlendi). `download` ve `preprocess` yerelde
+  yeniden koşulamaz; sonraki aşamalar `data/interim/` üzerinden çalışıyor.
+- Yaygınlık sayıları **dil modelinden**; bağımsız insan doğrulaması yok.
+- `gift_given` oranı bir **üst sınır**: deneme koşusunda `household → gift_given`
+  yönünde 14 uyuşmazlık, ters yönde 0.
+- **All Beauty ile Grocery ayrılamıyor** — güven aralıkları örtüşüyor.
+- `confidence` alanı analizden düşürüldü (`low` ≡ `unclear`, %100 örtüşme).
+- Deneme setiyle uyum **F1 olarak raporlanamaz**: prompt tam o satırlar okunarak
+  yazıldı.
+
+---
+
+### Sıradaki adımlar — öncelik sırasıyla
+
+**1 · BLOKLAYAN — insan etiketlemesi (Hafta 4).**
+Üç kişi, 500 satır, bağımsız; sayfalar hazır ve körlenmiş.
+Projenin tek gerçek referansı bu: damıtma, yaygınlık iddiası ve bütün öneri
+deneyi bu ölçümün üstüne kuruluyor. Bitmeden 3, 4 ve 5 başlayamaz.
+
+```bash
+#   ... üç kişi data/annotations/human/validation_500_{A,B,C}.xlsx doldurur ...
+python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
+python -m gift_contamination.analysis.validation
+```
+Kapı: Fleiss κ ≥ 0,60 (2026-08-29'da, sonuç görülmeden sabitlendi).
+
+**2 · EKİP KARARI — `household` kontaminasyon mu?** (Hafta 6'dan önce)
+Toys'ta cevabı %23,25 ile %43,42 arasında değiştiriyor. Kavramsal bir karar,
+veriden çıkmıyor. Kod ikisini de koşuyor (C1 / C1b); rapor bir duruş almalı.
+Ölçüm ikisinin *aynı şey olmadığını* söylüyor: `gift_given` mevsimselliği 1,58×,
+`household` 1,09× (düz).
+
+**3 · UYGULAMA — damıtma ve tam korpus çıkarımı** (Hafta 5)
+`detection/distill.py` + `detection/inference.py`. 47.200 etiket eğitim seti;
+çıktı kcore'un **her** satırı için bir etiket olmalı.
+
+**4 · UYGULAMA — gerçek etiketleri deneye bağlamak**
+`build_atomic`'e `--labels` CLI yolu. Seam hazır: fonksiyon `labels` ve
+`label_source` alıyor, satır sayısı tutmazsa gürültülü hata veriyor. 3 bitmeden
+anlamı yok — 11.800 satırlık örnek kcore'u kapatmıyor.
+
+**5 · DENEY — Kapı 2** (Hafta 6–7)
+Gerçek etiketle C0 / C1 / C1b / C4, tam epoch, 3–5 seed, bootstrap GA.
+`experiment.models`, `experiment.bootstrap_iters` ve `seeds` o zaman okunmaya
+başlar.
+
+**6 · PAZARLAMA METRİKLERİ** (Hafta 8) — M1 / M2 / M3.
+
+**7 · İSTEĞE BAĞLI** — C2/C3 koşulları, GRU4Rec / ItemKNN / Pop, ikincil
+modelle uyum ölçümü. MVP dışı (CLAUDE.md §11); zaman kalırsa.
+
+---
+
+## 9. Nereden devam etmeli
 
 | Ne arıyorsanız | Dosya |
 |---|---|
@@ -367,5 +465,5 @@ yayınlanamaz.
 | Neden şu yerine bu seçildi (tarihli) | [`DECISIONS.md`](DECISIONS.md) |
 | Elle etiketleme yapacaksanız | [`ETIKETLEME_REHBERI.md`](ETIKETLEME_REHBERI.md) |
 
-Buradaki sayılar `reports/results/` altındaki ölçümlerden geliyor ve Hafta 2 sonu
-itibarıyla günceldir.
+Buradaki sayılar `reports/results/` altındaki ölçümlerden geliyor. En son
+2026-08-29 denetiminde doğrulandılar; güncel durum için §8'e bakın.

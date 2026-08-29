@@ -1,5 +1,0 @@
-# AYRI VENV: venv-recsys
-# RecBole kendi torch/numpy pin'lerini getirir, vLLM ile çakışır.
--r requirements.txt
-torch>=2.0
-recbole>=1.2

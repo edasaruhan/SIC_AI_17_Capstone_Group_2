@@ -64,8 +64,8 @@ src/gift_contamination/
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render
     llm_annotate.py      # vLLM batch annotation (veri paralel) + deneme koşusu
-    distill.py           # ModernBERT fine-tune
-    inference.py         # tam korpus inference
+    distill.py           # ⛔ YAZILMADI - ModernBERT fine-tune   (Hafta 5)
+    inference.py         # ⛔ YAZILMADI - tam korpus inference   (Hafta 5)
   analysis/
     keyword_scan.py      # sözcüksel vekil (ölçü çubuğu, detektör değil)
     precision_check.py   # vekilin elle doğrulanması (T4)
@@ -80,12 +80,14 @@ src/gift_contamination/
                          #   İKİSİNİ de yazar, hiçbirini seçmez.
   recsys/
     atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
-                         #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu)
+                         #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu).
+                         #   BUGÜN yalnızca sözcüksel vekille koşuyor - `labels`
+                         #   parametresi var ama dolduran CLI yolu yok (§7)
     conditions.py        # C0–C4 + C1b (gift+household, sağlamlık kontrolü)
-    run_experiment.py    # deney koşucusu            (Hafta 6, RecBole gerekir)
-    marketing_metrics.py # M1, M2, M3                (Hafta 8)
+    run_experiment.py    # deney koşucusu — .venv-recbole altında koşar
+    marketing_metrics.py # ⛔ YAZILMADI - M1, M2, M3              (Hafta 8)
   utils/
-    seeding.py, io.py, logging.py
+    io.py, logging.py
 ```
 
 ---
@@ -294,20 +296,35 @@ etiket istiyor (**4,97M satır**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25
 betimsel eğrilerini keskinleştiriyor ama zorunlu değil — RQ1 `main` çerçevesinden güven
 aralığıyla zaten cevaplanabiliyor. Ters sırada deney 20 saat boşuna bekler.
 
-**Bağımlılık uyarısı:** RecBole'un pin'leri vLLM/torch ile çakışabilir.
-`requirements-llm.txt` ve `requirements-recsys.txt` **ayrı venv'lerde** kurulur.
-Çakışma çözmeye çalışmayın, ayırın.
+**Bağımlılık uyarısı — ölçüldü, varsayım değil.** RecBole 1.2.0 `np.float_`
+kullanıyor; numpy 2.0 o adı kaldırdı ve ana ortam numpy 2.5 üzerinde. Çözmeye
+çalışmayın, **ayırın**: RecBole `.venv-recbole` altına `requirements-recbole.txt`
+ile kurulur (pin gerekçeleri dosyanın içinde). İki ortam yalnızca `.inter`
+dosyaları üzerinden konuşur, ortak kod import etmez.
+
+LLM tarafı yerelde koşmuyor: Kaggle'da, `scripts/kaggle_annotate.py` kendi
+ortamını kurarak. `requirements-llm.txt` yalnızca yerel GPU'su olan biri denemek
+isterse duruyor.
 
 ---
 
-## 7. Komut Arayüzü (hedef sözleşme)
+## 7. Komut Arayüzü
 
-Kod bu arayüze göre yazılmalı. Her adım tek başına yeniden çalıştırılabilir olmalı.
+Her adım tek başına yeniden çalıştırılabilir; çıktı varsa `--force` olmadan
+yeniden hesaplanmaz.
+
+> **Aşağıdaki komutların hepsi BUGÜN çalışır.** Henüz yazılmamış olanlar en
+> altta, ayrı bir blokta ve öyle işaretli. Karışık liste tutmak, hangi adımın
+> gerçekten koşabildiğini belirsiz bırakıyordu (denetim, 2026-08-29).
 
 ```bash
 python -m gift_contamination.data.download      --config configs/base.yaml --category pilot
 python -m gift_contamination.data.preprocess    --config configs/base.yaml --category pilot
-python -m gift_contamination.data.sampling      --config configs/base.yaml --category pilot --n 10000
+python -m gift_contamination.analysis.keyword_scan --config configs/base.yaml --category pilot
+# Örneklem boyutu `sampling.n_annotate` ile config'ten gelir - CLI bayrağı YOK.
+python -m gift_contamination.data.sampling      --config configs/base.yaml --category all
+python -m gift_contamination.analysis.eda       --config configs/base.yaml
+python -m gift_contamination.analysis.deep_eda  --config configs/base.yaml
 python -m gift_contamination.detection.llm_annotate --config configs/base.yaml --category high
 # Kapı 1'in 4. ölçütü: deneme satırları örneğin İÇİNDE DEĞİL, ayrıca etiketlenir
 python -m gift_contamination.data.sampling          --config configs/base.yaml --trial-source 200
@@ -315,9 +332,6 @@ python -m gift_contamination.detection.llm_annotate --config configs/base.yaml -
 python -m gift_contamination.analysis.gate1         --config configs/base.yaml --category high
 # RQ1 tablosu - dört kategori etiketlendikten SONRA
 python -m gift_contamination.analysis.prevalence    --config configs/base.yaml --category all
-python -m gift_contamination.detection.distill  --config configs/base.yaml
-python -m gift_contamination.detection.inference --config configs/base.yaml --category high
-python -m gift_contamination.analysis.descriptive --config configs/base.yaml
 # Hafta 4 - insan doğrulaması. Etiketleyen kişi LLM'in cevabını GÖRMEZ.
 python -m gift_contamination.data.sampling   --config configs/base.yaml --validation
 python -m gift_contamination.data.labelsheet --validation --export --annotators 3
@@ -332,6 +346,27 @@ python -m gift_contamination.recsys.conditions --config configs/base.yaml --cate
 python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
        --category high --condition C0 --model SASRec --seed 42
 ```
+
+**Henüz YAZILMADI — hedef sözleşme.** Aşağıdakiler çalışmaz; modülleri yok.
+Bir komutu buradan yukarıdaki bloğa taşımak, o modülün testleriyle birlikte
+geldiği anlamına gelir.
+
+```bash
+# Hafta 5 — damıtma ve tam korpus çıkarımı
+python -m gift_contamination.detection.distill   --config configs/base.yaml
+python -m gift_contamination.detection.inference --config configs/base.yaml --category high
+# Hafta 8 — pazarlama metrikleri (M1/M2/M3)
+python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
+```
+
+> **`recsys.atomic` bugün YALNIZCA sözcüksel vekille koşuyor.** `build_atomic`
+> bir `labels` parametresi taşıyor ama onu dolduran bir CLI yolu yok ve hiçbir
+> çağıran vermiyor — çıktı bu yüzden `label_source: proxy` damgalı ve
+> `reportable: false`. Gerçek etiketler `detection.inference` tam korpusu
+> etiketledikten sonra gelecek: `build_atomic` kcore'un **her** satırı için
+> etiket bekliyor (satır sayısı tutmazsa gürültülü hata veriyor), yani 11.800
+> satırlık annotation örneği tek başına yetmez. Zincir: Hafta 4 doğrulama →
+> Hafta 5 damıtma + çıkarım → Hafta 6 gerçek deney.
 
 Kurallar:
 - Her komut **idempotent** olmalı; çıktı varsa `--force` olmadan yeniden hesaplamamalı.
@@ -354,7 +389,15 @@ Kurallar:
    `docs/DECISIONS.md`'ye tarih ve gerekçe yazılır.
 10. **pandas ile 10M+ satır okumayın.**
 11. **Hardcode path yazmayın.** Her şey config üzerinden.
-12. **Seed sabitlemeden deney koşmayın.**
+12. **Seed sabitlemeden deney koşmayın.** Yöntem: `seed` config'ten okunur ve
+    **açıkça** geçirilir (`sample(seed=...)`, `default_rng(seed)`,
+    RecBole `init_seed`). Katman/koşul başına türetilen seed'ler
+    `zlib.crc32` ile üretilir — `hash()` DEĞİL: `hash()` `PYTHONHASHSEED`
+    ile süreçten sürece değişir ve "seed 42 ile yeniden üretilebilir"
+    iddiasını sessizce yalanlar (`sampling._stratum_seed`,
+    `conditions._seed_for`). Global `random.seed()` çağıran bir yardımcı
+    **yok**; süreç içinde `os.environ["PYTHONHASHSEED"]` yazmak da işe
+    yaramaz — o değişken yorumlayıcı başlamadan önce okunur.
 
 ---
 

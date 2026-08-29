@@ -333,9 +333,17 @@ canlı bir mesele. İkisi de bu veri hacminde dakikalar içinde eğitiliyor — 
 raporunda *hesaplanarak* yazılıyor, sabit olarak iddia edilmiyor.
 
 **Gerekçe — ölçülen bedel.** Config'teki "ana orana KATILMAZ" notu soyut bir uyarı değil.
-Pilot kategoride iki çerçeve havuzlanırsa oran **%2.13 yerine %15.01** görünüyor: yedi kat
+Pilot kategoride üç çerçeve havuzlanırsa oran **%2,02 yerine %14,42** görünüyor: **7,1 kat**
 şişme. `tests/test_sampling.py::test_pooling_the_frames_inflates_the_rate` bunu sayıyla
 kilitliyor, ki `sample_frame` ayrımını kaldırmaya kalkan biri neyi kaybettiğini görsün.
+
+> **Düzeltme (denetim, 2026-08-29).** Bu paragraf önce "%2.13 yerine %15.01" diyordu.
+> İki hata vardı: (1) %2,13 *korpusun* vekil oranı, %15,01 ise *örneklemin* havuzlanmış
+> oranı — iki farklı popülasyon karşılaştırılıyordu; (2) havuzlanmış oran hiçbir
+> kategoride %15,01 çıkmıyor, ölçülen değer %14,42. Doğru karşılaştırma aynı örneklem
+> içinde: `main` %2,02 → havuzlanmış %14,42. Örneklemin korpusa yakınsaması ayrı bir
+> iddia ve zaten aşağıda duruyor. Şişme dört kategoride: All_Beauty 7,1× · Grocery 7,7× ·
+> Video Games 3,6× · Toys 2,0× (Toys'ta düşük çünkü korpus oranı zaten yüksek).
 
 **Doğrulama.** Dört kategoride `main` çerçevesinin vekil oranı, `clean` korpusun gerçek
 oranına iki standart hata içinde yakınsıyor: All_Beauty %2.02 vs %2.13 · Toys %11.27 vs
@@ -1221,4 +1229,124 @@ ardışık koşu artık **birebir aynı** dosyayı üretiyor. Testi yazıldı.
 **Etkilediği bölüm:** `analysis/prevalence.py` (yeni), `tests/test_prevalence.py`
 (yeni, 14 test), `analysis/gate1.py`, `analysis/validation.py`,
 `tests/test_gate1.py`, CLAUDE.md §2/§6/§10
+**Kim:** Ekip
+
+---
+
+### 2026-08-29 — Tam denetim: kod, config ve belgeler gerçeğe karşı sınandı
+
+Depo baştan sona okundu; her belgelenmiş komut, her config anahtarı ve her ölçüm
+iddiası gerçek koda ve gerçek veriye karşı kontrol edildi. **Bulunan on kusurun
+tamamı düzeltildi.** Sağlam çıkanlar da aşağıda — neyin sınandığını bilmek,
+neyin düzeldiğini bilmek kadar önemli.
+
+#### Doğrulanan sağlamlık
+
+- **271 test geçiyor**; 28 modülün hepsi temiz import ediliyor.
+- **Bit düzeyinde yeniden üretilebilirlik:** `deep_eda` yeniden koşuldu; 11 tablo
+  ve 8 figürün **hepsi** bayt bayt aynı çıktı, çalışma ağacı tertemiz kaldı.
+- **Hafta 4 zinciri uçtan uca koştu** — 500 gerçek satırda, sentetik etiketle,
+  geçici klasörde: `export → doldur → ingest → Fleiss κ → rapor`. Üç kişi 12 saat
+  harcamadan önce boru hattının çalıştığı biliniyor.
+- Kod hijyeni: çıplak `except` yok, mutable default yok, sessiz `pass` yok,
+  `TODO/FIXME/HACK` yok, commit edilmiş sır yok.
+- 17 belgelenmiş komuttan 13'ü sorunsuz; kalan 4'ü aşağıda.
+
+#### Düzeltilen kusurlar
+
+**1 · README'deki `mklink` komutu bozuktu — dosyada kontrol karakteri vardı.**
+Heredoc içinde yazılırken `\r` ve `\a` kaçışları yorumlanmış: `data\raw` →
+`data<CR>aw`, `D:\amazon` → `D:<BEL>mazon`. Komut kopyalanamaz hâldeydi ve dosya
+bir BEL karakteri taşıyordu. Bu depoda tekrarlayan bir tuzak; düzeltme bu kez
+kabuk üzerinden değil, ayrı bir Python dosyasıyla yapıldı.
+
+**2 · CLAUDE.md olmayan bir bayrak belgeliyordu.**
+`data.sampling --n 10000` — böyle bir bayrak yok, komut `unrecognized arguments`
+ile düşüyor. Örneklem boyutu config'ten (`sampling.n_annotate`) geliyor.
+
+**3 · CLAUDE.md olmayan bir modül belgeliyordu.** `analysis.descriptive` hiç
+yazılmadı; karşılığı `analysis.eda` (+ `deep_eda`). Komut listesi ayrıca
+yazılmış olanlarla yazılmamışları karışık tutuyordu; **ikiye ayrıldı** ve
+yazılmamışlar açıkça öyle işaretlendi.
+
+**4 · `requirements-recsys.txt` kurulduğunda ÇALIŞMAYAN bir ortam üretiyordu.**
+İçindeki `-r requirements.txt` `numpy>=1.26`'yı sınırsız bırakıyor, yani numpy
+2.x çekiliyor; RecBole 1.2.0 ise `np.float_` kullanıyor ve o ad numpy 2.0'da
+kaldırıldı. Dosya `requirements-recbole.txt` tarafından zaten geçersiz kılınmıştı
+(ölçülmüş pin'lerle, `.venv-recbole` altında çalıştığı doğrulandı: numpy 1.26.4,
+recbole 1.2.0, torch 2.13.0+cpu). **Silindi**, README ve CLAUDE.md yeniden
+yönlendirildi.
+
+**5 · `requirements-llm.txt` hiç kullanılmayan bir ortamı anlatıyordu.**
+Etiketlerin hiçbiri ondan gelmedi: LLM Kaggle'da koşuyor ve ortamı
+`scripts/kaggle_annotate.py` kendisi kuruyor. Dosya silinmedi (yerel GPU'su olan
+biri için geçerli) ama **rolü yazıldı** ve `vllm` alt sınırı Kaggle betiğiyle
+hizalandı (`>=0.6` → `>=0.7`).
+
+**6 · `utils/seeding.py` ölü koddu — ve içindeki düzeltme işe yaramıyordu.**
+Hiçbir yerden çağrılmıyordu. Dahası `os.environ["PYTHONHASHSEED"] = ...` satırı
+**süreç içinde etkisizdir**; o değişken yorumlayıcı başlamadan okunur. Yani modül
+var olmayan bir garanti ima ediyordu. Projenin gerçek yöntemi zaten farklı ve
+doğru: `seed` config'ten açıkça geçiriliyor, türetilmiş seed'ler `zlib.crc32`
+ile üretiliyor (`hash()` `PYTHONHASHSEED` ile değişir). Modül **silindi**,
+CLAUDE.md §8 kural 12 yöntemi anlatacak şekilde genişletildi.
+
+**7 · Config'te ölü anahtarlar vardı — ve biri ölçüme dokunuyordu.**
+`analysis.expected_peaks` DECISIONS'ta "ölçüme göre düzeltildi" diye kayıtlıydı
+ama **hiçbir yerden okunmuyordu**; `eda.py` aynı değeri kendi içinde `(12, 1)`
+olarak taşıyordu. Aynı şekilde `deep_eda.SUMMER = (6,7,8,9)`,
+`gate1.trough_months`un kopyasıydı. Birisi config'i düzeltip figürün
+değişmediğini görecekti. İkisi de config'ten okunur hâle getirildi; çıktının
+**bayt bayt aynı kaldığı** doğrulandı. `dataset.meta_prefix` ve
+`analysis.seasonality_months` gerçekten karşılıksızdı, silindi. Geri kalanlar
+(Hafta 5/7 anahtarları) config'in kendi kuralına göre **"⚠️ HENÜZ OKUNMUYOR"**
+diye işaretlendi.
+
+**8 · Ölü anahtarın geri gelmesini engelleyen test yazıldı.**
+`tests/test_config_keys.py`: her yaprak anahtar ya kodda okunuyor ya da
+işaretli olmalı. Test yazılır yazılmaz bir eksik yakaladı —
+`detection.secondary_sample_n`'in notu "aşağıdaki **iki** anahtar" diye düz yazı
+olduğu için makine çözemiyordu; işaret her anahtarın kendi satırına taşındı.
+
+**9 · Ölçülen bir sayı iki belgede yanlıştı.**
+"Çerçeveleri havuzlamanın bedeli" üç belgede geçiyordu ve ikisinde **%15,01**
+yazıyordu — hiçbir kategoride çıkmayan bir değer. Ayrıca karşılaştırma iki farklı
+popülasyonu yan yana koyuyordu: %2,13 *korpusun* oranı, havuzlanmış oran ise
+*örneklemin*. Yeniden ölçüldü: aynı örneklem içinde `main` **%2,02** →
+havuzlanmış **%14,42**, yani **7,1×**. Dört kategoride: All_Beauty 7,1× ·
+Grocery 7,7× · Video Games 3,6× · Toys 2,0×. README, GENEL_BAKIS ve DECISIONS
+düzeltildi; DECISIONS'a ne değiştiği ayrıca yazıldı.
+
+**10 · Fleiss κ commit edilen JSON'a 17 basamaklı float olarak yazılıyordu.**
+Rapor değeri 4 basamağa yuvarlandı — ama **kapı ham değeri karşılaştırmaya devam
+ediyor**, ayrı bir `kappa_exact` alanı üzerinden. Yuvarlanmış bir değerle
+karşılaştırmak 0,59996'yı 0,60 eşiğinden geçirirdi; okunabilirlik için yapılan
+bir işlem kapının kararını değiştiremez. Testi yazıldı.
+
+#### Belgelenen sınırlar (düzeltilmedi, kayda geçti)
+
+- **Öneri deneyi henüz gerçek etiketle koşamıyor.** `build_atomic` bir `labels`
+  parametresi taşıyor ama onu dolduran CLI yolu yok ve hiçbir çağıran vermiyor.
+  Bu bir eksiklik, arıza değil: zincir Hafta 4 doğrulaması → Hafta 5 damıtma +
+  tam korpus çıkarımı → Hafta 6 gerçek deney. 11.800 satırlık annotation örneği
+  tek başına yetmiyor; `build_atomic` kcore'un **her** satırı için etiket
+  istiyor ve tutmazsa gürültülü hata veriyor.
+- `data/raw` boş (~16 GB temizlendi); `download` ve `preprocess` yerelde yeniden
+  koşulamıyor. Sonraki aşamalar `data/interim/` üzerinden çalışıyor.
+- `detection/distill.py`, `detection/inference.py`, `recsys/marketing_metrics.py`
+  yazılmadı. Config'teki karşılıkları işaretli.
+
+#### Belgelerde yapılan yapısal değişiklik
+
+`GENEL_BAKIS.md`'ye **§8 "Şu an ne çalışıyor, sırada ne var"** eklendi: neyin
+doğrulandığı, neyin kısmi, neyin yazılmadığı, bilinen sınırlar ve **öncelik
+sırasıyla sıradaki adımlar**. `PROJECT_SPEC.md` ile `ROADMAP.md`'ye "bu belge
+PLANDIR, durum raporu değildir" uyarısı kondu — SPEC'in durum satırı hâlâ "ekip
+onayı bekliyor" diyordu.
+
+**Etkilediği bölüm:** `README.md`, `CLAUDE.md` (§2/§6/§7/§8), `configs/base.yaml`,
+`docs/GENEL_BAKIS.md` (§5/§8/§9), `docs/PROJECT_SPEC.md`, `docs/ROADMAP.md`,
+`analysis/eda.py`, `analysis/deep_eda.py`, `analysis/validation.py`,
+`tests/test_config_keys.py` (yeni), `tests/test_validation.py`;
+`requirements-recsys.txt` ve `utils/seeding.py` **silindi**
 **Kim:** Ekip
