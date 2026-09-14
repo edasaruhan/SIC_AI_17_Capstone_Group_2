@@ -125,6 +125,16 @@ distill:
   batch_size: 32
   lr: 3.0e-5
   val_fraction: 0.1
+  # SADAKAT KAPISI — 2026-09-14'te, HİÇBİR MODEL EĞİTİLMEDEN yazıldı. Deneyin
+  # kullandığı iki ikili karar üzerinden ölçülür, beş sınıflı makro-F1 üzerinden
+  # değil: C1 `gift_given`'ı, C1b `gift_given`+`household`+`received`'ı çıkarıyor.
+  # 0,85 bir yargı: damıtma bu kararlara %15'ten fazla F1 kaybı eklemesin.
+  # ModernBERT geçemezse `fallback_model` bir kez denenir; o da geçemezse deney
+  # DURUR. Bkz. DECISIONS 2026-09-14.
+  fidelity:
+    c1_axis_f1_min: 0.85          # öğrenci vs öğretmen, ayrılmış %10
+    c1b_axis_f1_min: 0.85         # öğrenci vs öğretmen, ayrılmış %10
+    max_drop_vs_teacher_on_human: 0.05   # öğrenci vs insan C1 F1'i, öğretmeninkinden en fazla bu kadar düşük
 
 experiment:
   conditions: [C0, C1, C4]                   # MVP. C2/C3 sonra.
@@ -146,6 +156,21 @@ experiment:
     freeze_universe_on: C0                   # DEĞİŞTİRİLEMEZ
   # ⚠️ HENÜZ OKUNMUYOR. Bootstrap güven aralıkları Hafta 7.
   bootstrap_iters: 1000
+
+# ⚠️ BU BLOĞUN TAMAMI HENÜZ OKUNMUYOR — önceden kayıt; okuyan kod Faz 4'te.
+# Kapı 2 — deneyin KURULUMU geçerli mi? ETKİYİ ölçmez. Eşikler 2026-09-14'te,
+# HİÇBİR DENEY KOŞUSU YAPILMADAN yazıldı (Kapı 1 ile aynı disiplin). Kategori ×
+# model başına dört ölçüt; biri eksikse karar INCOMPLETE:
+#   1. test (kullanıcı, ürün) çiftleri bütün koşullarda birebir aynı (hash)
+#   2. her koşulun gerçek ürün evreni C0'ın alt kümesi (gölge sonek soyulup)
+#   3. plasebo taban çizgisini geçmiyor: (C4 − C0) ve (C4b − C0) kullanıcı başı
+#      Recall@10 farkının eşli bootstrap GA'sının alt ucu <= 0
+#   4. C0 Recall@10'un seed'ler arası değişim katsayısı < seed_cv_max
+gate2:
+  metric: Recall@10
+  bootstrap_n: 2000
+  ci: 0.95
+  seed_cv_max: 0.10
 
 analysis:
   # ÖLÇÜLDÜ (data-research §4.5, T14): tepe dört kategoride de Aralık-Ocak.
@@ -186,7 +211,23 @@ gate1:
 # GÖRÜLMEDEN sabitlendi (Kapı 1'in eşikleriyle aynı disiplin).
 validation:
   n: 500
+  # GEÇİŞ: özgün tasarım (üç sayfa bu sayıyla üretildi). Faz 1'de okuyan kod
+  # `annotators` listesine geçince bu anahtar silinir.
   n_annotators: 3
+  # Etiketi TOPLANAN etiketleyiciler. Tasarım üç kişiydi (A, B, C); yalnızca A
+  # teslim etti (2026-09-14). Sayfalar üç harfle üretildi ve öyle kalıyor —
+  # burada yalnızca okunacak olanlar yazılı. Bkz. DECISIONS 2026-09-14.
+  annotators: [A]      # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
+  # Etiket güvenilirliği ölçüldü mü. `none` -> Hafta 4 kapısı INCOMPLETE kalır,
+  # asla PASS yazılmaz. Başka bir değer (ör. inter/intra) henüz uygulanmadı ve
+  # verilirse kod gürültülü hata verir. Kullanıcı kararı, 2026-09-14.
+  reliability: none    # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
+  # Ölçüm yöntemi (2026-09-14, A'nın etiketleri modelle karşılaştırılmadan ÖNCE):
+  # ters olasılık ağırlığında bu değerin altındaki (kategori × LLM sınıfı)
+  # hücresinin kütlesi o sınıfın bütün kategorilerine dağıtılır; kalibrasyonda
+  # `main` satırı bu değerden az olan sınıf tüm çerçevelere düşer.
+  min_cell_n: 5       # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
+  bootstrap_n: 2000   # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
   # LLM ETİKETİNE göre katmanlı — sözcüksel vekile göre değil. Bu bir yaygınlık
   # örneği DEĞİL: `household` ve `received` bilerek fazla temsil ediliyor.
   # Gerekçe ölçüldü (2026-08-29 deneme koşusu): uyuşmazlıkların %42'si tek yönde,

@@ -474,24 +474,28 @@ Bunlar henüz kararlaştırılmadı. Claude Code bunları **kendi kafasına gör
 karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazsın.
 
 - [ ] **TBD** Örnekleme boyutu kesin sayı: 40K mı 60K mı (pilot sonucuna göre)
-- [ ] **TBD** C2'de kullanılacak nihai ağırlık(lar) — üçünü de mi koşacağız yoksa biri mi
-- [ ] **TBD** C3'ün RecBole'da nasıl implement edileceği (feature olarak mı, ayrı token mı)
-- [ ] **TBD** **`household` C1'e girecek mi — KAVRAMSAL karar, Hafta 6 öncesi.**
-  Kayıt eskiden "kappa sonucuna bağlı" diyordu; 2026-08-29'da bağımlılık değişti.
-  κ sınıfın *ayırt edilebilir* olduğunu söyler, *kontaminasyon sayılacağını* değil.
-  Projenin kendi tanımı *"alan kişi ürünü kendisi için seçmedi"* — bu tanıma göre
-  kendi çocuğuna alınan oyuncak da kontaminasyondur.
-  **Ölçüldü (2026-08-29):** `household` `main` çerçevesinin **%20,17'si**. C1 ya
-  %23,3 ya %43,4 etkileşim çıkarıyor — iki kat fark. İki sınıfın zaman imzası ayrı:
-  `gift_given` 1,58× mevsimsel, `household` **1,09×** yani düz. Sınırı çizen şey
-  vesile (`recipient=child`'da `household`'un %99'u `occasion=none`).
-  **Kod ikisini de koşabilir olacak:** C1 (yalnızca `gift_given`) birincil,
-  C1b (+`household`) sağlamlık kontrolü. Aynı kod yolu, farklı süzgeç — karar
-  sonuca göre değil, sonuç her iki tanım altında raporlanır
-- [ ] **TBD** **`received` sınıfının C1'de silinip silinmeyeceği.** Şema v3 (2026-08-27)
-  beşinci sınıfı ekledi ama C1'in tanımı hâlâ yalnızca `gift_given` diyor. Aynı soru,
-  aynı gerekçe: alan kişi ürünü kullanıyor ama seçmedi. `household` ile birlikte
-  karara bağlanmalı
+- [x] ~~**TBD** C2'de kullanılacak nihai ağırlık(lar)~~ → **KAPSAM DIŞI 2026-09-14.**
+  C2 uygulanmadı ve çağrılırsa açık hata veriyor. Önceki kod bir `weight` kolonu
+  ekliyordu ama hiçbir şey onu okumuyordu — koşulsa C0'ın aynısı "C2" diye
+  raporlanırdı. RQ3 C3 ile cevaplanıyor. Gerekçe: DECISIONS 2026-09-14
+- [x] ~~**TBD** C3'ün RecBole'da nasıl implement edileceği~~ → **KARARLAŞTI 2026-09-14:
+  AYRI TOKEN.** Eğitimdeki `gift_given` satırlarının ürünü `<id>::gift` olur,
+  valid/test'e dokunulmaz, değerlendirmede gölge ürünler maskelenir. Feature
+  yaklaşımı hediye ürününü eğitimde tahmin HEDEFİ bırakırdı ve kirlilik çıkış
+  katmanından geri sızardı. C3, C1 ile aynı etiket kümesini kullanır.
+  Gerekçe: DECISIONS 2026-09-14
+- [x] ~~**TBD** `household` ve `received` C1'e girecek mi~~ → **KARARLAŞTI 2026-09-14
+  (kullanıcı).** **C1 birincil** = yalnızca `gift_given` (literatürdeki hediye).
+  **C1b sağlamlık** = `gift_given` + `household` + `received` ("alıcı ürünü kendisi
+  seçmedi"). C1b'nin kendi plasebosu **C4b** (C1b kadar rastgele satır) — C1b
+  C1'in yaklaşık iki katı satır çıkardığı için C4'le karşılaştırılamaz. İkisi de
+  raporlanır. Ölçülen arka plan (2026-08-29): `household` `main`'in %20,17'si;
+  `gift_given` 1,58× mevsimsel, `household` 1,09× (düz). Gerekçe: DECISIONS 2026-09-14
+- [x] ~~**TBD** Hafta 4 etiketleyici sayısı~~ → **2026-09-14: TEK ETİKETLEYİCİ (A).**
+  B ve C teslim etmedi; kullanıcı güvenilirliğin ayrıca ölçülmemesine karar verdi.
+  Hafta 4 kapısı **INCOMPLETE** kalır (PASS yazılmaz), proje tarihli kararla
+  ilerler, sınırlılık olarak raporlanır. Bütün ölçüm yöntemleri A'nın etiketleri
+  modelle karşılaştırılmadan önce kaydedildi. Gerekçe: DECISIONS 2026-09-14
 - [x] ~~**TBD** κ eşiği 5 sınıfta hâlâ 0.60 mı?~~ → **KARARLAŞTI 2026-08-29.**
   **0,60'ta kaldı.** κ sınıf sayısıyla düşme eğiliminde diye eşiği peşinen düşürmek,
   kapıyı koşudan önce gevşetmenin başka bir biçimi olurdu. Bunun yerine iki kural,

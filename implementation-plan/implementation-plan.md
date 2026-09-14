@@ -326,6 +326,17 @@ Oversight is built into the pipeline as gates rather than added as review:
 | Confidence threshold | Team selects the operating point | Full — the threshold is a business control, not a constant |
 | Result interpretation | Team decides what the evidence supports | Full |
 
+> **Deviation recorded 2026-09-14.** Only one of the three planned annotators completed
+> the 500-item validation set. Inter-annotator agreement therefore cannot be computed, and
+> the team decided not to substitute an intra-annotator re-test. The Week-4 agreement gate
+> is recorded as **INCOMPLETE — not passed and not failed** — and the pipeline proceeds by
+> that dated decision. No F1 threshold was ever fixed (by design: fixing one after seeing
+> results would be a post-hoc gate), so the phrase "agreement or F1 thresholds" above no
+> longer describes a live control. Class-level F1 against the single annotator is still
+> reported, with bootstrap confidence intervals, and single-annotator labelling is stated as
+> a limitation. All measurement methods were registered before the annotator's labels were
+> compared with the model's. Details: `repo/docs/DECISIONS.md`, entry 2026-09-14.
+
 **The confidence threshold deserves emphasis** because it is where automation should stop and judgement should begin. A production deployment could suppress personalisation only above a chosen threshold, trading coverage against precision. That is a business decision with a customer-experience cost on both sides — over-suppression degrades personalisation for people who made no gift purchase; under-suppression leaves contamination in place. We report the precision–coverage curve so that a human can choose, rather than embedding a default.
 
 ### 5.5 Avoiding harmful or misleading marketing outputs

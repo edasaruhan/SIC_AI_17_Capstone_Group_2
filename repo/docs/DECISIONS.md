@@ -1350,3 +1350,156 @@ onayı bekliyor" diyordu.
 `tests/test_config_keys.py` (yeni), `tests/test_validation.py`;
 `requirements-recsys.txt` ve `utils/seeding.py` **silindi**
 **Kim:** Ekip
+
+---
+
+### 2026-09-14 — Hafta 4 tek etiketleyiciyle kapanıyor: sapma kaydı ve ÖNCEDEN kayıt
+
+> **Bu kayıt, A'nın etiketleri modelin etiketleriyle karşılaştırılmadan ÖNCE
+> commit edildi.** A'nın dosyasına yalnızca bütünlük için bakıldı: satır sayısı,
+> kimlikler, sözlük dışı etiket, metnin değişip değişmediği, marjinal etiket
+> dağılımı ve notlar. LLM etiketiyle tek bir satır bile birleştirilmedi. Aşağıdaki
+> her yöntem ve eşik o yüzden "sonucu görmeden" yazılmış sayılır.
+
+#### Ne oldu
+
+Hafta 4'ün tasarımı üç bağımsız etiketleyici ve Fleiss κ ≥ 0,60 kapısıydı
+(2026-08-26, 2026-08-29). **Yalnızca A** 500 satırı etiketledi; B ve C
+yapmayacak. A'nın dosyası 2026-09-14 02:28'de teslim edildi.
+
+Bütünlük kontrolü: **500/500 dolu** · başlıklar ve `val_id` kümesi bozulmamış ·
+metin hiçbir satırda değişmemiş · sözlük dışı etiket yok · dağılım `household`
+170 · `self` 144 · `gift_given` 129 · `unclear` 46 · `received` 11 · 131 satırda
+not var, **hepsi "kendi çocuğu"** (rehberin istediği `KENDI_COCUGU` kodu değil) ·
+`EMIN_DEGIL` hiç kullanılmamış.
+
+#### Karar — güvenilirlik ölçülmeyecek
+
+2026-08-26 kaydı tek kişi senaryosu için bir yedek adlandırmıştı:
+**intra-annotator agreement** (aynı kişinin bir alt kümeyi yeniden etiketlemesi).
+Kullanıcı 2026-09-14'te bunu da, ikinci bir etiketleyiciyi de **uygulamama**
+kararı verdi.
+
+Sonuçları:
+
+1. **Hafta 4 kapısı INCOMPLETE kalır — PASS yazılmaz, FAIL da yazılmaz.**
+   Ölçülmemiş bir ölçüt `passed: null` taşır; bu projede atlanmış bir ölçüt hiçbir
+   zaman geçmiş sayılmadı (Kapı 1'le aynı kural).
+2. Proje bu **tarihli kararla** ilerliyor. CLAUDE.md §12'nin başarı ölçütü V1
+   ("LLM ile insan etiketi arasında sınıf bazlı F1 raporlanabiliyorsa") tek
+   etiketleyiciyle **karşılanabilir**; κ ise karşılanamaz.
+3. Raporda sınırlılık olarak: tek kişinin yargısı referans; etiket gürültüsü
+   ölçülmedi; A belirsizlik işareti hiç kullanmadı.
+4. ROADMAP §11'deki "κ < 0,6 → `household`'ı `unclear` ile birleştir" yedeği ile
+   rehber/`validation.py`'deki "`household` ile `gift_given` birleşir" ifadesi
+   çelişiyordu. **İkisi de artık tetiklenemez** — κ ölçülmeyecek. Tek
+   etiketleyicinin sonucuna bakılarak şema değiştirilmeyecek.
+
+#### ÖNCEDEN KAYIT — Hafta 4 ölçüm yöntemi (eşik YOK)
+
+- **Referans:** A'nın etiketi. Uzlaşı / beraberlik adımı yok.
+- **Örneklem düzeyi (500 satır, ağırlıksız):** sınıf bazlı P/R/F1, makro-F1,
+  doğruluk, yön yön uyuşmazlık. Doğrulama LLM etiketine göre **bilerek dengesiz**
+  çekildi; bu sayılar `household`/`gift_given` yönünde yanlıdır ve öyle etiketlenir.
+- **Popülasyon düzeyi (yalnızca `main` satırları, n=339, ters olasılık ağırlıklı):**
+  (kategori c, LLM sınıfı k) hücresindeki bir satırın ağırlığı
+  `N_main(c,k) / n_doğrulama_main(c,k)`. `n_doğrulama_main(c,k) < 5` olan hücrenin
+  popülasyon kütlesi, o sınıfın **bütün kategorilerdeki** doğrulama `main`
+  satırlarına eşit bölünür. Hiç doğrulama satırı olmayan sınıfın kütlesi
+  "kapsanmayan pay" olarak ayrıca yazılır. Popülasyon: dört kategorinin `main`
+  çerçeveleri (kategori başına 10.000, yani eşit ağırlık — RQ1'le tutarlı).
+- **Güven aralığı:** yüzdelik bootstrap, 2.000 tekrar, `seed` config'ten; satırlar
+  (kategori × LLM sınıfı) hücreleri içinde yeniden örneklenir. Hem ağırlıksız hem
+  ağırlıklı ölçümler için.
+- **Az örnekli sınıf:** insan sayısı `min_class_n_for_kappa` (20) altındaki sınıf
+  raporda `sparse: true` işaretlenir (öngörülen: `received`, n=11). Hesaptan
+  çıkarılmaz, işaretlenir.
+- **`KENDI_COCUGU`:** "kendi çocuğu" notu ingest'te koda normalize edilir; ham not
+  ayrıca saklanır. İşaretli satırlarda A'nın ve LLM'in etiket dağılımı raporlanır.
+- **Sözcüksel vekil vs insan:** mevcut hediye ekseni ölçümü, değişmeden.
+
+#### ÖNCEDEN KAYIT — insan kalibrasyonlu yaygınlık (RQ1)
+
+Doğrulama LLM etiketine göre katmanlı çekildiği için her LLM sınıfının "insanın
+gözünde gerçekte ne olduğu" tahmin edilebilir. Tanım D için
+(dar = `gift_given`; geniş = `gift_given` + `household` + `received`):
+
+- `PPV_k^D = P(A'nın etiketi ∈ D | LLM etiketi = k)` — `main` satırlarından,
+  kategoriler havuzlanarak (`main` satır sayıları: `gift_given` 62 · `household`
+  104 · `received` 19 · `self` 100 · `unclear` 54).
+- `düzeltilmiş oran_c^D = Σ_k pay_main,c(k) · PPV_k^D`.
+- Bir sınıfın `main` doğrulama satırı 5'ten azsa o sınıf için tüm çerçevelerin
+  satırları kullanılır ve işaretlenir (şu an hiçbir sınıf bu durumda değil).
+- GA: 2.000 bootstrap; PPV için doğrulama satırları LLM sınıfı içinde, paylar için
+  `main` satırları kategori içinde yeniden örneklenir.
+- **Varsayım** (PPV kategoriden bağımsız) Toys'un kendi `main` satırlarıyla
+  sınanır ve raporlanır; seçim için kullanılmaz. 500 satırın tamamıyla hesaplanan
+  PPV duyarlılık analizi olarak yazılır.
+- `DEFINITIONS["broad"]`'a `received` eklenir (aşağıdaki C1b tanımıyla tutarlı).
+
+#### ÖNCEDEN KAYIT — damıtma sadakat kapısı (eğitimden önce)
+
+- Öğrenci vs öğretmen, katmanlı ayrılmış %10 LLM etiketi üzerinde:
+  **C1 ekseni** (`gift_given` vs geri kalan) F1 ≥ **0,85** **ve**
+  **C1b ekseni** (`gift_given`∪`household`∪`received` vs geri kalan) F1 ≥ **0,85**.
+- Öğrenci vs insan (500 doğrulama satırı — eğitimden **dışlanır**): öğrencinin C1
+  ekseni F1'i, öğretmeninkinden en fazla **0,05** düşük.
+- Ayrılmış kümenin 5-core'a düşen kısmında aynı sayılar ayrıca raporlanır, kapıya
+  girmez (clean → 5-core dağılım kaymasının ölçümü).
+- ModernBERT geçemezse DeBERTa-v3 bir kez denenir; o da geçemezse deney **durur**
+  ve karar kullanıcıya döner.
+- 0,85 bir yargıdır ve öyle kaydediliyor: damıtmanın deneyin kullandığı ikili
+  kararlara %15'ten fazla F1 kaybı eklememesi.
+
+#### ÖNCEDEN KAYIT — Kapı 2 (deney koşularından önce)
+
+Kurulum geçerliliği ölçer, **etkiyi ölçmez**. Kategori × model başına:
+
+1. Test (kullanıcı, ürün) çiftleri bütün koşullarda **birebir aynı** (hash).
+2. Her koşulun gerçek ürün evreni C0'ın **alt kümesi** (gölge sonek soyulup).
+3. **Plasebo taban çizgisini geçmiyor:** kullanıcı başı Recall@10 farkının
+   (C4 − C0) eşli bootstrap %95 GA'sının alt ucu ≤ 0. Aynısı C4b − C0 için.
+   Rastgele veri silmenin anlamlı iyileştirme getirmesi kurulum hatasına işaret.
+4. **Seed kararlılığı:** C0 Recall@10'un seed'ler arası değişim katsayısı < 0,10.
+
+Karar deseni Kapı 1'le aynı: eksik koşu/seed varsa INCOMPLETE.
+
+#### Koşul tanımları (CLAUDE.md §13 TBD'leri kapanıyor)
+
+| kod | ne yapar | rol |
+|---|---|---|
+| C0 | bütün etkileşimler | taban |
+| **C1** | `gift_given` eğitimden çıkar | **birincil** (RQ2) |
+| C4 | C1 kadar rastgele satır çıkar | C1'in plasebosu |
+| **C3** | `gift_given` satırları eğitimde **gölge token** olur | **RQ3** |
+| C1b | `gift_given` + `household` + `received` çıkar | sağlamlık |
+| C4b | C1b kadar rastgele satır çıkar | C1b'nin plasebosu |
+| C2 | — | **uygulanmadı**; çağrılırsa açık hata |
+
+- **`household` ve `received`:** kavramsal karar kullanıcıda (2026-09-14). Birincil
+  tanım literatürdeki hediye (`gift_given`); "alıcı ürünü kendisi seçmedi" tanımı
+  (C1b) sağlamlık kontrolü. İkisi de raporlanır.
+- **C4b neden var:** C1b, C1'in yaklaşık iki katı satır çıkarıyor. C1b'yi C4'le
+  karşılaştırmak iki farklı veri kaybını karıştırırdı.
+- **C3 — "feature mı, ayrı token mı" → AYRI TOKEN.** Eğitim bölümündeki
+  `gift_given` satırlarının `item_id`'si `<id>::gift` olur; valid/test satırlarına
+  dokunulmaz; değerlendirmede gölge ürünlerin skoru `-inf` yapılır. Gerekçe:
+  bayrağı feature olarak eklemek hediye ürününü eğitimde **tahmin hedefi**
+  bırakırdı — kirlilik çıkış katmanından öneri listesine geri sızardı. Gölge token
+  hediye olayını sekansta tutar ama gerçek ürünün ne gömülmesini ne hedefini
+  kirletir. Bedeli: gölge ile gerçek ürün gömülmesi bilgi paylaşmaz. C3, C1 ile
+  **aynı etiket kümesini** kullanır (RQ3 "silmek mi söylemek mi" karşılaştırması).
+- **C2:** mevcut kod bir `weight` kolonu ekliyordu ama hiçbir şey onu okumuyordu;
+  koşulsa C0'ın aynısı eğitilir ve "C2" diye raporlanırdı. `NotImplementedError`
+  ile kilitleniyor.
+
+#### Analiz karşıtlıkları (yön ne çıkarsa çıksın raporlanır)
+
+- **RQ2:** C1 − C4 (asıl), C1 − C0 · doz–yanıt: Toys etkisi vs Grocery etkisi
+- **RQ3:** C3 − C1, C3 − C0
+- **Sağlamlık:** C1b − C4b
+- Hepsi seed'ler üzerinden ortalanmış kullanıcı başı metriklerle **eşli bootstrap**.
+
+**Etkilediği bölüm:** `configs/base.yaml` (`validation`, `distill.fidelity`,
+`gate2`, `experiment.conditions`), CLAUDE.md §13, `implementation-plan.md` §5.4
+**Kim:** Kullanıcı (kararlar) · Ekip
