@@ -308,3 +308,86 @@ def test_calibration_is_skipped_not_invented_without_labels(annotated: Config):
     kal = evaluate(annotated, ["pilot"])["calibration"]
 
     assert kal == {"skipped": True, "reason": "dogrulama etiketleri henuz yok"}
+
+
+def test_the_post_hoc_sensitivity_is_separate_and_labelled(cfg: Config):
+    """Sonuc goruldukten sonra eklenen analiz BIRINCIL sayinin yerine gecmemeli.
+
+    Ayri blokta durmali, `post_hoc: true` tasimali ve birincil kalibre oran
+    degismemeli.
+    """
+    from gift_contamination.analysis.prevalence import evaluate as prev_eval
+    from gift_contamination.data.labelsheet import (
+        LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path,
+    )
+    from gift_contamination.data.sampling import validation_path
+
+    cfg._data["validation"].update(
+        {"annotators": ["A"], "reliability": "none", "n": 20, "bootstrap_n": 50}
+    )
+    dest = annotation_path(cfg, "pilot")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "sample_frame": ["main"] * 100,
+        "purchase_type": ["gift_given"] * 20 + ["self"] * 80,
+        "backend": ["vllm"] * 100, "model": ["m"] * 100, "prompt_version": ["v3"] * 100,
+    }).write_parquet(dest)
+    llm = ["gift_given"] * 10 + ["self"] * 10
+    csv = labeled_path(validation_path(cfg, 20))
+    csv.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "val_id": list(range(1, 21)),
+        "category": [cfg.category_slug("pilot")] * 20,
+        "sample_frame": ["main"] * 20,
+        "purchase_type": llm, "val_stratum": llm,
+        "label_A": ["gift_given"] * 6 + ["household"] * 4 + ["self"] * 9 + ["gift_given"],
+        "notes_A": [None] * 20,
+        LABEL_SOURCE_COLUMN: [LABEL_SOURCE] * 20,
+    }).write_csv(csv)
+
+    kal = prev_eval(cfg, ["pilot"])["calibration"]
+    slug = cfg.category_slug("pilot")
+
+    blok = kal["post_hoc_own_category_ppv_pct"]
+    assert blok["post_hoc"] is True
+    assert slug in blok["by_category"]
+    # Tek kategori oldugu icin kendi PPV'si = havuzlanmis PPV; birincil deger aynen
+    assert blok["by_category"][slug]["narrow"] == pytest.approx(20.0)
+    assert kal["by_category"][slug]["narrow"]["calibrated_pct"] == pytest.approx(20.0)
+
+
+def test_a_category_interval_does_not_depend_on_processing_order(cfg: Config):
+    """Bir kategorinin GA'si, yanindaki kategorilerin sirasina bagli olmamali.
+
+    Tek bir rng butun kategorilere sirayla dagitilinca `--category all` ile tek
+    tek cagri farkli GA uretiyordu (2026-09-14'te olculdu). Seed (kategori, tanim)
+    basina turetiliyor.
+    """
+    from gift_contamination.analysis.prevalence import calibration
+    from gift_contamination.data.labelsheet import (
+        LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path,
+    )
+    from gift_contamination.data.sampling import validation_path
+
+    cfg._data["validation"].update(
+        {"annotators": ["A"], "reliability": "none", "n": 20, "bootstrap_n": 80}
+    )
+    llm = ["gift_given"] * 10 + ["self"] * 10
+    csv = labeled_path(validation_path(cfg, 20))
+    csv.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "val_id": list(range(1, 21)), "category": ["X"] * 10 + ["Y"] * 10,
+        "sample_frame": ["main"] * 20, "purchase_type": llm, "val_stratum": llm,
+        "label_A": ["gift_given"] * 6 + ["household"] * 4 + ["self"] * 9 + ["gift_given"],
+        "notes_A": [None] * 20, LABEL_SOURCE_COLUMN: [LABEL_SOURCE] * 20,
+    }).write_csv(csv)
+
+    def kat(gift: int) -> dict:
+        return {"n_main": 100, "counts": {"gift_given": gift, "self": 100 - gift},
+                "definitions": {"narrow": {"rate_pct": gift}, "broad": {"rate_pct": gift}}}
+
+    ab = calibration(cfg, {"X": kat(20), "Y": kat(5)})["by_category"]
+    ba = calibration(cfg, {"Y": kat(5), "X": kat(20)})["by_category"]
+
+    assert ab["X"]["narrow"]["ci95_pct"] == ba["X"]["narrow"]["ci95_pct"]
+    assert ab["Y"]["broad"]["ci95_pct"] == ba["Y"]["broad"]["ci95_pct"]

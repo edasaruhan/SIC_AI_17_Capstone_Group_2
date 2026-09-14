@@ -470,3 +470,92 @@ def test_kendi_cocugu_rows_are_cross_tabulated():
     assert out["n_flagged"] == 3
     assert out["human_label"] == {"gift_given": 1, "household": 2}
     assert out["human_to_llm"]["household->gift_given"] == 1
+
+
+# ------------------------------------------------- ikili eksenler (C1 / C1b)
+def test_binary_axis_matches_a_hand_computed_two_by_two():
+    """C1 ekseni: 10 satir, elle sayilan 2x2.
+
+    referans pozitif (gift_given): satir 0-3        -> 4
+    tahmin pozitif:                satir 0-2 + 5,6  -> 5
+    TP = 3 (0,1,2)  FP = 2 (5,6)  FN = 1 (3)
+    K = 3/5 = 0,6   D = 3/4 = 0,75   F1 = 2*0,6*0,75/1,35 = 0,6667
+    """
+    from gift_contamination.analysis.validation import binary_axis_measurement
+
+    ref = ["gift_given"] * 4 + ["household", "self", "self", "unclear", "self", "self"]
+    pred = ["gift_given"] * 3 + ["self", "self", "gift_given", "gift_given",
+                                 "unclear", "self", "self"]
+    keys = [("X", p) for p in pred]
+
+    out = binary_axis_measurement(ref, pred, np.ones(10), keys, ("gift_given",),
+                                  n_boot=50, seed=1)
+
+    assert out["n_reference_positive"] == 4
+    assert out["precision"]["value"] == pytest.approx(0.6)
+    assert out["recall"]["value"] == pytest.approx(0.75)
+    assert out["f1"]["value"] == pytest.approx(2 * 0.6 * 0.75 / 1.35, abs=1e-4)
+
+
+def test_household_gift_confusion_is_not_an_error_on_the_broad_axis():
+    """C1b ekseninde `household <-> gift_given` karisikligi HATA DEGIL.
+
+    Bes sinifli makro-F1 bu satirlari yanlis sayar; deneyin C1b karari icin
+    ikisi de ayni kumede. Olculdu (2026-09-14): en buyuk uyusmazlik tam burada.
+    """
+    from gift_contamination.analysis.validation import binary_axis_measurement
+    from gift_contamination.detection.schema import CONTAMINATION
+
+    ref = ["household"] * 5 + ["gift_given"] * 5 + ["self"] * 5
+    pred = ["gift_given"] * 5 + ["household"] * 5 + ["self"] * 5
+    keys = [("X", p) for p in pred]
+
+    dar = binary_axis_measurement(ref, pred, np.ones(15), keys, CONTAMINATION["narrow"],
+                                  n_boot=20, seed=1)
+    genis = binary_axis_measurement(ref, pred, np.ones(15), keys, CONTAMINATION["broad"],
+                                    n_boot=20, seed=1)
+
+    assert dar["f1"]["value"] == 0.0
+    assert genis["f1"]["value"] == 1.0
+
+
+def test_the_report_carries_both_axes_for_the_distillation_gate(cfg: Config):
+    """Damitma kapisi ogretmenin C1 F1'ini RAPORDAN okuyacak - kodla uretilmis olmali."""
+    n = 24
+    etiket = ["gift_given", "self", "household", "unclear"] * (n // 4)
+    _write_labeled(cfg, {"A": etiket}, llm=etiket)
+    _single(cfg)
+
+    eksen = evaluate(cfg, n)["measurements"]["contamination_axes"]
+
+    assert set(eksen["sample"]) == {"C1", "C1b"}
+    assert eksen["sample"]["C1"]["f1"]["value"] == 1.0
+    assert eksen["sample"]["C1b"]["positive_labels"] == ["gift_given", "household", "received"]
+
+
+def test_a_completely_missed_class_counts_as_zero_in_macro_f1():
+    """TP=0 olan sinif makro-F1'e 0 olarak GIRMELI, sessizce dusmemeli.
+
+    Onceki `compare()` `if precision and recall` diyordu: precision 0.0 falsy
+    oldugu icin F1 None oluyor ve sinif ortalamadan cikiyordu. Sonuc: modelin
+    HIC bilemedigi bir sinif makro-F1'i YUKSELTIYORDU. (2026-09-14'te bir test
+    yakaladi; gercek rapordaki sayilari etkilemedi - her sinifta en az bir TP vardi.)
+
+    self: 2/2 dogru -> F1 1,0. gift_given: 2 referans, 2 tahmin, 0 TP -> F1 0.
+    Dogru makro = (1,0 + 0) / 2 = 0,5 ; hatali eski deger 1,0 olurdu.
+    """
+    ref = pl.Series(["self", "self", "gift_given", "gift_given", "household", "household"])
+    pred = pl.Series(["self", "self", "household", "household", "gift_given", "gift_given"])
+
+    out = compare(ref, pred)
+
+    assert out["per_class"]["gift_given"]["f1"] == 0.0
+    assert out["per_class"]["household"]["f1"] == 0.0
+    assert out["macro_f1"] == pytest.approx((1.0 + 0.0 + 0.0) / 3, abs=1e-4)
+
+    agirlikli = scored_measurement(
+        ref.to_list(), pred.to_list(), np.ones(6), [("X", p) for p in pred.to_list()],
+        n_boot=10, seed=1, min_class_n=1,
+    )
+    assert agirlikli["per_class"]["gift_given"]["f1"]["value"] == 0.0
+    assert agirlikli["macro_f1"]["value"] == pytest.approx(1 / 3, abs=1e-4)

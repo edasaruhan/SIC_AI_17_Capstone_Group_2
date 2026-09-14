@@ -59,6 +59,7 @@ from ..config import Config
 from ..data.labelsheet import LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path
 from ..data.sampling import LABELS, validation_path
 from ..detection.llm_annotate import annotation_path
+from ..detection.schema import CONDITION_OF, CONTAMINATION
 from ..utils.io import write_json
 from ..utils.logging import get_logger
 from . import viz
@@ -322,11 +323,12 @@ def compare(reference: pl.Series, prediction: pl.Series) -> dict:
         n_pred = sum(1 for _, p in pairs if p == c)
         precision = round(tp / n_pred, 3) if n_pred else None
         recall = round(tp / n_ref, 3) if n_ref else None
-        f1 = (
-            round(2 * precision * recall / (precision + recall), 3)
-            if precision and recall
-            else None
-        )
+        # F1 = 2TP / (2TP + FP + FN). Onceki hali `if precision and recall`
+        # idi: TP=0 olan sinifta precision 0.0 (falsy) oldugu icin F1 None
+        # oluyor ve sinif makro-F1'den SESSIZCE dusuyordu - tamamen kacirilan
+        # bir sinif ortalamayi YUKSELTIYORDU. Payda sifirsa gercekten tanimsiz.
+        payda = 2 * tp + (n_pred - tp) + (n_ref - tp)
+        f1 = round(2 * tp / payda, 3) if payda else None
         per_class[c] = {
             "n_reference": n_ref, "n_predicted": n_pred,
             "precision": precision, "recall": recall, "f1": f1,
@@ -390,9 +392,10 @@ def _scores(conf: np.ndarray) -> dict[str, np.ndarray | float]:
     with np.errstate(divide="ignore", invalid="ignore"):
         precision = np.where(n_pred > 0, tp / n_pred, np.nan)
         recall = np.where(n_ref > 0, tp / n_ref, np.nan)
-        f1 = np.where(
-            (precision + recall) > 0, 2 * precision * recall / (precision + recall), np.nan
-        )
+        # 2TP / (2TP + FP + FN): TP=0 ama sinif tahmin/referansta varsa F1 = 0,
+        # tanimsiz DEGIL. Tanimsiz yalnizca sinif ne referansta ne tahminde varsa.
+        payda = 2 * tp + (n_pred - tp) + (n_ref - tp)
+        f1 = np.where(payda > 0, 2 * tp / payda, np.nan)
     toplam = conf.sum()
     tanimli = ~np.isnan(f1)
     return {
@@ -564,6 +567,53 @@ def scored_measurement(
     }
 
 
+def _binary_prf(ref: np.ndarray, pred: np.ndarray, w: np.ndarray) -> tuple[float, float, float]:
+    tp = float(w[ref & pred].sum())
+    fp = float(w[~ref & pred].sum())
+    fn = float(w[ref & ~pred].sum())
+    p = tp / (tp + fp) if (tp + fp) > 0 else float("nan")
+    r = tp / (tp + fn) if (tp + fn) > 0 else float("nan")
+    payda = 2 * tp + fp + fn
+    f = 2 * tp / payda if payda > 0 else float("nan")
+    return p, r, f
+
+
+def binary_axis_measurement(
+    ref_labels: list[str], pred_labels: list[str], w: np.ndarray, strata_keys: list[tuple],
+    positive: tuple[str, ...], *, n_boot: int, seed: int,
+) -> dict:
+    """Deneyin KULLANDIGI ikili karar: satir kontaminasyon kumesinde mi, degil mi.
+
+    Bes sinifli makro-F1 deneyin kararini olcmez: C1 yalnizca "gift_given mi"
+    diye soruyor, C1b "gift_given/household/received mi". `household <->
+    gift_given` karisikligi C1b ekseninde hata DEGILDIR.
+
+    Damitma kapisinin onceden kayitli kurali (DECISIONS 2026-09-14) ogretmenin
+    C1 ekseni F1'ini istiyor; o sayi buradan, kodla uretilmis olarak gelir.
+    """
+    if not ref_labels:
+        return {"skipped": True, "reason": "karsilastirilacak satir yok", "n_rows": 0}
+    ref = np.asarray([v in positive for v in ref_labels], dtype=bool)
+    pred = np.asarray([v in positive for v in pred_labels], dtype=bool)
+    w = np.asarray(w, dtype=float)
+
+    nokta = _binary_prf(ref, pred, w)
+    rng = np.random.default_rng(seed)
+    strata = _strata_index(strata_keys)
+    boots = np.empty((n_boot, 3))
+    for b in range(n_boot):
+        idx = np.concatenate([s[rng.integers(0, len(s), len(s))] for s in strata])
+        boots[b] = _binary_prf(ref[idx], pred[idx], w[idx])
+    return {
+        "positive_labels": list(positive),
+        "n_rows": len(ref_labels),
+        "n_reference_positive": int(ref.sum()),
+        "precision": {"value": _r(nokta[0]), "ci95": _ci(boots[:, 0])},
+        "recall": {"value": _r(nokta[1]), "ci95": _ci(boots[:, 1])},
+        "f1": {"value": _r(nokta[2]), "ci95": _ci(boots[:, 2])},
+    }
+
+
 def kendi_cocugu_table(df: pl.DataFrame, tag: str) -> dict | None:
     """`KENDI_COCUGU` isaretli satirlarda insan ve LLM etiketinin dagilimi.
 
@@ -697,6 +747,8 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
     kategoriler = sorted(set(main_rows["category"].to_list()))
     pop = population_counts(cfg, kategoriler)
     eksik = [c for c in kategoriler if not any(key[0] == c for key in pop)]
+    w = None
+    main_keys = list(zip(main_rows["category"].to_list(), main_rows["purchase_type"].to_list()))
     if not main_rows.height:
         weighted: dict = {"skipped": True, "reason": "dogrulamada `main` satiri yok"}
     elif eksik:
@@ -709,12 +761,27 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
         weighted = {
             **scored_measurement(
                 main_rows["reference"].to_list(), main_rows["purchase_type"].to_list(), w,
-                list(zip(main_rows["category"].to_list(), main_rows["purchase_type"].to_list())),
-                n_boot=n_boot, seed=seed, min_class_n=min_class_n,
+                main_keys, n_boot=n_boot, seed=seed, min_class_n=min_class_n,
             ),
             "population": "dort kategorinin `main` cercevesi (kategori basina esit)",
             "weights": meta,
         }
+
+    # Deneyin ikili kararlari (C1, C1b). Tanim `detection.schema.CONTAMINATION`.
+    eksenler: dict[str, dict] = {"sample": {}, "main_weighted": {}}
+    for ad, etiketler in CONTAMINATION.items():
+        kosul = CONDITION_OF[ad]
+        eksenler["sample"][kosul] = binary_axis_measurement(
+            usable["reference"].to_list(), usable["purchase_type"].to_list(),
+            np.ones(usable.height),
+            list(zip(usable["category"].to_list(), usable["purchase_type"].to_list())),
+            etiketler, n_boot=n_boot, seed=seed,
+        )
+        if w is not None:
+            eksenler["main_weighted"][kosul] = binary_axis_measurement(
+                main_rows["reference"].to_list(), main_rows["purchase_type"].to_list(),
+                w, main_keys, etiketler, n_boot=n_boot, seed=seed,
+            )
 
     kendi = {t: kendi_cocugu_table(df, t) for t in tags}
 
@@ -755,6 +822,9 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
             "llm_vs_human": vs_llm,
             "llm_vs_human_sample_ci": sample_ci,
             "llm_vs_human_main_weighted": weighted,
+            # Deneyin kullandigi ikili kararlar. Damitma kapisi ogretmenin C1
+            # F1'ini buradan (`sample`) okur - onceden kayitli kural.
+            "contamination_axes": eksenler,
             # Vekilin ILK bagimsiz olcumu. Onceki 0,58/0,61 yazar destekliydi.
             "proxy_vs_human_gift_only": vs_proxy,
             "kendi_cocugu": kendi,
@@ -787,6 +857,12 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
     if not weighted.get("skipped"):
         log.info("  agirlikli (main)  dogruluk %s  macro F1 %s",
                  weighted["accuracy"], weighted["macro_f1"])
+    for duzey, tablo in eksenler.items():
+        for kosul, m in tablo.items():
+            if not m.get("skipped"):
+                log.info("  eksen %-4s %-14s K=%s D=%s F1=%s %s", kosul, duzey,
+                         m["precision"]["value"], m["recall"]["value"],
+                         m["f1"]["value"], m["f1"]["ci95"])
     log.info("  vekil (gift ekseni) %s", vs_proxy["per_class"].get(GIFT))
     return report
 

@@ -333,11 +333,13 @@ python -m gift_contamination.analysis.gate1         --config configs/base.yaml -
 # RQ1 tablosu - dört kategori etiketlendikten SONRA
 python -m gift_contamination.analysis.prevalence    --config configs/base.yaml --category all
 # Hafta 4 - insan doğrulaması. Etiketleyen kişi LLM'in cevabını GÖRMEZ.
+# Sayfalar üç harfle (A/B/C) üretildi; YALNIZCA A teslim etti (2026-09-14).
+# `--validation` etiketleyici listesini `validation.annotators`'tan okur - `--annotators 3`
+# VERMEYİN: boş B/C sayfalarını çeker ve `load_labels` config'le uyuşmadığı için durur.
 python -m gift_contamination.data.sampling   --config configs/base.yaml --validation
-python -m gift_contamination.data.labelsheet --validation --export --annotators 3
-#   ... üç kişi kendi xlsx'ini doldurur ...
-python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
-python -m gift_contamination.analysis.validation  --config configs/base.yaml
+python -m gift_contamination.data.labelsheet --validation --export --annotators 3   # yapıldı
+python -m gift_contamination.data.labelsheet --validation --ingest
+python -m gift_contamination.analysis.validation  --config configs/base.yaml   # -> INCOMPLETE
 # Hafta 6 — deney. Atomic dosya ve koşullar RecBole GEREKTİRMEZ; yalnızca
 # run_experiment gerektirir. Etiket verilmezse sözcüksel vekil kullanılır ve
 # çıktı `reportable: false` damgası taşır — sonuç tablosuna giremez.
@@ -490,7 +492,12 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
   seçmedi"). C1b'nin kendi plasebosu **C4b** (C1b kadar rastgele satır) — C1b
   C1'in yaklaşık iki katı satır çıkardığı için C4'le karşılaştırılamaz. İkisi de
   raporlanır. Ölçülen arka plan (2026-08-29): `household` `main`'in %20,17'si;
-  `gift_given` 1,58× mevsimsel, `household` 1,09× (düz). Gerekçe: DECISIONS 2026-09-14
+  `gift_given` 1,58× mevsimsel, `household` 1,09× (düz). Gerekçe: DECISIONS 2026-09-14.
+  **Öncelik (2026-09-14, doğrulamadan sonra, deneyden ÖNCE):** C1b/C4b **kesilmez**.
+  Hafta 4 ölçtü: C1 etiketinin popülasyon kesinliği 0,65 (F1 0,72), C1b'nin 0,84
+  (F1 0,79). Tanım aynı, yalnızca öncelik değişti.
+  **Yorum kuralı (önceden kayıtlı):** C1 ≈ C4 → "bu etiket hassasiyetiyle saptanamadı",
+  "etki yok" DEĞİL; C1 > C4 → gerçek etkinin alt sınırı
 - [x] ~~**TBD** Hafta 4 etiketleyici sayısı~~ → **2026-09-14: TEK ETİKETLEYİCİ (A).**
   B ve C teslim etmedi; kullanıcı güvenilirliğin ayrıca ölçülmemesine karar verdi.
   Hafta 4 kapısı **INCOMPLETE** kalır (PASS yazılmaz), proje tarihli kararla

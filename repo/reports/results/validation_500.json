@@ -1,0 +1,592 @@
+{
+  "meta": {
+    "n": 500,
+    "annotators": [
+      "A"
+    ],
+    "n_annotators": 1,
+    "reliability": "none",
+    "model": null,
+    "prompt_version": null,
+    "thresholds_fixed": "2026-08-29, configs/base.yaml -> validation",
+    "methods_registered": "2026-09-14, DECISIONS (A modelle karsilastirilmadan once)"
+  },
+  "criteria": {
+    "1_annotator_agreement": {
+      "skipped": true,
+      "passed": null,
+      "reason": "tek etiketleyici (A); etiket guvenilirligi olculmedi - kullanici karari 2026-09-14 (DECISIONS)",
+      "design": {
+        "planned_annotators": 3,
+        "planned_statistic": "Fleiss kappa",
+        "threshold": 0.6
+      }
+    }
+  },
+  "measurements": {
+    "n_tie": 0,
+    "n_usable": 500,
+    "reference_distribution": {
+      "gift_given": 129,
+      "household": 170,
+      "received": 11,
+      "self": 144,
+      "unclear": 46
+    },
+    "llm_vs_human": {
+      "n_compared": 500,
+      "accuracy": 0.64,
+      "macro_f1": 0.5404,
+      "per_class": {
+        "gift_given": {
+          "n_reference": 129,
+          "n_predicted": 150,
+          "precision": 0.68,
+          "recall": 0.791,
+          "f1": 0.731
+        },
+        "household": {
+          "n_reference": 170,
+          "n_predicted": 150,
+          "precision": 0.807,
+          "recall": 0.712,
+          "f1": 0.756
+        },
+        "received": {
+          "n_reference": 11,
+          "n_predicted": 40,
+          "precision": 0.175,
+          "recall": 0.636,
+          "f1": 0.275
+        },
+        "self": {
+          "n_reference": 144,
+          "n_predicted": 100,
+          "precision": 0.71,
+          "recall": 0.493,
+          "f1": 0.582
+        },
+        "unclear": {
+          "n_reference": 46,
+          "n_predicted": 60,
+          "precision": 0.317,
+          "recall": 0.413,
+          "f1": 0.358
+        }
+      },
+      "disagreements": {
+        "household->gift_given": 33,
+        "self->unclear": 32,
+        "self->received": 18,
+        "unclear->self": 17,
+        "self->household": 15,
+        "gift_given->received": 11,
+        "household->self": 10,
+        "gift_given->household": 9,
+        "self->gift_given": 8,
+        "gift_given->unclear": 5,
+        "unclear->household": 5,
+        "household->unclear": 4,
+        "received->gift_given": 4,
+        "unclear->gift_given": 3,
+        "gift_given->self": 2,
+        "household->received": 2,
+        "unclear->received": 2
+      }
+    },
+    "llm_vs_human_sample_ci": {
+      "n_rows": 500,
+      "accuracy": {
+        "value": 0.64,
+        "ci95": [
+          0.604,
+          0.674
+        ]
+      },
+      "macro_f1": {
+        "value": 0.5405,
+        "ci95": [
+          0.4897,
+          0.5869
+        ]
+      },
+      "per_class": {
+        "gift_given": {
+          "n_reference": 129,
+          "weighted_n_reference": 129.0,
+          "sparse": false,
+          "precision": {
+            "value": 0.68,
+            "ci95": [
+              0.6067,
+              0.7533
+            ]
+          },
+          "recall": {
+            "value": 0.7907,
+            "ci95": [
+              0.7343,
+              0.8462
+            ]
+          },
+          "f1": {
+            "value": 0.7312,
+            "ci95": [
+              0.6717,
+              0.7832
+            ]
+          }
+        },
+        "self": {
+          "n_reference": 144,
+          "weighted_n_reference": 144.0,
+          "sparse": false,
+          "precision": {
+            "value": 0.71,
+            "ci95": [
+              0.62,
+              0.79
+            ]
+          },
+          "recall": {
+            "value": 0.4931,
+            "ci95": [
+              0.4412,
+              0.5468
+            ]
+          },
+          "f1": {
+            "value": 0.582,
+            "ci95": [
+              0.5242,
+              0.6375
+            ]
+          }
+        },
+        "household": {
+          "n_reference": 170,
+          "weighted_n_reference": 170.0,
+          "sparse": false,
+          "precision": {
+            "value": 0.8067,
+            "ci95": [
+              0.7467,
+              0.8667
+            ]
+          },
+          "recall": {
+            "value": 0.7118,
+            "ci95": [
+              0.6564,
+              0.7662
+            ]
+          },
+          "f1": {
+            "value": 0.7562,
+            "ci95": [
+              0.7089,
+              0.8
+            ]
+          }
+        },
+        "received": {
+          "n_reference": 11,
+          "weighted_n_reference": 11.0,
+          "sparse": true,
+          "precision": {
+            "value": 0.175,
+            "ci95": [
+              0.075,
+              0.3
+            ]
+          },
+          "recall": {
+            "value": 0.6364,
+            "ci95": [
+              0.3333,
+              0.9
+            ]
+          },
+          "f1": {
+            "value": 0.2745,
+            "ci95": [
+              0.12,
+              0.4231
+            ]
+          }
+        },
+        "unclear": {
+          "n_reference": 46,
+          "weighted_n_reference": 46.0,
+          "sparse": false,
+          "precision": {
+            "value": 0.3167,
+            "ci95": [
+              0.2,
+              0.4333
+            ]
+          },
+          "recall": {
+            "value": 0.413,
+            "ci95": [
+              0.2973,
+              0.5349
+            ]
+          },
+          "f1": {
+            "value": 0.3585,
+            "ci95": [
+              0.2499,
+              0.4643
+            ]
+          }
+        }
+      },
+      "bootstrap": {
+        "n": 2000,
+        "seed": 42,
+        "strata": "kategori x LLM sinifi"
+      },
+      "note": "AGIRLIKSIZ - dogrulama LLM etiketine gore dengesiz cekildi; populasyon duzeyi icin `llm_vs_human_main_weighted`"
+    },
+    "llm_vs_human_main_weighted": {
+      "n_rows": 339,
+      "accuracy": {
+        "value": 0.7269,
+        "ci95": [
+          0.6605,
+          0.7894
+        ]
+      },
+      "macro_f1": {
+        "value": 0.4943,
+        "ci95": [
+          0.4377,
+          0.5576
+        ]
+      },
+      "per_class": {
+        "gift_given": {
+          "n_reference": 58,
+          "weighted_n_reference": 3255.0622,
+          "sparse": false,
+          "precision": {
+            "value": 0.6485,
+            "ci95": [
+              0.5271,
+              0.7707
+            ]
+          },
+          "recall": {
+            "value": 0.7987,
+            "ci95": [
+              0.7013,
+              0.8921
+            ]
+          },
+          "f1": {
+            "value": 0.7158,
+            "ci95": [
+              0.618,
+              0.8045
+            ]
+          }
+        },
+        "self": {
+          "n_reference": 132,
+          "weighted_n_reference": 25235.9926,
+          "sparse": false,
+          "precision": {
+            "value": 0.7756,
+            "ci95": [
+              0.6874,
+              0.8549
+            ]
+          },
+          "recall": {
+            "value": 0.9093,
+            "ci95": [
+              0.8918,
+              0.9261
+            ]
+          },
+          "f1": {
+            "value": 0.8371,
+            "ci95": [
+              0.7785,
+              0.8857
+            ]
+          }
+        },
+        "household": {
+          "n_reference": 101,
+          "weighted_n_reference": 5402.8048,
+          "sparse": false,
+          "precision": {
+            "value": 0.7638,
+            "ci95": [
+              0.6833,
+              0.8379
+            ]
+          },
+          "recall": {
+            "value": 0.4853,
+            "ci95": [
+              0.377,
+              0.6324
+            ]
+          },
+          "f1": {
+            "value": 0.5935,
+            "ci95": [
+              0.4989,
+              0.7008
+            ]
+          }
+        },
+        "received": {
+          "n_reference": 3,
+          "weighted_n_reference": 163.5396,
+          "sparse": true,
+          "precision": {
+            "value": 0.0906,
+            "ci95": [
+              0.0,
+              0.2719
+            ]
+          },
+          "recall": {
+            "value": 0.1796,
+            "ci95": [
+              0.0,
+              1.0
+            ]
+          },
+          "f1": {
+            "value": 0.1205,
+            "ci95": [
+              0.0,
+              0.3277
+            ]
+          }
+        },
+        "unclear": {
+          "n_reference": 45,
+          "weighted_n_reference": 5942.6008,
+          "sparse": false,
+          "precision": {
+            "value": 0.3319,
+            "ci95": [
+              0.2017,
+              0.4493
+            ]
+          },
+          "recall": {
+            "value": 0.1479,
+            "ci95": [
+              0.088,
+              0.2424
+            ]
+          },
+          "f1": {
+            "value": 0.2046,
+            "ci95": [
+              0.1248,
+              0.2977
+            ]
+          }
+        }
+      },
+      "bootstrap": {
+        "n": 2000,
+        "seed": 42,
+        "strata": "kategori x LLM sinifi"
+      },
+      "population": "dort kategorinin `main` cercevesi (kategori basina esit)",
+      "weights": {
+        "min_cell_n": 5,
+        "population_rows": 40000,
+        "collapsed_cells": [
+          "All_Beauty/received (n=4)",
+          "Video_Games/received (n=3)"
+        ],
+        "uncovered_share": 0.0
+      }
+    },
+    "contamination_axes": {
+      "sample": {
+        "C1": {
+          "positive_labels": [
+            "gift_given"
+          ],
+          "n_rows": 500,
+          "n_reference_positive": 129,
+          "precision": {
+            "value": 0.68,
+            "ci95": [
+              0.6067,
+              0.7533
+            ]
+          },
+          "recall": {
+            "value": 0.7907,
+            "ci95": [
+              0.7343,
+              0.8462
+            ]
+          },
+          "f1": {
+            "value": 0.7312,
+            "ci95": [
+              0.6717,
+              0.7832
+            ]
+          }
+        },
+        "C1b": {
+          "positive_labels": [
+            "gift_given",
+            "household",
+            "received"
+          ],
+          "n_rows": 500,
+          "n_reference_positive": 310,
+          "precision": {
+            "value": 0.85,
+            "ci95": [
+              0.8118,
+              0.8824
+            ]
+          },
+          "recall": {
+            "value": 0.9323,
+            "ci95": [
+              0.9073,
+              0.955
+            ]
+          },
+          "f1": {
+            "value": 0.8892,
+            "ci95": [
+              0.8651,
+              0.9102
+            ]
+          }
+        }
+      },
+      "main_weighted": {
+        "C1": {
+          "positive_labels": [
+            "gift_given"
+          ],
+          "n_rows": 339,
+          "n_reference_positive": 58,
+          "precision": {
+            "value": 0.6485,
+            "ci95": [
+              0.5271,
+              0.7707
+            ]
+          },
+          "recall": {
+            "value": 0.7987,
+            "ci95": [
+              0.7013,
+              0.8921
+            ]
+          },
+          "f1": {
+            "value": 0.7158,
+            "ci95": [
+              0.618,
+              0.8045
+            ]
+          }
+        },
+        "C1b": {
+          "positive_labels": [
+            "gift_given",
+            "household",
+            "received"
+          ],
+          "n_rows": 339,
+          "n_reference_positive": 162,
+          "precision": {
+            "value": 0.8422,
+            "ci95": [
+              0.7877,
+              0.8902
+            ]
+          },
+          "recall": {
+            "value": 0.7415,
+            "ci95": [
+              0.6386,
+              0.8564
+            ]
+          },
+          "f1": {
+            "value": 0.7886,
+            "ci95": [
+              0.7186,
+              0.8545
+            ]
+          }
+        }
+      }
+    },
+    "proxy_vs_human_gift_only": {
+      "n_compared": 500,
+      "accuracy": 0.686,
+      "macro_f1": 0.618,
+      "per_class": {
+        "gift_given": {
+          "n_reference": 129,
+          "n_predicted": 160,
+          "precision": 0.412,
+          "recall": 0.512,
+          "f1": 0.457
+        },
+        "not_gift": {
+          "n_reference": 371,
+          "n_predicted": 340,
+          "precision": 0.815,
+          "recall": 0.747,
+          "f1": 0.779
+        }
+      },
+      "disagreements": {
+        "not_gift->gift_given": 94,
+        "gift_given->not_gift": 63
+      }
+    },
+    "kendi_cocugu": {
+      "A": {
+        "n_flagged": 131,
+        "human_label": {
+          "household": 131
+        },
+        "llm_label": {
+          "gift_given": 19,
+          "household": 102,
+          "received": 1,
+          "self": 5,
+          "unclear": 4
+        },
+        "human_to_llm": {
+          "household->household": 102,
+          "household->gift_given": 19,
+          "household->self": 5,
+          "household->unclear": 4,
+          "household->received": 1
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Referans tek etiketleyicinin yargisi; etiket guvenilirligi olculmedi.",
+    "Belirsizlik isareti (EMIN_DEGIL) kullanilan satir: 0.",
+    "Agirliksiz olcumler katmanlama nedeniyle household/gift_given yonunde yanli; populasyon icin agirlikli olcum okunmali."
+  ],
+  "verdict": "INCOMPLETE"
+}

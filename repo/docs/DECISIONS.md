@@ -1503,3 +1503,123 @@ Karar deseni Kapı 1'le aynı: eksik koşu/seed varsa INCOMPLETE.
 **Etkilediği bölüm:** `configs/base.yaml` (`validation`, `distill.fidelity`,
 `gate2`, `experiment.conditions`), CLAUDE.md §13, `implementation-plan.md` §5.4
 **Kim:** Kullanıcı (kararlar) · Ekip
+
+---
+
+### 2026-09-14 — Hafta 4 sonuçları: model vekilden iyi, C1 etiketi gürültülü, RQ1 kalibre edildi
+
+> Yöntemler `8c697a8`'de, onları uygulayan kod `eed7f35`'te — ikisi de bu sonuçlar
+> üretilmeden **önce** push'landı. Aşağıdaki hiçbir eşik ya da tanım sonuca
+> bakılarak değiştirilmedi. Sonuçtan sonra eklenen tek analiz aşağıda **post-hoc**
+> diye işaretli ve birincil sayının yerine geçmiyor.
+
+#### Karar: INCOMPLETE (önceden kayıtlı)
+
+Tek etiketleyici; güvenilirlik ölçülmedi. Kapı ölçütü `passed: null`.
+
+#### LLM vs A — beş sınıf
+
+| | örneklem (500, ağırlıksız) | popülasyon (`main`, ağırlıklı, 339 satır) |
+|---|---|---|
+| doğruluk | 0,640 | **0,727** [0,661–0,789] |
+| makro-F1 | 0,540 | 0,494 [0,438–0,558] |
+
+| sınıf | örneklem F1 | popülasyon K | popülasyon D | popülasyon F1 |
+|---|---:|---:|---:|---:|
+| `gift_given` | 0,731 | 0,649 | 0,799 | 0,716 |
+| `self` | 0,582 | 0,776 | 0,909 | 0,837 |
+| `household` | 0,757 | 0,764 | 0,485 | 0,594 |
+| `unclear` | 0,359 | 0,332 | 0,148 | 0,205 |
+| `received` (az örnekli, n=11) | 0,274 | 0,091 | 0,180 | 0,121 |
+
+Makro-F1'i iki küçük/bulanık sınıf aşağı çekiyor. En büyük uyuşmazlıklar:
+**A `household` → LLM `gift_given` 33** (bilinen sınır) · A `self` → LLM `unclear` 32 ·
+A `self` → LLM `received` 18. `KENDI_COCUGU` işaretli 131 satırın **hepsi** A'da
+`household`; LLM 102'sinde aynı, 19'unda `gift_given` diyor.
+
+Sözcüksel vekil (hediye ekseni): K 0,41 · D 0,51 · **F1 0,46**. LLM belirgin iyi.
+Vekilin önceki 0,58/0,61 sayıları "yazar destekli ön geçiş"ti; bu ilk bağımsız ölçümü.
+
+#### Deneyin kullandığı ikili eksenler — öğretmen vs A
+
+| eksen | örneklem F1 [GA] | popülasyon K · D · F1 [GA] |
+|---|---|---|
+| **C1** `gift_given` | 0,731 [0,672–0,783] | 0,649 · 0,799 · **0,716** [0,618–0,805] |
+| **C1b** `gift_given`+`household`+`received` | 0,889 [0,865–0,910] | 0,842 · 0,742 · **0,789** [0,719–0,855] |
+
+Damıtma kapısının önceden kayıtlı üçüncü ölçütü öğretmenin **örneklem C1 F1'ini**
+(0,731) referans alıyor: öğrenci ≥ 0,681 olmalı.
+
+#### RQ1 — insan kalibrasyonlu yaygınlık
+
+| kategori | dar ham | **dar kalibre** [GA] | *post-hoc* | geniş ham | **geniş kalibre** [GA] | *post-hoc* |
+|---|---:|---|---:|---:|---|---:|
+| Toys | 23,25 | **18,99** [15,76–22,31] | *21,86* | 44,02 | **44,22** [40,41–48,35] | *54,37* |
+| Video Games | 7,86 | **7,90** [5,83–10,57] | *4,02* | 15,23 | **22,74** [17,81–28,10] | *12,97* |
+| Grocery | 4,28 | **5,43** [3,39–8,26] | *2,61* | 9,57 | **18,29** [13,38–24,05] | *14,02* |
+| All Beauty | 4,70 | **5,54** [3,44–8,41] | *4,05* | 8,84 | **17,97** [12,81–23,45] | *6,86* |
+
+Geniş ham oranlar önceki kayıttan (%43,42 vb.) biraz yüksek: `received` artık geniş
+tanımda.
+
+**Okuma:**
+1. Toys'un ham dar oranı (%23,25) kalibre GA'nın **dışında**. Deneme koşusundan beri
+   yazılı "üst sınır" uyarısı ölçümle doğrulandı.
+2. Doz–yanıt: Toys hâlâ ayrık. **Video Games artık alt gruptan ayrılamıyor** (GA'lar
+   örtüşüyor) — ham oranlarda ayrıktı.
+3. **Kalibrasyonun varsayımı Toys'ta tutmuyor** (önceden kayıtlı kontrol): kendi
+   PPV'siyle geniş %54,37, havuzlanmış PPV'yle %44,22. Düşük hediyeli kategorilerde
+   geniş oranın ~ikiye katlanması büyük ölçüde havuzlanmış `PPV_geniş(self) = 0,12`'den
+   geliyor — o değeri Toys'un çocuk alımları taşıyor.
+4. **Post-hoc duyarlılık** (sonuç görüldükten sonra eklendi, birincil DEĞİL): her
+   kategorinin kendi PPV'siyle geniş oran All Beauty'de %6,86, Grocery'de %14,02. Kategori
+   başına doğrulama satırı az olduğu için gürültülü; ama birincil geniş oranların düşük
+   hediyeli kategorilerde **yukarı yanlı olabileceğini** gösteriyor. Rapor aralığı
+   ikisiyle birlikte verir.
+
+#### Plana etkisi
+
+- **Önceden kayıt tutuyor.** F1 bir ölçümdü, kapı değil; proje ilerliyor.
+- **Prompt v4 yok; 500 etiket hiçbir ayar için kullanılmaz.** Kullanılırsa projenin tek
+  bağımsız referansı yok olur — deneme setinin F1 olarak raporlanamamasıyla aynı hata.
+- **C1b önceliği (kullanıcı, 2026-09-14, deney koşulmadan):** C1 birincil kalıyor; ama
+  C1b ve C4b artık kesme sırasında **değil**, çekirdekte. C1'in etiketi gürültülü; C1'de
+  fark çıkmazsa daha iyi ölçülen eksen elimizde olmalı. Tanım değişmedi, öncelik değişti.
+
+#### ÖNCEDEN KAYIT — deney sonuçlarının yorum kuralı (HİÇBİR DENEY KOŞULMADAN)
+
+Etiket gürültüsü koşulu plaseboya doğru çeker: C1'in çıkardığı satırların popülasyonda
+~%35'i hediye değil, hediyelerin ~%20'si hiç çıkarılmıyor.
+
+- **C1 ≈ C4** (eşli bootstrap GA sıfırı içeriyor) → *"bu etiket hassasiyetiyle
+  saptanamadı"*. **"Etki yok" yazılmaz.**
+- **C1 > C4** (GA sıfırın üstünde) → gerçek etkinin **alt sınırı**.
+- **C1 < C4** → olduğu gibi raporlanır, yorumlanmaya zorlanmaz.
+- Aynı kural C1b/C4b için. Sonuç tablosunda her eksenin ölçülen K/D değeri yanında durur.
+
+#### Bu fazda bulunan ve düzeltilen hatalar
+
+1. **Makro-F1 şişiriliyordu.** `compare()` `if precision and recall` diyordu; TP=0 olan
+   sınıfta precision `0.0` (falsy) olduğu için F1 `None` oluyor ve sınıf ortalamadan
+   **sessizce düşüyordu** — tamamen kaçırılan bir sınıf makro-F1'i yükseltiyordu. Aynı
+   desen ağırlıklı ve ikili ölçümde de vardı. `F1 = 2TP/(2TP+FP+FN)`'ye geçildi. Gerçek
+   nokta tahminleri etkilenmedi (her sınıfta en az bir TP vardı), ama **ağırlıklı
+   makro-F1'in GA üst ucu 0,629 → 0,558** düştü: bootstrap tekrarlarında `received`'ın
+   TP=0 kaldığı örneklerde sınıf ortalamadan atılıyordu. Hata sonuçlar commit edilmeden
+   bir test tarafından yakalandı.
+2. **Kalibrasyon GA'ları işleme sırasına bağlıydı.** Tek rng kategorilere sırayla
+   dağıtılıyordu; `--category all` ile tek tek çağrı farklı GA veriyordu. Seed artık
+   (kategori, tanım) başına türetiliyor (`sampling._stratum_seed` deseni). Testi var.
+3. **Rapor yanlış korpusu söylüyordu** — "oranlar k-core korpusuna aittir". Örnekleme ve
+   vekil **clean** korpustan okuyor; Toys annotation satırlarının yalnızca %17,6'sı
+   5-core'da. Bu cümleyi önceki bir oturumda doğrulamadan yazmıştım.
+4. **Bir test tesadüfen geçiyordu** — "geniş − dar = household" `received` eklenince
+   yanlıştı ama fixture'ın küçük `main` çerçevesi `received` etiketine hiç ulaşmadığı için
+   geçiyordu. Kurgu düzeltildi; test artık kendi kurgusunu da doğruluyor.
+
+Kontaminasyon tanımları tek yere taşındı: `detection.schema.CONTAMINATION`. Yaygınlık,
+doğrulama eksenleri ve (Faz 3'te) deney koşulları aynı kümeyi okuyor.
+
+**Etkilediği bölüm:** `analysis/validation.py`, `analysis/prevalence.py`,
+`detection/schema.py`, `reports/results/validation_500.json`, `prevalence.json`, F18, F19
+**Kim:** Kullanıcı (C1b önceliği) · Ekip

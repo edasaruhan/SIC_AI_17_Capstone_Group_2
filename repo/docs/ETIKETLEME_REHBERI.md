@@ -375,6 +375,13 @@ Dosyayı **adını değiştirmeden** kaydedip geri gönderin.
 
 ## 9. Bittikten sonra ne oluyor
 
+> **Güncelleme (2026-09-14).** Doğrulama **tek etiketleyiciyle (A)** tamamlandı; B ve C
+> teslim etmedi. Bu yüzden aşağıdaki **uyum (Fleiss κ) hesaplanmadı** ve kapı PASS
+> değil **INCOMPLETE** olarak kayıtlı. Modelin doğruluğu ve anahtar kelime yöntemi A'nın
+> etiketlerine karşı ölçüldü. A'nın "kendi çocuğu" notlarının 131'i `KENDI_COCUGU`
+> koduna çevrildi. Sonuçlar ve sınırlılıklar: `DECISIONS.md`, 2026-09-14.
+> Aşağısı özgün üç kişilik tasarımı anlatıyor.
+
 Üç dosya toplandığında tek bir komut çalışıyor ve üç sayı çıkıyor:
 
 | Ölçüm | Ne soruyor | Eşik |

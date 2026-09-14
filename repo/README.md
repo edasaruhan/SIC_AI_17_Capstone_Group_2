@@ -75,11 +75,12 @@ python -m gift_contamination.analysis.gate1         --category all
 python -m gift_contamination.analysis.prevalence    --category all
 
 # Hafta 4 — insan doğrulaması (etiketleyen kişi LLM'in cevabını GÖRMEZ)
+# Üç sayfa üretildi, yalnızca A teslim etti. Hangi sayfaların okunacağı
+# config'ten gelir (`validation.annotators`); --annotators vermeyin.
 python -m gift_contamination.data.sampling   --validation --category all
-python -m gift_contamination.data.labelsheet --validation --export --annotators 3
-#   ... üç kişi kendi xlsx'ini bağımsız doldurur ...
-python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
-python -m gift_contamination.analysis.validation
+python -m gift_contamination.data.labelsheet --validation --export --annotators 3   # yapıldı
+python -m gift_contamination.data.labelsheet --validation --ingest
+python -m gift_contamination.analysis.validation          # -> INCOMPLETE (tek etiketleyici)
 
 # Hafta 6 — deney iskelesi (bugün SÖZCÜKSEL VEKİL etiketiyle; çıktı
 # `reportable: false` damgalı). run_experiment .venv-recbole altında koşar.

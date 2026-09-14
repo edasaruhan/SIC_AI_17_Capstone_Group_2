@@ -49,9 +49,9 @@ import numpy as np
 import polars as pl
 
 from ..config import Config, add_standard_args, resolve_roles
-from ..data.sampling import LABELS
+from ..data.sampling import LABELS, _stratum_seed
 from ..detection.llm_annotate import annotation_path
-from ..detection.schema import PurchaseType
+from ..detection.schema import CONTAMINATION
 from ..utils.io import read_json, write_json
 from ..utils.logging import get_logger
 from . import viz
@@ -67,16 +67,10 @@ from .validation import (
 log = get_logger("analysis.prevalence")
 
 FRAME_MAIN = "main"
-GIFT = PurchaseType.GIFT_GIVEN.value
-HOUSEHOLD = PurchaseType.HOUSEHOLD.value
-RECEIVED = PurchaseType.RECEIVED.value
 
-# Dar tanim C1'e, genis tanim C1b'ye karsilik gelir (recsys/conditions.py).
-# `received` genise 2026-09-14'te girdi: "alici urunu kendisi secmedi".
-DEFINITIONS: dict[str, tuple[str, ...]] = {
-    "narrow": (GIFT,),
-    "broad": (GIFT, HOUSEHOLD, RECEIVED),
-}
+# Dar tanim C1'e, genis tanim C1b'ye karsilik gelir. Tanim burada DEGIL,
+# `detection.schema.CONTAMINATION`'da - dogrulama ve deney ayni kumeyi okuyor.
+DEFINITIONS: dict[str, tuple[str, ...]] = CONTAMINATION
 Z95 = 1.959963985
 
 
@@ -247,7 +241,6 @@ def calibration(cfg: Config, kategoriler: dict) -> dict:
     ppv = ppv_table(kaynak)
     ppv_all = ppv_table({k: (rows, "all") for k, rows in _by_class(df).items()})
 
-    rng = np.random.default_rng(seed)
     sonuc: dict[str, dict] = {}
     duyarlilik: dict[str, dict] = {}
     for slug, d in kategoriler.items():
@@ -256,6 +249,11 @@ def calibration(cfg: Config, kategoriler: dict) -> dict:
         sonuc[slug] = {}
         duyarlilik[slug] = {}
         for ad, etiketler in DEFINITIONS.items():
+            # (kategori, tanim) basina TURETILMIS seed. Tek bir rng butun
+            # kategorilere sirayla dagitilinca bir kategorinin GA'si islenme
+            # SIRASINA bagli oluyordu (olculdu: `--category all` ile tek tek
+            # cagrinin GA'lari farkli cikti). `sampling._stratum_seed` deseni.
+            rng = np.random.default_rng(_stratum_seed(seed, f"calibration|{slug}|{ad}"))
             nokta = calibrated_rate(shares, ppv[ad])
             boots = np.empty(n_boot)
             p_vec = np.array([shares[k] for k in LABELS])
@@ -315,6 +313,31 @@ def calibration(cfg: Config, kategoriler: dict) -> dict:
                 },
             }
 
+    # --- POST-HOC DUYARLILIK. Onceden kayitli DEGIL: sonuc goruldukten sonra,
+    # varsayim kontrolu Toys'ta tutmadigi icin eklendi (2026-09-14). Her kategori
+    # KENDI main dogrulama satirlariyla; satiri `min_cell_n`'den az olan sinif
+    # havuzlanmis PPV'ye duser ve listelenir. BIRINCIL SAYININ YERINE GECMEZ.
+    post_hoc: dict[str, dict] = {}
+    for slug, d in kategoriler.items():
+        kendi = main_val.filter(pl.col("category") == slug)
+        own = _by_class(kendi)
+        shares = {k: d["counts"].get(k, 0) / int(d["n_main"]) for k in LABELS}
+        sources, havuz = {}, []
+        for k in LABELS:
+            if len(own.get(k, [])) >= min_cell_n:
+                sources[k] = own[k]
+            else:
+                sources[k] = kaynak[k][0]
+                havuz.append(k)
+        post_hoc[slug] = {
+            **{
+                ad: _pct(calibrated_rate(shares, {k: _ppv(r, e) for k, r in sources.items()}))
+                for ad, e in DEFINITIONS.items()
+            },
+            "n_validation_main_rows": kendi.height,
+            "classes_using_pooled_ppv": havuz,
+        }
+
     return {
         "method": (
             "PPV_k = P(insan in D | LLM = k), main satirlarindan kategoriler "
@@ -338,6 +361,15 @@ def calibration(cfg: Config, kategoriler: dict) -> dict:
         "by_category": sonuc,
         "assumption_check": kontrol,
         "sensitivity_all_frames_pct": duyarlilik,
+        "post_hoc_own_category_ppv_pct": {
+            "post_hoc": True,
+            "note": (
+                "Sonuc goruldukten sonra eklendi: Toys'ta kendi PPV'si ile havuzlanmis "
+                "PPV farkli cikti. Birincil sayinin yerine GECMEZ; kategori basina "
+                "dogrulama satiri az oldugu icin gurultuludur."
+            ),
+            "by_category": post_hoc,
+        },
         "bootstrap": {"n": n_boot, "seed": seed},
     }
 

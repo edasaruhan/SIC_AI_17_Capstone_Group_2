@@ -131,8 +131,9 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 
 ## 5. Nerede duruyoruz
 
-**Hafta 1–3 bitti; Hafta 5'in etiketlemesi de bitti. Hafta 4 (insan doğrulaması)
-insan emeği bekliyor.** Ayrıntılı durum ve sıradaki adımlar için **§8**.
+**Hafta 1–4 bitti; Hafta 5'in etiketlemesi de bitti.** Hafta 4 **tek etiketleyiciyle**
+kapandı (kapı INCOMPLETE — güvenilirlik ölçülmedi). Sırada damıtma. Ayrıntılı durum ve
+sıradaki adımlar için **§8**.
 
 | | |
 |---|---|
@@ -141,9 +142,12 @@ insan emeği bekliyor.** Ayrıntılı durum ve sıradaki adımlar için **§8**.
 | Hediye vekil oranı — Grocery (kontrol) | **%1,85** |
 | Çekilmiş örnek | **47.200** (180 katman) |
 | LLM ile etiketlenmiş | **47.200** (4 × 11.800) |
-| Ölçülen hediye oranı — Toys / Grocery | **%23,25** / **%4,28** |
+| Hediye oranı — Toys / Grocery (LLM, ham) | %23,25 / %4,28 |
+| **Hediye oranı — Toys / Grocery (insan kalibrasyonlu)** | **%19,0** / **%5,4** |
+| LLM–insan uyumu, C1 ekseni (popülasyon) | F1 **0,72** · kesinlik 0,65 |
 | Kapı 1 | 4 kategoride **PASS (4/4)** |
-| Geçen test | **271** |
+| Hafta 4 | **INCOMPLETE** — tek etiketleyici (A), 500 satır |
+| Geçen test | **311** |
 
 ### Hangi veri, ne kadar
 
@@ -176,11 +180,11 @@ filtrelendi, kronolojik kullanıcı sekansları kuruldu. Sonra bir **sözcüksel
 yazıldı: `gift`, `bought for my`, `present for` gibi kalıpları arayan basit bir tarayıcı.
 
 > **Bu vekil bir detektör değil — ölçü çubuğu.** Anahtar kelime taraması nihai yöntemimiz
-> değil; LLM'in ondan daha iyi olduğunu göstermek için bir taban çizgisi lazım. İki ayrı
-> ön geçişte ölçüldü: kesinlik **0,58** ve **0,61**, duyarlılık **0,76**. Yani
-> işaretlediği her 10 review'ın yaklaşık 4'ü hediye değil, ve gerçek hediyelerin dörtte
-> birini kaçırıyor. LLM'in aşması gereken çıta bu. *Kesin rakam Hafta 4'ün bağımsız insan
-> doğrulamasından gelecek — bunlar yazar destekli ön geçiş.*
+> değil; LLM'in ondan daha iyi olduğunu göstermek için bir taban çizgisi lazım. Yazar
+> destekli iki ön geçişte kesinlik 0,58 ve 0,61, duyarlılık 0,76 ölçülmüştü.
+> **Hafta 4'ün bağımsız ölçümü daha kötü çıktı:** kesinlik **0,41**, duyarlılık **0,51**,
+> F1 **0,46** (500 satır, tek etiketleyici). İşaretlediğinin yarısından fazlası hediye
+> değil, hediyelerin yarısını kaçırıyor. Aynı satırlarda LLM'in F1'i **0,73**.
 
 | Kategori | Rol | Temiz review | Hediye vekil oranı |
 |---|---|---:|---:|
@@ -224,36 +228,46 @@ sonuçlarından `prompts/gift_detection_v2.md` yazıldı.
 Dört kategorinin tamamı Kaggle'da (2× T4) etiketlendi: **47.200 satır**, kategori
 başına ~57 dakika. Kapı 1 dördünde de **PASS (4/4)**.
 
-**RQ1'in cevabı** — `main` çerçevesi, kategori başına n = 10.000:
+**RQ1'in cevabı** — `main` çerçevesi, kategori başına n = 10.000. Oranlar **clean**
+korpusa ait (5-core deney korpusuna değil). "Kalibre" = LLM'in her sınıfının Hafta 4'te
+insanın gözünde gerçekte ne olduğuna göre düzeltilmiş oran.
 
-| kategori | rol | hediye (C1) | %95 GA | +household (C1b) | sözcüksel vekil |
-|---|---|---:|---|---:|---:|
-| Toys and Games | high | **%23,25** | 22,43–24,09 | %43,42 | %11,07 |
-| Video Games | mid | **%7,86** | 7,35–8,40 | %14,48 | %4,40 |
-| All Beauty | pilot | **%4,70** | 4,30–5,13 | %8,00 | %2,13 |
-| Grocery and Gourmet Food | low | **%4,28** | 3,90–4,69 | %8,52 | %1,85 |
+| kategori | rol | C1 · LLM ham | **C1 · insan kalibre** [%95 GA] | C1b · ham | **C1b · kalibre** [%95 GA] |
+|---|---|---:|---|---:|---|
+| Toys and Games | high | %23,25 | **%19,0** [15,8–22,3] | %44,0 | **%44,2** [40,4–48,4] |
+| Video Games | mid | %7,86 | **%7,9** [5,8–10,6] | %15,2 | **%22,7** [17,8–28,1] |
+| Grocery and Gourmet Food | low | %4,28 | **%5,4** [3,4–8,3] | %9,6 | **%18,3** [13,4–24,1] |
+| All Beauty | pilot | %4,70 | **%5,5** [3,4–8,4] | %8,8 | **%18,0** [12,8–23,5] |
 
-**Doz–yanıt tasarımı kuruldu.** `high/mid/low/pilot` rolleri Hafta 1'de *sözcüksel
-vekilden* atanmıştı — hiçbir dil modeli veriyi görmeden. Ölçüm o sırayı doğruladı.
-Toys ile Video Games'in güven aralıkları birbirinden ve alt ikiliden ayrık; All
-Beauty ile Grocery ise **ayrılamıyor** (aralıklar örtüşüyor) ve öyle raporlanacak.
+C1 = yalnızca `gift_given` (birincil). C1b = `gift_given` + `household` + `received`
+("alıcı ürünü kendisi seçmedi", sağlamlık).
 
-> **Sözcüksel vekil hediyelerin yaklaşık yarısını kaçırıyor.** LLM/vekil oranı dört
-> kategoride **1,79–2,32×** — dar bir bant. Sıra korunuyor, seviye korunmuyor.
-> Anahtar kelimeyle ölçüm yapan çalışmaların oranı sistematik olarak eksik saydığı
-> anlamına geliyor; damıtma yığınının gerekçesi tam olarak bu.
+**Kalibrasyon neyi değiştirdi:**
+- **Toys'un ham oranı (%23,25) kalibre aralığın dışında.** Deneme koşusundan beri yazılı
+  "üst sınır" uyarısı ölçümle doğrulandı: model kendi çocuğuna alınanları hediye sayıyor.
+- **Doz–yanıt zayıfladı.** Toys hâlâ açıkça ayrık; ama Video Games artık düşük hediyeli
+  gruptan **ayrılamıyor** (ham oranlarda ayrıktı).
+- **C1b'nin düşük hediyeli kategorilerdeki kalibre oranlarına temkinli bakın.** Yöntem
+  hataları kategoriler arasında havuzluyor ve bu varsayım Toys'ta tutmuyor. Her kategorinin
+  kendi hatalarıyla (post-hoc, gürültülü) C1b: All Beauty %6,9 · Grocery %14,0 · Video
+  Games %13,0. Gerçek değer muhtemelen iki sayının arasında.
 
-**İki uyarı, ikisi de raporun içinde:**
+**Doğrulamanın söylediği (Hafta 4, tek etiketleyici A, 500 satır):**
 
-1. Bu sayılar **dil modelinin** etiketleri. Bağımsız insan doğrulaması (Hafta 4)
-   henüz bitmedi — `prevalence.json` bunu `human_validated: false` olarak taşıyor
-   ve iddia edilmiyor, **diskten okunuyor**.
-2. `%23,25` bir **üst sınır**. Deneme koşusundaki uyuşmazlıkların 14'ü tek yönde
-   (insan `household`, model `gift_given`); ters yön sıfır.
+| | model vs A | sözcüksel vekil vs A |
+|---|---|---|
+| C1 ekseni (hediye mi?) — popülasyon | kesinlik 0,65 · duyarlılık 0,80 · **F1 0,72** | F1 0,46 |
+| C1b ekseni — popülasyon | kesinlik 0,84 · duyarlılık 0,74 · **F1 0,79** | — |
 
-**Açık kalan karar:** `household` kontaminasyon sayılacak mı? Tablodaki iki sütun
-arasındaki fark bu — Toys'ta %23 ile %43. Karar **kavramsal** ve ekipte; kod
-hiçbirini seçmiyor, ikisini de koşuyor (C1 / C1b).
+> **Model anahtar kelimeden belirgin iyi — ama C1 etiketi gürültülü.** Popülasyonda
+> modelin "hediye" dediklerinin yaklaşık üçte biri A'ya göre hediye değil (çoğu kendi
+> çocuğuna alınan). Bu, deneyde C1'i plaseboya doğru çeker. Bu yüzden deney koşulmadan
+> şu kural yazıldı: **C1 ≈ C4 → "bu etiket hassasiyetiyle saptanamadı", "etki yok" değil;
+> C1 > C4 → gerçek etkinin alt sınırı.** Aynı sebeple daha iyi ölçülen C1b ekseni artık
+> kesilmiyor.
+
+**Sınırlılık, raporun içinde:** referans **tek kişi**; etiket güvenilirliği ölçülmedi.
+`prevalence.json` bunu `human_validation.reliability_measured: false` olarak taşıyor.
 
 ---
 
@@ -317,7 +331,8 @@ Bu, tam koşudaki **%23,25**'lik hediye oranının muhtemelen bir **üst sınır
 olduğu anlamına gelir. Üstelik bu 200 satır prompt'un yazılırken okunduğu
 satırlar (DECISIONS 2026-08-26) — yani sayı iyimser tarafta; görülmemiş veride
 fazla çağırma daha kötü olabilir, daha iyi değil. Gerçek ölçüm Hafta 4'ün bağımsız
-500 satırı. Ayrıntı: `reports/results/gate1_Toys_and_Games.json` → `disagreements`,
+500 satırı. **Hafta 4 doğruladı (2026-09-14):** insan kalibrasyonlu oran **%19,0**
+[15,8–22,3]; ham %23,25 aralığın dışında. Ayrıntı: `reports/results/gate1_Toys_and_Games.json` → `disagreements`,
 `per_class`.
 
 Ölçüt bu yüzden **duman testi** diye anılıyor, doğrulama diye değil: prompt'un
@@ -362,9 +377,9 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Bu bölüm **2026-08-29 denetiminde** dosya dosya doğrulandı. "Çalışıyor" yazan
-> her satır ya bir testle ya da o gün gerçekten koşturulmuş bir komutla
-> kontrol edildi; koşturulamayanlar aşağıda ayrıca yazıyor.
+> Son güncelleme **2026-09-14** (Hafta 4 kapanışı). "Çalışıyor" yazan her satır ya bir
+> testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
+> aşağıda ayrıca yazıyor.
 
 ### Çalışıyor — doğrulandı
 
@@ -375,82 +390,72 @@ yayınlanamaz.
 | Üç çerçeveli örnekleme (main / boost / boost_received) | tamam | çerçeve ayrımı testle kilitli; havuzlama bedeli ölçüldü (7,1×) |
 | LLM annotation (Kaggle, 2× T4, vLLM, prompt v3) | 4 × 11.800 satır | dördü de `backend: vllm`, `is_partial: false`, boş kolon yok |
 | **Kapı 1** | 4 kategoride de **PASS (4/4)** | eşikler koşudan önce sabit; `reports/results/gate1_*.json` |
-| **RQ1 yaygınlık tablosu** + F19 | tamam | `prevalence.json`, Wilson GA, iki tanım yan yana |
-| Hafta 4 makinesi (set çekimi → körleme → 3 sayfa → ingest → Fleiss κ) | uçtan uca koştu | 500 gerçek satırda, **sentetik** etiketle, geçici klasörde denendi |
+| **Hafta 4 — insan doğrulaması** | **INCOMPLETE** · tek etiketleyici (A), 500 satır | yöntemler `8c697a8`, kod `eed7f35` — ikisi de sonuçtan önce push'landı; `validation_500.json`, F18 |
+| **RQ1 yaygınlık** — ham + insan kalibrasyonlu, F19 | tamam | `prevalence.json`; kalibrasyon elle hesaplanmış örnekle test ediliyor |
 | RecBole iskelesi (atomic, C0–C4 + C1b) | tamam | `test_conditions`, `test_no_leakage` |
 | Deney koşucusu (BPR, C0/C1/C4) | duman testi geçti | `.venv-recbole`, 5 epoch, tek seed |
-| Test paketi | **271 test geçiyor** | `pytest tests -q` |
+| Test paketi | **311 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
-- **Öneri deneyi yalnızca sözcüksel vekille koşuyor.** `build_atomic` bir
-  `labels` parametresi taşıyor ama onu dolduran CLI yolu yok ve hiçbir çağıran
-  vermiyor. Bütün deney çıktıları bu yüzden `label_source: proxy` ve
-  `reportable: false` damgalı — bilinçli bir kilit, arıza değil.
-- **Hafta 4'ün makinesi hazır, insanı yok.** Üç sayfa doldurulmadı; bu
-  yüzden F18 üretilmedi ve `prevalence.json` `human_validated: false` taşıyor.
+- **Öneri deneyi yalnızca sözcüksel vekille koşuyor.** `build_atomic` bir `labels`
+  parametresi taşıyor ama onu dolduran CLI yolu yok. Bütün deney çıktıları bu yüzden
+  `label_source: proxy` ve `reportable: false` damgalı — bilinçli bir kilit, arıza değil.
+- **C1b tanımı değişti ama koşul kodu henüz değişmedi.** Karar (2026-09-14): C1b =
+  `gift_given` + `household` + `received`. Yaygınlık ve doğrulama bu tanımı
+  `detection.schema.CONTAMINATION`'dan okuyor; `recsys/conditions.py` hâlâ eski ikili
+  kümeyi taşıyor ve Faz 3'te aynı yerden okuyacak şekilde değişecek.
 
 ### Yazılmadı
 
-`detection/distill.py` · `detection/inference.py` · `recsys/marketing_metrics.py`
-Config'te bu aşamalara ait anahtarlar duruyor ve **"⚠️ HENÜZ OKUNMUYOR"** diye
+`detection/distill.py` · `detection/inference.py` · `recsys/marketing_metrics.py` ·
+C4b (C1b'nin plasebosu) · C3'ün gölge token uygulaması · kullanıcı başı deney çıktısı ·
+eşli bootstrap. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
 işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
-
-C2/C3 koşullarının kodu var ama hiç koşulmadı. Çoklu seed ve bootstrap güven
-aralıkları da Hafta 7'de.
 
 ### Bilinen sınırlar
 
-- `data/raw` **boş** (~16 GB temizlendi). `download` ve `preprocess` yerelde
-  yeniden koşulamaz; sonraki aşamalar `data/interim/` üzerinden çalışıyor.
-- Yaygınlık sayıları **dil modelinden**; bağımsız insan doğrulaması yok.
-- `gift_given` oranı bir **üst sınır**: deneme koşusunda `household → gift_given`
-  yönünde 14 uyuşmazlık, ters yönde 0.
-- **All Beauty ile Grocery ayrılamıyor** — güven aralıkları örtüşüyor.
+- **İnsan referansı tek kişi; etiket güvenilirliği ölçülmedi.** Hafta 4 kapısı bu yüzden
+  INCOMPLETE. Kullanıcı kararı, 2026-09-14.
+- **C1 etiketi gürültülü:** popülasyonda kesinlik 0,65, duyarlılık 0,80. C1b daha iyi
+  (0,84 / 0,74). Deney sonuçları buna göre okunacak (yorum kuralı DECISIONS'ta, deneyden önce).
+- **Kalibrasyonun varsayımı Toys'ta tutmuyor** — PPV kategoriden bağımsız değil. Düşük
+  hediyeli kategorilerde C1b'nin kalibre oranı muhtemelen yukarı yanlı.
+- `received` sınıfı pratikte güvenilmez: A yalnızca 11 kez kullandı, modelin bu sınıftaki
+  kesinliği popülasyonda 0,09.
+- Oranlar **clean** korpusa ait; 5-core deney korpusunda farklılar (T8).
+- `data/raw` **boş** (~16 GB temizlendi). `download` ve `preprocess` yerelde yeniden
+  koşulamaz; sonraki aşamalar `data/interim/` üzerinden çalışıyor.
 - `confidence` alanı analizden düşürüldü (`low` ≡ `unclear`, %100 örtüşme).
-- Deneme setiyle uyum **F1 olarak raporlanamaz**: prompt tam o satırlar okunarak
-  yazıldı.
+- Deneme setiyle uyum **F1 olarak raporlanamaz**: prompt tam o satırlar okunarak yazıldı.
 
 ---
 
 ### Sıradaki adımlar — öncelik sırasıyla
 
-**1 · BLOKLAYAN — insan etiketlemesi (Hafta 4).**
-Üç kişi, 500 satır, bağımsız; sayfalar hazır ve körlenmiş.
-Projenin tek gerçek referansı bu: damıtma, yaygınlık iddiası ve bütün öneri
-deneyi bu ölçümün üstüne kuruluyor. Bitmeden 3, 4 ve 5 başlayamaz.
+Tam plan ve takvim (28 Ekim varsayımıyla): `DECISIONS.md` 2026-09-14 kayıtları.
 
-```bash
-#   ... üç kişi data/annotations/human/validation_500_{A,B,C}.xlsx doldurur ...
-python -m gift_contamination.data.labelsheet --validation --ingest --annotators 3
-python -m gift_contamination.analysis.validation
-```
-Kapı: Fleiss κ ≥ 0,60 (2026-08-29'da, sonuç görülmeden sabitlendi).
+**1 · DAMITMA ve TAM KORPUS ÇIKARIMI** (Hafta 5) — `detection/distill.py` +
+`detection/inference.py`. 47.200 LLM etiketinden **500 doğrulama satırı dışlanarak**
+ModernBERT eğitilir; Toys + Grocery 5-core'unun her satırı (4,6 milyon) etiketlenir.
+Sadakat kapısı eğitimden önce yazıldı: C1 ve C1b eksenlerinde öğrenci–öğretmen F1 ≥ 0,85,
+öğrencinin insana karşı C1 F1'i öğretmeninkinden (0,731) en fazla 0,05 düşük.
+Kaggle'da koşar.
 
-**2 · EKİP KARARI — `household` kontaminasyon mu?** (Hafta 6'dan önce)
-Toys'ta cevabı %23,25 ile %43,42 arasında değiştiriyor. Kavramsal bir karar,
-veriden çıkmıyor. Kod ikisini de koşuyor (C1 / C1b); rapor bir duruş almalı.
-Ölçüm ikisinin *aynı şey olmadığını* söylüyor: `gift_given` mevsimselliği 1,58×,
-`household` 1,09× (düz).
+**2 · KOŞUL KODU** — C1b tanımı + **C4b** plasebosu · **C3 gölge token** (RQ3) · C2'nin
+açık hatayla kilitlenmesi · `build_atomic --labels distilled` · kullanıcı başı metrikler.
 
-**3 · UYGULAMA — damıtma ve tam korpus çıkarımı** (Hafta 5)
-`detection/distill.py` + `detection/inference.py`. 47.200 etiket eğitim seti;
-çıktı kcore'un **her** satırı için bir etiket olmalı.
+**3 · DENEY — Kapı 2** (Hafta 6–7) — {Toys, Grocery} × {SASRec, BPR} × 3 seed;
+C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulardan önce yazıldı.
 
-**4 · UYGULAMA — gerçek etiketleri deneye bağlamak**
-`build_atomic`'e `--labels` CLI yolu. Seam hazır: fonksiyon `labels` ve
-`label_source` alıyor, satır sayısı tutmazsa gürültülü hata veriyor. 3 bitmeden
-anlamı yok — 11.800 satırlık örnek kcore'u kapatmıyor.
+**4 · İSTATİSTİK** — seed'ler üzerinden eşli bootstrap: C1−C4, C3−C1, C1b−C4b.
 
-**5 · DENEY — Kapı 2** (Hafta 6–7)
-Gerçek etiketle C0 / C1 / C1b / C4, tam epoch, 3–5 seed, bootstrap GA.
-`experiment.models`, `experiment.bootstrap_iters` ve `seeds` o zaman okunmaya
-başlar.
+**5 · PAZARLAMA METRİKLERİ** (Hafta 8) — M1 israf oranı · M2 yarı ömür · M3 segment.
 
-**6 · PAZARLAMA METRİKLERİ** (Hafta 8) — M1 / M2 / M3.
+**6 · SONUÇ RAPORU** — RQ1–RQ4, her biri güven aralığıyla ve sınırlılıklarıyla birlikte.
 
-**7 · İSTEĞE BAĞLI** — C2/C3 koşulları, GRU4Rec / ItemKNN / Pop, ikincil
-modelle uyum ölçümü. MVP dışı (CLAUDE.md §11); zaman kalırsa.
+**Kesme sırası** (teslim erken çıkarsa): M3 → BPR'nin ek seed'leri → Grocery'de C3.
+**Kesilmez:** C0/C1/C4, C1b/C4b, Toys × SASRec × C3.
 
 ---
 

@@ -12,9 +12,11 @@
       ],
       "broad": [
         "gift_given",
-        "household"
+        "household",
+        "received"
       ]
-    }
+    },
+    "corpus": "clean (verified + min_words + dedup), NOT the 5-core experiment corpus"
   },
   "categories": {
     "All_Beauty": {
@@ -49,13 +51,14 @@
         "broad": {
           "labels": [
             "gift_given",
-            "household"
+            "household",
+            "received"
           ],
-          "k": 800,
-          "rate_pct": 8.0,
+          "k": 884,
+          "rate_pct": 8.84,
           "ci95_pct": [
-            7.48,
-            8.55
+            8.3,
+            9.41
           ]
         }
       },
@@ -94,13 +97,14 @@
         "broad": {
           "labels": [
             "gift_given",
-            "household"
+            "household",
+            "received"
           ],
-          "k": 4342,
-          "rate_pct": 43.42,
+          "k": 4402,
+          "rate_pct": 44.02,
           "ci95_pct": [
-            42.45,
-            44.39
+            43.05,
+            45.0
           ]
         }
       },
@@ -139,13 +143,14 @@
         "broad": {
           "labels": [
             "gift_given",
-            "household"
+            "household",
+            "received"
           ],
-          "k": 1448,
-          "rate_pct": 14.48,
+          "k": 1523,
+          "rate_pct": 15.23,
           "ci95_pct": [
-            13.8,
-            15.18
+            14.54,
+            15.95
           ]
         }
       },
@@ -184,13 +189,14 @@
         "broad": {
           "labels": [
             "gift_given",
-            "household"
+            "household",
+            "received"
           ],
-          "k": 852,
-          "rate_pct": 8.52,
+          "k": 957,
+          "rate_pct": 9.57,
           "ci95_pct": [
-            7.99,
-            9.08
+            9.01,
+            10.16
           ]
         }
       },
@@ -204,11 +210,224 @@
     "All_Beauty",
     "Grocery_and_Gourmet_Food"
   ],
-  "human_validated": false,
+  "human_validation": {
+    "report_exists": true,
+    "n_annotators": 1,
+    "reliability_measured": false,
+    "verdict": "INCOMPLETE"
+  },
+  "calibration": {
+    "method": "PPV_k = P(insan in D | LLM = k), main satirlarindan kategoriler havuzlanarak; duzeltilmis oran = sum_k pay_main(k) * PPV_k",
+    "reference": {
+      "annotators": [
+        "A"
+      ],
+      "reliability_measured": false
+    },
+    "ppv": {
+      "narrow": {
+        "gift_given": {
+          "value": 0.6774,
+          "n": 62,
+          "source": "main"
+        },
+        "self": {
+          "value": 0.02,
+          "n": 100,
+          "source": "main"
+        },
+        "household": {
+          "value": 0.0865,
+          "n": 104,
+          "source": "main"
+        },
+        "received": {
+          "value": 0.1053,
+          "n": 19,
+          "source": "main"
+        },
+        "unclear": {
+          "value": 0.0556,
+          "n": 54,
+          "source": "main"
+        }
+      },
+      "broad": {
+        "gift_given": {
+          "value": 0.9032,
+          "n": 62,
+          "source": "main"
+        },
+        "self": {
+          "value": 0.12,
+          "n": 100,
+          "source": "main"
+        },
+        "household": {
+          "value": 0.8173,
+          "n": 104,
+          "source": "main"
+        },
+        "received": {
+          "value": 0.1579,
+          "n": 19,
+          "source": "main"
+        },
+        "unclear": {
+          "value": 0.1111,
+          "n": 54,
+          "source": "main"
+        }
+      }
+    },
+    "by_category": {
+      "All_Beauty": {
+        "narrow": {
+          "raw_pct": 4.7,
+          "calibrated_pct": 5.54,
+          "ci95_pct": [
+            3.44,
+            8.41
+          ]
+        },
+        "broad": {
+          "raw_pct": 8.84,
+          "calibrated_pct": 17.97,
+          "ci95_pct": [
+            12.81,
+            23.45
+          ]
+        }
+      },
+      "Toys_and_Games": {
+        "narrow": {
+          "raw_pct": 23.25,
+          "calibrated_pct": 18.99,
+          "ci95_pct": [
+            15.76,
+            22.31
+          ]
+        },
+        "broad": {
+          "raw_pct": 44.02,
+          "calibrated_pct": 44.22,
+          "ci95_pct": [
+            40.41,
+            48.35
+          ]
+        }
+      },
+      "Video_Games": {
+        "narrow": {
+          "raw_pct": 7.86,
+          "calibrated_pct": 7.9,
+          "ci95_pct": [
+            5.83,
+            10.57
+          ]
+        },
+        "broad": {
+          "raw_pct": 15.23,
+          "calibrated_pct": 22.74,
+          "ci95_pct": [
+            17.81,
+            28.1
+          ]
+        }
+      },
+      "Grocery_and_Gourmet_Food": {
+        "narrow": {
+          "raw_pct": 4.28,
+          "calibrated_pct": 5.43,
+          "ci95_pct": [
+            3.39,
+            8.26
+          ]
+        },
+        "broad": {
+          "raw_pct": 9.57,
+          "calibrated_pct": 18.29,
+          "ci95_pct": [
+            13.38,
+            24.05
+          ]
+        }
+      }
+    },
+    "assumption_check": {
+      "category": "Toys_and_Games",
+      "n_validation_main_rows": 154,
+      "classes_falling_back": [],
+      "narrow": {
+        "pooled_ppv_pct": 18.99,
+        "own_ppv_pct": 21.86
+      },
+      "broad": {
+        "pooled_ppv_pct": 44.22,
+        "own_ppv_pct": 54.37
+      }
+    },
+    "sensitivity_all_frames_pct": {
+      "All_Beauty": {
+        "narrow": 5.74,
+        "broad": 18.71
+      },
+      "Toys_and_Games": {
+        "narrow": 18.86,
+        "broad": 46.3
+      },
+      "Video_Games": {
+        "narrow": 8.05,
+        "broad": 23.76
+      },
+      "Grocery_and_Gourmet_Food": {
+        "narrow": 5.69,
+        "broad": 19.22
+      }
+    },
+    "post_hoc_own_category_ppv_pct": {
+      "post_hoc": true,
+      "note": "Sonuc goruldukten sonra eklendi: Toys'ta kendi PPV'si ile havuzlanmis PPV farkli cikti. Birincil sayinin yerine GECMEZ; kategori basina dogrulama satiri az oldugu icin gurultuludur.",
+      "by_category": {
+        "All_Beauty": {
+          "narrow": 4.05,
+          "broad": 6.86,
+          "n_validation_main_rows": 62,
+          "classes_using_pooled_ppv": [
+            "received"
+          ]
+        },
+        "Toys_and_Games": {
+          "narrow": 21.86,
+          "broad": 54.37,
+          "n_validation_main_rows": 154,
+          "classes_using_pooled_ppv": []
+        },
+        "Video_Games": {
+          "narrow": 4.02,
+          "broad": 12.97,
+          "n_validation_main_rows": 63,
+          "classes_using_pooled_ppv": [
+            "received"
+          ]
+        },
+        "Grocery_and_Gourmet_Food": {
+          "narrow": 2.61,
+          "broad": 14.02,
+          "n_validation_main_rows": 60,
+          "classes_using_pooled_ppv": []
+        }
+      }
+    },
+    "bootstrap": {
+      "n": 2000,
+      "seed": 42
+    }
+  },
   "caveats": [
-    "Etiketler LLM'den; insan dogrulamasi HENUZ YOK (Hafta 4).",
-    "Dar tanim UST SINIR: deneme kosusunda household -> gift_given yonunde 14 uyusmazlik, ters yonde 0.",
-    "Oranlar k-core korpusuna aittir, ham korpusa degil.",
+    "Insan referansi TEK etiketleyici; etiket guvenilirligi OLCULMEDI (Hafta 4 karari: INCOMPLETE). Kalibrasyonlu oranlar bu sinirla okunur.",
+    "HAM dar tanim UST SINIR: deneme kosusunda household -> gift_given yonunde 14 uyusmazlik, ters yonde 0.",
+    "Oranlar clean korpusuna aittir (verified + min_words + dedup); 5-core deney korpusuna degil.",
     "Kategoriler arasi HAVUZLANMIS oran raporlanmaz - her kategori esit tahsisle cekildi, korpus paylariyla degil."
   ]
 }

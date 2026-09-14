@@ -45,6 +45,25 @@ class PurchaseType(StrEnum):
     UNCLEAR = "unclear"
 
 
+# KONTAMINASYON TANIMLARI - TEK dogruluk kaynagi (karar 2026-09-14).
+# Yayginlik (`analysis.prevalence`), dogrulamanin ikili eksenleri
+# (`analysis.validation`) ve deney kosullari (`recsys.conditions`) AYNI kumeyi
+# kullanmali: uc yerde ayri yazilmis bir tanim sessizce ayrisir ve "C1b'nin
+# etiket kalitesi" ile "C1b kosulunun cikardigi satirlar" farkli seyler olur.
+#   dar   -> C1  (birincil): literaturdeki hediye
+#   genis -> C1b (saglamlik): alici urunu kendisi SECMEDI
+CONTAMINATION: dict[str, tuple[str, ...]] = {
+    "narrow": (PurchaseType.GIFT_GIVEN.value,),
+    "broad": (
+        PurchaseType.GIFT_GIVEN.value,
+        PurchaseType.HOUSEHOLD.value,
+        PurchaseType.RECEIVED.value,
+    ),
+}
+# Tanimin deney kosulundaki adi.
+CONDITION_OF = {"narrow": "C1", "broad": "C1b"}
+
+
 class Confidence(StrEnum):
     """LLM oz-beyani.
 
