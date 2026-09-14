@@ -1623,3 +1623,86 @@ doğrulama eksenleri ve (Faz 3'te) deney koşulları aynı kümeyi okuyor.
 **Etkilediği bölüm:** `analysis/validation.py`, `analysis/prevalence.py`,
 `detection/schema.py`, `reports/results/validation_500.json`, `prevalence.json`, F18, F19
 **Kim:** Kullanıcı (C1b önceliği) · Ekip
+
+---
+
+### 2026-09-14 — Hafta 5 kodu: damıtma ve tam korpus çıkarımı (HİÇBİR MODEL EĞİTİLMEDEN)
+
+> Sadakat kapısının eşikleri `8c697a8`'de. Bu kayıttaki her karar **eğitimden önce**
+> verildi; hiçbir öğrenci eğitilmedi, hiçbir öğrenci tahmini görülmedi.
+
+#### Ne kuruldu
+
+| adım | nerede | ne yapar |
+|---|---|---|
+| `distill prepare` | yerel, CPU | LLM etiketi + örnek metni → eğitim/ayrılmış paket; 500 doğrulama satırı `(category,row_id)` ile dışlanır |
+| `distill train` | Kaggle, tek T4 | ModernBERT-base, sabit 3 epoch, **model seçimi yok** → sadakat kapısı |
+| `inference prepare` | yerel, CPU | 5-core satırı → öğretmenin gördüğü dört alan |
+| `inference run` | Kaggle, kategori başına bir T4 | 5-core'un her satırına etiket + 5 sınıf olasılığı; 200.000'lik parçalar, kaldığı yerden devam |
+
+Akış tek hücrede: `scripts/kaggle_distill.py`. Kapı PASS değilse çıkarım adımı koşmaz.
+
+#### Ölçülen (yerelde, gerçek veriyle)
+
+- 47.200 LLM etiketi − 500 doğrulama satırı − 45 ayrıştırma hatası = **46.655**
+  (eğitim 41.988 · ayrılmış 4.667; katman = kategori × etiket). Ayrılmış kümenin 5-core'a
+  düşen kısmı **546** satır — dağılım kayması ölçümü bu kadar satıra dayanacak.
+- **Sızıntı koddan bağımsız sayıldı:** paket ∩ doğrulama `(category,row_id)` = **0**;
+  500 insan satırının metniyle birebir aynı metin taşıyan paket satırı = **0**.
+- Eğitim etiketleri: `self` 26.877 · `gift_given` 7.868 · `household` 4.260 ·
+  `unclear` 2.482 · `received` **501**. `received` öğrenci için de zayıf sınıf olacak.
+- Çıkarım girdisi: Toys **2.164.018** (22 satırda ürün adı yok) · Grocery **2.434.594**
+  (393). Kimlik kümesi 5-core'la birebir. Aynı satır için eğitim paketindeki metin ile
+  çıkarım girdisindeki metin **aynı** (300/300 örnek) — öğrenci eğitimde ve çıkarımda aynı
+  girdiyi görüyor. Öğrenci metninin medyanı ~305 karakter.
+
+#### Eğitimden önce verilen kararlar
+
+1. **Rapor model başına** (`distill_report_base.json`, `distill_report_fallback.json`).
+   Tek dosya olsaydı yedek modelin koşusu ana modelin FAIL kanıtını ezerdi.
+2. **"Yedek yalnızca ana model FAIL olursa, bir kez" kuralı KODDA.** Önceden kayıtlı kural
+   (bu günün önceki kaydı) yalnızca yazılıydı; `train --model fallback` artık ana modelin
+   raporu FAIL değilse duruyor (INCOMPLETE de dahil). İki modeli eğitip iyisini seçmek,
+   kapıyı aynı kümede ölçerken model seçmek olurdu.
+3. **Eğitim tek kartta, DDP değil** (CLAUDE.md §6'daki öngörüden sapma). 42K satırlık
+   eğitimde kazanç küçük; ve iki kart görünürken Trainer sessizce DataParallel'e geçip
+   etkin grup boyunu 64'e çıkarıyor — config'te yazan 32 koşmamış olurdu. Raporda
+   `n_gpu` ve `effective_batch_size` ayrıca yazılıyor. Çıkarım **kategori başına bir kart**.
+4. **`distill.gradient_checkpointing: true`.** `distill.max_length: 1024`'ün "bedava"
+   gerekçesi (2026-08-25) ModernBERT'in dolgu kaldırmasına dayanıyordu; o yalnızca
+   FlashAttention'la çalışıyor ve T4'te FlashAttention yok. 32 × 1024 token'lık bir grup
+   kaba hesapla 16 GB'ı aşıyor (**ölçülmedi**). Tavan 1024'te kaldı — öğretmen 6.000
+   karakter gördü ve girdi eşitliği sadakat ölçümünün ön koşulu. Checkpointing sonucu
+   değiştirmez, eğitimi ~%30 yavaşlatır.
+5. **`warmup_ratio: 0.1`, `weight_decay: 0.01` koddan config'e taşındı** ("kodda
+   hardcode parametre yok"). Değerler transformers'ın yaygın varsayılanları; ayar yapılmadı.
+6. **Tahminde token bütçeli gruplar** (grup başına ≤ 65.536 token). Sabit 256 satırlık
+   grup, uzunluğa göre sıralı listenin sonunda 256 × 1024 token kurardı. Mühendislik
+   ayarı: CPU'da aynı satırların tek seferde ve parça parça tahmini arasındaki en büyük
+   olasılık farkı 1,2e-7.
+7. **transformers sürümüne bağımsızlık.** Kaggle imajındaki sürüm bilinmiyor; v5
+   `warmup_ratio`'yu ve `group_by_length`'i yeniden adlandırdı. Yanlış ad, model
+   indirildikten **sonra** hata verirdi. Argümanlar kurulu sürümün alanlarına bakılarak
+   kuruluyor (testi var).
+
+#### Doğrulanan / doğrulanmayan
+
+- **Doğrulandı:** 331 test (stub öğrenciyle sızıntı, kapı mantığı, devam ettirme, eksik
+  satır hatası) · CPU duman testi, transformers 5.17 + torch 2.14: gerçek ModernBERT-base
+  ve deberta-v3-base config'lerinin küçültülmüş, **rastgele ağırlıklı** kopyalarıyla
+  eğitim → kapı → rapor → yedek kuralı → 3 parçalı çıkarım uçtan uca geçti. DeBERTa SDPA
+  desteklemediği için eager dikkate düşüyor (beklenen).
+- **Doğrulanmadı:** T4 üzerinde fp16 davranışı, bellek, gerçek hız. Eğitim kaybı NaN
+  olursa kod durur ve `FP16 = False` ile yeniden koşmayı söyler.
+
+#### Bilinen sınırlar
+
+- Öğrenci **clean** korpusun örneğiyle eğitiliyor, **5-core**'u etiketliyor. Ayrılmış
+  kümenin 5-core kısmı (546 satır) ayrıca raporlanıyor ama kapıya girmiyor.
+- Çıkarım raporundaki "LLM'le örtüşme" **iyimser**: o satırların çoğu eğitimdeydi.
+  Tarafsız sayı damıtma raporundaki `student_vs_teacher_holdout_in_kcore`.
+
+**Etkilediği bölüm:** `detection/distill.py`, `detection/inference.py`,
+`scripts/kaggle_distill.py`, `configs/base.yaml` (`distill`, `paths.models`),
+`reports/results/distill_bundle.json`, CLAUDE.md §2/§6/§7/§10, README, GENEL_BAKIS §6/§8
+**Kim:** Ekip

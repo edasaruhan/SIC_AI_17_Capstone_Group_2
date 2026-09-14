@@ -39,6 +39,7 @@ def cfg(tmp_path: Path) -> Config:
             "processed": str(tmp_path / "processed"),
             "annotations": str(tmp_path / "annotations"),
             "human": str(tmp_path / "annotations" / "human"),
+            "models": str(tmp_path / "models"),
             "figures": str(tmp_path / "figures"),
             "results": str(tmp_path / "results"),
         },
@@ -106,6 +107,25 @@ def cfg(tmp_path: Path) -> Config:
         },
         # gate1 figuru (F17) bu iki anahtari okuyor.
         "eda": {"figure_dpi": 72, "figure_format": "png"},
+        # Hafta 5. Esikler configs/base.yaml ile AYNI (gate1 gerekcesi). Testler
+        # yalnizca `stub` ogrenciyle kosar - model indirilmez, GPU gerekmez.
+        "distill": {
+            "base_model": "answerdotai/ModernBERT-base",
+            "fallback_model": "microsoft/deberta-v3-base",
+            "max_length": 1024,
+            "epochs": 3,
+            "batch_size": 32,
+            "lr": 3.0e-5,
+            "warmup_ratio": 0.1,
+            "weight_decay": 0.01,
+            "gradient_checkpointing": True,
+            "val_fraction": 0.25,   # fixture kucuk: katmanlarda ayirma gercekten olsun
+            "fidelity": {
+                "c1_axis_f1_min": 0.85,
+                "c1b_axis_f1_min": 0.85,
+                "max_drop_vs_teacher_on_human": 0.05,
+            },
+        },
         # Esikler configs/base.yaml ile AYNI. Testin isi esik degerini degil,
         # esigin baglayici olup olmadigini sinamak; farkli bir deger koymak
         # "gercek config'te de boyle mi" sorusunu cevapsiz birakirdi.

@@ -11,7 +11,7 @@ paths:
   processed:   data/processed
   annotations: data/annotations
   human:       data/annotations/human
-  models:      models          # ⚠️ HENÜZ OKUNMUYOR - damıtılmış model çıktısı (Hafta 5)
+  models:      models          # damıtılmış öğrenci (detection/distill.py)
   figures:     reports/figures
   results:     reports/results
 
@@ -110,20 +110,30 @@ detection:
   # silinmedi - hangi annotation hangi prompt'la uretildigi izlenebilsin diye.
   prompt_path: prompts/gift_detection_v3.md
 
-# ⚠️ BU BLOĞUN TAMAMI HENÜZ OKUNMUYOR. `detection/distill.py` yazılmadı
-# (Hafta 5). Seçimler ve gerekçeleri kayıtta kalsın diye duruyor.
+# Hafta 5 — `detection/distill.py` (eğitim) ve `detection/inference.py` okuyor.
 distill:
   # ModernBERT verimlilik ve 149M'lik ayak izi için seçildi, 8192 context için
   # DEĞİL: kanıt gövdenin medyan %1-3'ünde duruyor, 512 token'da kayıp yalnızca
-  # %0.013-0.044 (data-research §4.8, T5). max_length 1024 bir tavan; ModernBERT
-  # unpadding + local attention kullandığı için gerçek maliyet fiili uzunluğa
-  # bağlı, tavana değil - yani 1024 bedava.
+  # %0.013-0.044 (data-research §4.8, T5). max_length 1024 bir tavan.
+  # DÜZELTME (2026-09-14, eğitimden önce): "1024 bedava" gerekçesi ModernBERT'in
+  # dolgu kaldırmasına dayanıyordu ve o yalnızca FlashAttention'la çalışıyor —
+  # T4'te (Turing) FlashAttention yok. Tavan yine 1024 (öğretmen 6.000 karakter
+  # gördü, girdi eşitliği önemli); bellek `gradient_checkpointing` ile, tahminde
+  # token bütçeli gruplarla karşılanıyor.
   base_model: answerdotai/ModernBERT-base
   fallback_model: microsoft/deberta-v3-base   # fidelity gate kaçarsa sağlamlık kontrolü
   max_length: 1024
   epochs: 3
   batch_size: 32
   lr: 3.0e-5
+  # transformers'ın sınıflandırma ince ayarı için yaygın varsayılanları; ayar
+  # yapılmadı, yapılmayacak (model seçimi yok — `distill.py` başındaki not).
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  # Sonucu değiştirmez, ~%30 yavaşlatır. Kapalıyken 32 x 1024 token'lık bir grubun
+  # aktivasyonları + AdamW durumu 16 GB'lık T4'ü aşar (kaba HESAP ~13 + ~2,4 GB,
+  # ÖLÇÜLMEDİ — Kaggle oturumunu bir OOM'a harcamamak için ihtiyatlı seçim).
+  gradient_checkpointing: true
   val_fraction: 0.1
   # SADAKAT KAPISI — 2026-09-14'te, HİÇBİR MODEL EĞİTİLMEDEN yazıldı. Deneyin
   # kullandığı iki ikili karar üzerinden ölçülür, beş sınıflı makro-F1 üzerinden

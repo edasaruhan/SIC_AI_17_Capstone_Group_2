@@ -278,8 +278,8 @@ C1 = yalnızca `gift_given` (birincil). C1b = `gift_given` + `household` + `rece
 | 1 | Veri indirme, ön işleme, sözcüksel vekil, derin EDA | ✅ bitti |
 | 2 | Katmanlı örnekleme, etiket şeması, prompt v2, 200 deneme etiketi | ✅ bitti |
 | 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
-| 4 | 500 satır insan etiketleme (3 kişi), Fleiss κ ve sınıf bazlı F1, duyarlılık analizi | 🔄 set çekildi + sayfalar hazır · **etiketleme bekliyor** |
-| 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | 🔄 annotation ✅ (4/4 kategori, Kapı 1 hepsinde PASS) · damıtma ⏳ |
+| 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) |
+| 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | 🔄 annotation ✅ (4/4, Kapı 1 PASS) · damıtma + çıkarım kodu ✅ (CPU duman testi) · **Kaggle koşusu bekliyor** |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 iskele ✅ + duman koşusu geçti · gerçek koşu ⏳ |
 | 7 | C1/C2/C3 koşulları, bootstrap güven aralıkları, çoklu seed | ⏳ |
 | 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ⏳ |
@@ -377,7 +377,7 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Son güncelleme **2026-09-14** (Hafta 4 kapanışı). "Çalışıyor" yazan her satır ya bir
+> Son güncelleme **2026-09-14** (Hafta 4 kapanışı + Hafta 5 damıtma/çıkarım kodu). "Çalışıyor" yazan her satır ya bir
 > testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
 > aşağıda ayrıca yazıyor.
 
@@ -394,7 +394,9 @@ yayınlanamaz.
 | **RQ1 yaygınlık** — ham + insan kalibrasyonlu, F19 | tamam | `prevalence.json`; kalibrasyon elle hesaplanmış örnekle test ediliyor |
 | RecBole iskelesi (atomic, C0–C4 + C1b) | tamam | `test_conditions`, `test_no_leakage` |
 | Deney koşucusu (BPR, C0/C1/C4) | duman testi geçti | `.venv-recbole`, 5 epoch, tek seed |
-| Test paketi | **311 test geçiyor** | `pytest tests -q` |
+| **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
+| Damıtma + çıkarım **GPU yolu** (`train`, `run`) | yalnızca CPU duman testi | küçük rastgele ModernBERT ve DeBERTa, transformers 5.17: eğitim → kapı → rapor → parça parça çıkarım uçtan uca; **T4 üzerinde henüz koşmadı** |
+| Test paketi | **331 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
@@ -408,9 +410,8 @@ yayınlanamaz.
 
 ### Yazılmadı
 
-`detection/distill.py` · `detection/inference.py` · `recsys/marketing_metrics.py` ·
-C4b (C1b'nin plasebosu) · C3'ün gölge token uygulaması · kullanıcı başı deney çıktısı ·
-eşli bootstrap. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
+`recsys/marketing_metrics.py` · C4b (C1b'nin plasebosu) · C3'ün gölge token
+uygulaması · kullanıcı başı deney çıktısı · eşli bootstrap · Kapı 2 değerlendiricisi. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
 işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
 
 ### Bilinen sınırlar
@@ -435,12 +436,19 @@ işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını enge
 
 Tam plan ve takvim (28 Ekim varsayımıyla): `DECISIONS.md` 2026-09-14 kayıtları.
 
-**1 · DAMITMA ve TAM KORPUS ÇIKARIMI** (Hafta 5) — `detection/distill.py` +
-`detection/inference.py`. 47.200 LLM etiketinden **500 doğrulama satırı dışlanarak**
-ModernBERT eğitilir; Toys + Grocery 5-core'unun her satırı (4,6 milyon) etiketlenir.
-Sadakat kapısı eğitimden önce yazıldı: C1 ve C1b eksenlerinde öğrenci–öğretmen F1 ≥ 0,85,
-öğrencinin insana karşı C1 F1'i öğretmeninkinden (0,731) en fazla 0,05 düşük.
-Kaggle'da koşar.
+**1 · DAMITMA ve TAM KORPUS ÇIKARIMI** (Hafta 5) — **kod hazır, Kaggle koşusu
+bekliyor.** 47.200 LLM etiketinden 500 doğrulama satırı ve 45 ayrıştırma hatası
+dışlandı → 46.655 satır (eğitim 41.988 · ayrılmış 4.667). Sadakat kapısı eğitimden
+önce yazıldı: C1 ve C1b eksenlerinde öğrenci–öğretmen F1 ≥ 0,85, öğrencinin insana
+karşı C1 F1'i öğretmeninkinden (0,731) en fazla 0,05 düşük. Kapı PASS ise Toys +
+Grocery 5-core'unun her satırı (4,6 milyon) etiketlenir. Adımlar:
+1. Yerelde üretilmiş dört dosyayı (`data/processed/distill/` altında: `bundle`, `human`,
+   `infer_Toys_and_Games`, `infer_Grocery_and_Gourmet_Food`) **özel** bir Kaggle
+   dataset'ine yükleyin — review metni taşıyorlar.
+2. `scripts/kaggle_distill.py`'yi bir notebook hücresine yapıştırıp GPU T4 ×2 ve
+   Internet açıkken çalıştırın.
+3. `out/` klasörünü indirin: `*.json` → `reports/results/`, `*_inferred.parquet` →
+   `data/annotations/`.
 
 **2 · KOŞUL KODU** — C1b tanımı + **C4b** plasebosu · **C3 gölge token** (RQ3) · C2'nin
 açık hatayla kilitlenmesi · `build_atomic --labels distilled` · kullanıcı başı metrikler.

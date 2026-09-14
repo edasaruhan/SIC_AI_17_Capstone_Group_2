@@ -33,7 +33,9 @@ cp .env.example .env    # HF_TOKEN ve WANDB_API_KEY (ikisi de opsiyonel)
 **LLM annotation (Hafta 3–5) yerelde koşmuyor.** Kaggle'da iki T4 üzerinde
 koşuyor ve ortamı `scripts/kaggle_annotate.py` kendi kuruyor (vLLM dahil). Elinde
 uygun bir GPU olan biri yerelde denemek isterse `requirements-llm.txt` var, ama
-projenin ürettiği etiketlerin hepsi Kaggle'dan geldi.
+projenin ürettiği etiketlerin hepsi Kaggle'dan geldi. **Damıtma eğitimi ve tam
+korpus çıkarımı** da aynı yoldan: `scripts/kaggle_distill.py` (transformers'ı gerekirse
+kendi günceller); girdileri yerelde `prepare` adımları üretir.
 
 **RecBole deneyi (Hafta 6–7) ayrı bir venv istiyor** — `.venv-recbole`. Ayırmak
 tercih değil zorunluluk: RecBole 1.2.0 `np.float_` kullanıyor, numpy 2.0'da o ad
@@ -82,6 +84,14 @@ python -m gift_contamination.data.labelsheet --validation --export --annotators 
 python -m gift_contamination.data.labelsheet --validation --ingest
 python -m gift_contamination.analysis.validation          # -> INCOMPLETE (tek etiketleyici)
 
+# Hafta 5 — damıtma + tam korpus çıkarımı. `prepare` adımları YEREL (CPU, dakikalar);
+# `train` ve `run` Kaggle'da (scripts/kaggle_distill.py, 2× T4) koşar.
+python -m gift_contamination.detection.distill   prepare                   # 500 doğrulama satırı dışlanır
+python -m gift_contamination.detection.inference prepare --category high   # Toys 5-core, 2,16M satır
+python -m gift_contamination.detection.inference prepare --category low    # Grocery 5-core, 2,43M satır
+# (Kaggle) distill train  -> reports/results/distill_report_base.json (sadakat kapısı)
+# (Kaggle) inference run  -> data/annotations/<kategori>_inferred.parquet  (yalnızca kapı PASS ise)
+
 # Hafta 6 — deney iskelesi (bugün SÖZCÜKSEL VEKİL etiketiyle; çıktı
 # `reportable: false` damgalı). run_experiment .venv-recbole altında koşar.
 python -m gift_contamination.recsys.atomic     --category mid
@@ -128,9 +138,12 @@ Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış so
 | `data/interim/<kategori>_annotation_sample.parquet` | üç çerçeveli örneklem (main / boost / boost_received) |
 | `data/annotations/<kategori>_llm.parquet` | LLM etiketleri — `evidence_span` birebir metin taşır, **git'e girmez** |
 | `data/annotations/human/` | elle etiketleme sayfaları — birebir metin, **git'e girmez** |
+| `data/processed/distill/` | öğrenci eğitim paketi + 5-core çıkarım girdileri — birebir metin, **git'e girmez** |
+| `data/annotations/<kategori>_inferred.parquet` | öğrencinin 5-core etiketleri + sınıf olasılıkları (metin yok; parquet olduğu için yine git'e girmez) |
+| `models/distill/` | eğitilmiş öğrenci — git'e girmez |
 | `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları ve koşullar (C0–C4) |
-| `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, yaygınlık, deney raporları |
-| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, henüz üretilmedi) |
+| `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları |
+| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) |
 | `../data-research/data-research.md` | Data Research teslimi |
 
 ## Veri

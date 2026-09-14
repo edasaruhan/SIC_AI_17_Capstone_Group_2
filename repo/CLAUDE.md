@@ -64,8 +64,11 @@ src/gift_contamination/
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render
     llm_annotate.py      # vLLM batch annotation (veri paralel) + deneme koşusu
-    distill.py           # ⛔ YAZILMADI - ModernBERT fine-tune   (Hafta 5)
-    inference.py         # ⛔ YAZILMADI - tam korpus inference   (Hafta 5)
+    distill.py           # ModernBERT öğrenci: prepare (yerel) + train (Kaggle).
+                         #   500 doğrulama satırı (category,row_id) ile dışlanır;
+                         #   sadakat kapısı model başına rapor; yedek yalnızca ana FAIL ise
+    inference.py         # 5-core'un her satırı: prepare (yerel) + run (Kaggle),
+                         #   parça parça + devam; kapı PASS değilse gerçek model koşmaz
   analysis/
     keyword_scan.py      # sözcüksel vekil (ölçü çubuğu, detektör değil)
     precision_check.py   # vekilin elle doğrulanması (T4)
@@ -288,8 +291,12 @@ Desen `detection/llm_annotate.py`'de kurulu; sonraki modüller onu tekrar kullan
 sığmazsa (14B+) gerekir ve o zaman `gpus` düşürülür — kod
 `gpus × tensor_parallel_size ≤ mevcut kart` kontrolünü yapıyor.
 
-`distill.py` (ModernBERT eğitimi) için karşılığı DDP; `inference.py` (4,97M
-satır) için yine veri paralel, aynı parça deseni.
+> **2026-09-14 — Hafta 5'te uygulanan (DECISIONS):** `distill.py` eğitimi **tek
+> kartta** (DDP değil): 42K satırlık eğitimde kazanç küçük, ve iki kart görünürken
+> Trainer sessizce DataParallel'e geçip etkin grup boyunu config'tekinin iki katına
+> çıkarıyor. `inference.py` **kategori başına bir kart** (Toys GPU 0, Grocery GPU 1,
+> 4,6M satır) — satır bölmekten basit, çıktılar zaten ayrı; kaldığı yerden devam
+> 200.000'lik parçalarla. Akış `scripts/kaggle_distill.py`'de.
 
 **Inference kapsamı: önce `kcore`, sonra `clean`.** RQ2–RQ4 yalnızca k-core korpusuna
 etiket istiyor (**4,97M satır**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25 saat) RQ1'in
@@ -340,6 +347,13 @@ python -m gift_contamination.data.sampling   --config configs/base.yaml --valida
 python -m gift_contamination.data.labelsheet --validation --export --annotators 3   # yapıldı
 python -m gift_contamination.data.labelsheet --validation --ingest
 python -m gift_contamination.analysis.validation  --config configs/base.yaml   # -> INCOMPLETE
+# Hafta 5 — damıtma + tam korpus çıkarımı. `prepare` YEREL (CPU); `train`/`run` Kaggle'da
+# (`scripts/kaggle_distill.py`). Yerelde torch/transformers YOK - `--backend stub` testler için.
+python -m gift_contamination.detection.distill   prepare --config configs/base.yaml
+python -m gift_contamination.detection.distill   train   --config configs/base.yaml   # GPU
+python -m gift_contamination.detection.distill   train   --model fallback   # YALNIZCA base FAIL ise
+python -m gift_contamination.detection.inference prepare --config configs/base.yaml --category high
+python -m gift_contamination.detection.inference run     --config configs/base.yaml --category high  # GPU, kapı PASS
 # Hafta 6 — deney. Atomic dosya ve koşullar RecBole GEREKTİRMEZ; yalnızca
 # run_experiment gerektirir. Etiket verilmezse sözcüksel vekil kullanılır ve
 # çıktı `reportable: false` damgası taşır — sonuç tablosuna giremez.
@@ -354,9 +368,6 @@ Bir komutu buradan yukarıdaki bloğa taşımak, o modülün testleriyle birlikt
 geldiği anlamına gelir.
 
 ```bash
-# Hafta 5 — damıtma ve tam korpus çıkarımı
-python -m gift_contamination.detection.distill   --config configs/base.yaml
-python -m gift_contamination.detection.inference --config configs/base.yaml --category high
 # Hafta 8 — pazarlama metrikleri (M1/M2/M3)
 python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
 ```
@@ -433,6 +444,11 @@ Kurallar:
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık
   YALNIZCA `main`'den mi okunuyor; iki tanımdan biri sessizce seçilmiyor mu;
   `human_validated` diskten mi okunuyor (elle iddia edilmiyor)
+- `test_distill.py` — **kritik**: 500 doğrulama satırı eğitim paketine GİRMİYOR mu;
+  dışlanamayan satır hata veriyor mu; stub öğretmen/öğrenci kapıyı geçemiyor mu;
+  yedek model yalnızca ana model FAIL olunca koşuyor ve onun kanıtını ezmiyor mu
+- `test_inference.py` — 5-core'un her satırına TAM bir etiket mi; kesintiden sonra
+  bitmiş parça yeniden hesaplanmıyor mu; kapıyı geçmemiş öğrenci reddediliyor mu
 
 Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte kullanılmaz.
 
