@@ -108,6 +108,54 @@ def annotator_tags(n: int) -> list[str | None]:
     return [None] if n == 1 else list(string.ascii_uppercase[:n])
 
 
+def resolve_tags(annotators: int = 1, tags: list[str] | None = None) -> list[str | None]:
+    """Hangi sayfalar okunacak: acik etiket listesi varsa o, yoksa sayidan.
+
+    Acik liste GEREKLI cunku "kac kisi" ile "hangileri" ayni soru degil. Hafta 4
+    uc sayfayla (A, B, C) uretildi ama yalnizca A teslim etti (2026-09-14).
+    `annotators=1` o durumda `validation_500.xlsx`i (soneksiz) arardi ve A'nin
+    dosyasini hic gormezdi; `tags=['A']` dosyayi ve `label_A` kolonunu korur.
+    """
+    if tags is None:
+        return annotator_tags(annotators)
+    if not tags:
+        raise ValueError("etiketleyici listesi bos")
+    for t in tags:
+        if not (isinstance(t, str) and len(t) == 1 and t in string.ascii_uppercase):
+            raise ValueError(f"etiketleyici etiketi tek buyuk harf olmali, '{t}' verildi")
+    if len(set(tags)) != len(tags):
+        raise ValueError(f"tekrar eden etiketleyici etiketi: {tags}")
+    return list(tags)
+
+
+# Rehberin istedigi not kodlari. Etiketleyici bunlari DUZ TURKCE yazabilir:
+# A'nin 131 notunun hepsi "kendi çocuğu" (2026-09-14) - kod "KENDI_COCUGU"
+# tam eslesme aradigi icin hepsi sifir sayiliyordu. Niyet acik, bilgi kurtarilir.
+NOTE_CODES = {
+    "kendicocugu": "KENDI_COCUGU",
+    "emindegil": "EMIN_DEGIL",
+    "emindegilim": "EMIN_DEGIL",
+}
+_TR_FOLD = str.maketrans("çğıöşüâîûÇĞİIÖŞÜ", "cgiosuaiucgiiosu")
+
+
+def normalize_note(raw: str | None) -> str | None:
+    """Not metnini koda cevirir; kod degilse metni OLDUGU GIBI birakir.
+
+    Eslesme BUTUN not uzerinden, parca uzerinden degil: "kendi çocuğu değil"
+    tam tersini soyluyor ve KENDI_COCUGU'ya donusmemeli. Harf disi her sey ve
+    Turkce karakterler katlaniyor, yani "Kendi Çocuğu", "kendi_cocugu" ve
+    "KENDI_COCUGU" ayni koda gidiyor.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    katlanmis = "".join(ch for ch in text.translate(_TR_FOLD).lower() if ch.isalpha())
+    return NOTE_CODES.get(katlanmis, text)
+
+
 def sheet_path(csv_path: Path, tag: str | None = None) -> Path:
     stem = csv_path.stem if tag is None else f"{csv_path.stem}_{tag}"
     return csv_path.with_name(stem + ".xlsx")
@@ -144,7 +192,10 @@ def validation_csv(cfg: Config) -> Path:
 
 
 # --------------------------------------------------------------------- export
-def export(csv_path: Path, *, annotators: int = 1, force: bool = False) -> list[Path]:
+def export(
+    csv_path: Path, *, annotators: int = 1, tags: list[str] | None = None,
+    force: bool = False,
+) -> list[Path]:
     """CSV'yi acilir menulu, dondurulmus baslikli xlsx sayfalarina cevirir.
 
     Birden fazla etiketleyicide her dosya AYNI satirlari AYNI sirada tasir.
@@ -157,7 +208,8 @@ def export(csv_path: Path, *, annotators: int = 1, force: bool = False) -> list[
     df = source.select(columns)
 
     written = []
-    for tag in annotator_tags(annotators):
+    secilen = resolve_tags(annotators, tags)
+    for tag in secilen:
         dest = sheet_path(csv_path, tag)
         if should_skip(dest, force, log):
             written.append(dest)
@@ -167,10 +219,10 @@ def export(csv_path: Path, *, annotators: int = 1, force: bool = False) -> list[
         log_output(log, dest, n_rows=df.height)
 
     log.info("etiket kolonu acilir menulu; onyargi kolonlari sayfada YOK")
-    if annotators > 1:
+    if len(secilen) > 1:
         log.info(
             "%d ayri sayfa: her etiketleyici KENDI dosyasini doldurur, "
-            "birbirininkini gormez", annotators,
+            "birbirininkini gormez", len(secilen),
         )
     return written
 
@@ -218,38 +270,56 @@ def _write_sheet(
 
 # --------------------------------------------------------------------- ingest
 def ingest(
-    csv_path: Path, *, annotators: int = 1, force: bool = False
+    csv_path: Path, *, annotators: int = 1, tags: list[str] | None = None,
+    force: bool = False,
 ) -> tuple[Path, dict]:
     """Doldurulmus xlsx'leri okur, dogrular ve UTF-8 CSV olarak geri yazar.
 
-    Tek etiketleyicide cikti `label` / `notes` kolonlarini tasir. Birden
-    fazlada `label_A`, `label_B`, ... olur - Fleiss kappa'nin ihtiyaci bu.
+    Etiketsiz tek sayfada (Hafta 2) cikti `label` / `notes` tasir. Harfli
+    sayfalarda `label_A`, `notes_A`, ... olur - tek harf de olsa (`tags=['A']`).
+
+    `notes` KOD olarak normalize edilir (bkz. `normalize_note`); etiketleyicinin
+    yazdigi ham metin `notes_raw` kolonunda degismeden durur.
     """
     source = pl.read_csv(csv_path)
     id_col = _id_column(source)
     columns = export_columns(id_col)
+    secilen = resolve_tags(annotators, tags)
+    etiketsiz = secilen == [None]
 
     reports: dict[str, dict] = {}
     merged = source.drop("label", "notes")
-    for tag in annotator_tags(annotators):
+    for tag in secilen:
         filled = _read_sheet(csv_path, columns, id_col, tag)
-        reports["tek" if tag is None else tag] = _validate(filled, source, id_col)
+        rapor = _validate(filled, source, id_col)
+        normal = pl.Series(
+            "notes", [normalize_note(v) for v in filled["notes"].to_list()], dtype=pl.String
+        )
+        rapor["notes"] = {
+            "n_kendi_cocugu": int((normal == "KENDI_COCUGU").sum()),
+            "n_emin_degil": int((normal == "EMIN_DEGIL").sum()),
+            "n_serbest": int(
+                (normal.is_not_null() & ~normal.is_in(list(set(NOTE_CODES.values())))).sum()
+            ),
+        }
+        reports["tek" if tag is None else tag] = rapor
         suffix = "" if tag is None else f"_{tag}"
         merged = merged.join(
             filled.select(
                 id_col,
                 pl.col("label").alias(f"label{suffix}"),
-                pl.col("notes").alias(f"notes{suffix}"),
+                normal.alias(f"notes{suffix}"),
+                pl.col("notes").alias(f"notes_raw{suffix}"),
             ),
             on=id_col,
             how="left",
         )
 
-    if annotators == 1:
-        merged = merged.select(source.columns)
+    if etiketsiz:
+        merged = merged.select([*source.columns, "notes_raw"])
     merged = merged.with_columns(pl.lit(LABEL_SOURCE).alias(LABEL_SOURCE_COLUMN))
 
-    report = reports["tek"] if annotators == 1 else {"by_annotator": reports}
+    report = reports["tek"] if etiketsiz else {"by_annotator": reports}
     dest = labeled_path(csv_path)
     if should_skip(dest, force, log):
         return dest, report
@@ -334,6 +404,8 @@ def _log_report(name: str, report: dict) -> None:
         log.info("    %-12s %4d", label, n)
     if "vs_keyword_proxy" in report:
         log.info("    sozcuksel vekile karsi: %s", report["vs_keyword_proxy"])
+    if "notes" in report:
+        log.info("    notlar: %s", report["notes"])
     if report["n_labeled"] < report["n_total"]:
         log.warning(
             "    %d satir bos - etiketleme yarim",
@@ -357,7 +429,13 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         metavar="N",
-        help="Kac ayri sayfa (varsayilan: dogrulamada validation.n_annotators, digerinde 1)",
+        help="Kac ayri sayfa, A'dan baslayarak (dogrulamada varsayilan: validation.annotators)",
+    )
+    parser.add_argument(
+        "--tags",
+        default=None,
+        metavar="A,B",
+        help="Tam olarak hangi sayfalar (ör. 'A'). --annotators'i ezer.",
     )
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args(argv)
@@ -373,18 +451,20 @@ def main(argv: list[str] | None = None) -> int:
     else:
         csv_path = default_csv(cfg)
 
-    if args.annotators is not None:
+    annotators, tags = 1, None
+    if args.tags:
+        tags = [t.strip() for t in args.tags.split(",") if t.strip()]
+    elif args.annotators is not None:
         annotators = args.annotators
     elif args.validation:
-        annotators = int(cfg.get("validation.n_annotators"))
-    else:
-        annotators = 1
+        # Hafta 4: config'te yazan etiketleyiciler - ör. yalnizca teslim eden A.
+        tags = list(cfg.get("validation.annotators"))
 
     if args.export:
-        export(csv_path, annotators=annotators, force=args.force)
+        export(csv_path, annotators=annotators, tags=tags, force=args.force)
         return 0
 
-    _, report = ingest(csv_path, annotators=annotators, force=args.force)
+    _, report = ingest(csv_path, annotators=annotators, tags=tags, force=args.force)
     if "by_annotator" in report:
         for name, sub in report["by_annotator"].items():
             _log_report(name, sub)

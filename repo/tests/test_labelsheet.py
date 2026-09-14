@@ -31,6 +31,8 @@ from gift_contamination.data.labelsheet import (
     export_columns,
     ingest,
     labeled_path,
+    normalize_note,
+    resolve_tags,
     sheet_path,
 )
 from gift_contamination.data.sampling import LABELS
@@ -141,8 +143,9 @@ def test_round_trip_keeps_the_blind_columns(trial_csv: Path):
     out = pl.read_csv(dest)
 
     # Kaynak kolonlarin HEPSI ayni sirada geri gelmeli; sonuna `ingest`in
-    # bastigi kaynak damgasi ekleniyor.
-    assert out.columns == [*pl.read_csv(trial_csv).columns, LABEL_SOURCE_COLUMN]
+    # ekledigi iki koken kolonu geliyor: etiketleyicinin ham notu (normalize
+    # edilmeden once) ve kaynak damgasi.
+    assert out.columns == [*pl.read_csv(trial_csv).columns, "notes_raw", LABEL_SOURCE_COLUMN]
     assert out[LABEL_SOURCE_COLUMN].to_list() == [LABEL_SOURCE] * 4
     assert out["kw_gift_proxy"].to_list() == [True, False, True, False]
     assert out["row_id"].to_list() == [11, 22, 33, 44]
@@ -331,3 +334,76 @@ def test_id_column_must_be_unambiguous(tmp_path: Path):
 
     with pytest.raises(ValueError, match="belirsiz"):
         export(path)
+
+
+# ------------------------------------------ tek etiketleyici (2026-09-14)
+@pytest.mark.parametrize(
+    "raw",
+    ["kendi çocuğu", "Kendi Çocuğu ", "KENDI_COCUGU", "kendi_cocugu", "KENDİ ÇOCUĞU", "kendi cocugu."],
+)
+def test_natural_turkish_notes_map_to_the_code(raw: str):
+    """A'nin 131 notunun hepsi "kendi çocuğu" diye yazildi, kod degil.
+
+    Kod tam eslesme aradigi icin hepsi SIFIR sayiliyordu. Niyet acik; bilgi
+    kaybolmamali.
+    """
+    assert normalize_note(raw) == "KENDI_COCUGU"
+
+
+@pytest.mark.parametrize("raw", ["emin değilim", "EMIN_DEGIL", "Emin degil"])
+def test_uncertainty_notes_map_to_the_code(raw: str):
+    assert normalize_note(raw) == "EMIN_DEGIL"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["kendi çocuğu değil", "kendi çocuğu mu torunu mu belli değil", "yeğeni için"],
+)
+def test_a_note_that_says_something_else_is_left_untouched(raw: str):
+    """Esleme BUTUN not uzerinden. "kendi çocuğu değil" tam tersini soyler.
+
+    Parca eslemesi bunu KENDI_COCUGU'ya cevirir ve olcumu sessizce bozardi.
+    """
+    assert normalize_note(raw) == raw
+
+
+@pytest.mark.parametrize("raw", [None, "", "   "])
+def test_empty_notes_stay_empty(raw):
+    assert normalize_note(raw) is None
+
+
+@pytest.mark.parametrize("bad", [["a"], ["AB"], [], ["A", "A"], [3]])
+def test_resolve_tags_rejects_malformed_tags(bad):
+    with pytest.raises(ValueError):
+        resolve_tags(tags=bad)
+
+
+def test_only_the_configured_annotator_is_ingested(validation_csv_file: Path):
+    """Uc sayfa uretildi, yalnizca A doldurdu (2026-09-14).
+
+    `annotators=1` soneksiz dosyayi arardi ve A'yi hic gormezdi; `tags=['A']`
+    dogru dosyayi okumali, `label_A` kolonunu korumali ve B/C'ye hic
+    dokunmamali - doldurulmamis sayfalar olcume sizmamali.
+    """
+    export(validation_csv_file, annotators=3)
+    _fill_tagged(validation_csv_file, "A", ["gift_given", "self", "household", "unclear"])
+    import openpyxl
+
+    book = openpyxl.load_workbook(sheet_path(validation_csv_file, "A"))
+    col = export_columns("val_id").index("notes") + 1
+    for row, note in enumerate(["", "", "kendi çocuğu", "emin değilim"], start=2):
+        book.active.cell(row=row, column=col, value=note or None)
+    book.save(sheet_path(validation_csv_file, "A"))
+
+    dest, report = ingest(validation_csv_file, tags=["A"])
+    out = pl.read_csv(dest)
+
+    assert out["label_A"].to_list() == ["gift_given", "self", "household", "unclear"]
+    assert "label_B" not in out.columns and "label_C" not in out.columns
+    assert out["notes_A"].to_list() == [None, None, "KENDI_COCUGU", "EMIN_DEGIL"]
+    # Etiketleyicinin yazdigi ham metin kaybolmadi
+    assert out["notes_raw_A"].to_list() == [None, None, "kendi çocuğu", "emin değilim"]
+    assert set(report["by_annotator"]) == {"A"}
+    assert report["by_annotator"]["A"]["notes"] == {
+        "n_kendi_cocugu": 1, "n_emin_degil": 1, "n_serbest": 0,
+    }

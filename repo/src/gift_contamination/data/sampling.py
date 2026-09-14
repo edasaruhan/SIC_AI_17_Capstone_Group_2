@@ -860,9 +860,9 @@ def build_validation(
         log,
     )
     log.info(
-        "Simdi `labelsheet --export --annotators %s` ile sayfalari uretin. "
+        "Simdi `labelsheet --validation --export --tags %s` ile sayfalari uretin. "
         "Etiketleyen kisi LLM'in cevabini GORMEMELI.",
-        cfg.get("validation.n_annotators"),
+        ",".join(cfg.get("validation.annotators")),
     )
     log.info("GIZLILIK: bu dosya birebir review metni tasir ve git'e GIRMEZ.")
     return dest

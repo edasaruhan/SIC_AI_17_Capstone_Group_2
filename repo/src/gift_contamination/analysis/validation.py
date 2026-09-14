@@ -1,16 +1,32 @@
 """Hafta 4 - insan dogrulamasi. Projenin TEK gercek referansi.
 
-Girdi : data/annotations/human/validation_<n>_labeled.csv (label_A/B/C dolu)
+Girdi : data/annotations/human/validation_<n>_labeled.csv (label_<harf> dolu)
 Cikti : reports/results/validation_<n>.json + reports/figures/F18_*.png
 
-Uc olcum var ve UCU DE AYRI SORUYA cevap veriyor:
+IKI MOD, config belirliyor (`validation.annotators`, `validation.reliability`):
 
-  1. FLEISS KAPPA - "gorev tanimi acik mi?"
-     Uc etiketleyici birbiriyle ne kadar uyusuyor. Dusukse sorun detektorde
+  * Birden cok etiketleyici + `reliability: fleiss` -> ozgun tasarim. Referans
+    cogunluk uzlasisi, kapi Fleiss kappa.
+  * TEK etiketleyici + `reliability: none` -> 2026-09-14'ten beri FIILI durum.
+    Yalnizca A teslim etti. Referans A'nin etiketi. Uyum olculemez, o yuzden
+    kapi olcutu `passed: null` ve karar INCOMPLETE - ASLA PASS yazilmaz.
+    Olcum yontemleri A'nin etiketleri modelle karsilastirilmadan ONCE kaydedildi
+    (DECISIONS 2026-09-14, commit 8c697a8).
+
+Olcumler ve cevapladiklari sorular:
+
+  1. FLEISS KAPPA - "gorev tanimi acik mi?" (yalnizca cok etiketleyicide)
+     Etiketleyiciler birbiriyle ne kadar uyusuyor. Dusukse sorun detektorde
      degil SEMADA: insanlar bile ayni satiri farkli etiketliyorsa modelden
-     tutarlilik beklemek anlamsiz. Tek KAPI olcutu bu (esik `validation.kappa_min`).
+     tutarlilik beklemek anlamsiz. KAPI olcutu bu (esik `validation.kappa_min`).
 
-  2. LLM vs INSAN UZLASI SI - "detektor ne kadar dogru?"
+  1b. AGIRLIKLI OLCUM - "populasyonda detektor ne kadar dogru?"
+     Dogrulama LLM etiketine gore BILEREK dengesiz cekildi; agirliksiz F1
+     `household`/`gift_given` yonunde yanlidir. Yalnizca `main` satirlariyla,
+     (kategori x LLM sinifi) hucresine ters olasilik agirligi verilerek
+     populasyon duzeyi olcum ayrica raporlanir. Bootstrap GA ikisinde de.
+
+  2. LLM vs INSAN - "detektor ne kadar dogru?"
      Sinif bazli precision/recall/F1 + yon yon karisiklik. KAPI DEGIL, olcum:
      esigi hicbir belgede sabitlenmedi ve sonucu gordukten sonra bir esik
      uydurmak, kapiyi sonradan kurmak olur. Raporlanir, karara baglanmaz.
@@ -42,6 +58,7 @@ import polars as pl
 from ..config import Config
 from ..data.labelsheet import LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path
 from ..data.sampling import LABELS, validation_path
+from ..detection.llm_annotate import annotation_path
 from ..utils.io import write_json
 from ..utils.logging import get_logger
 from . import viz
@@ -53,6 +70,13 @@ GIFT = "gift_given"
 # Uzlasi saglanamayan satirin etiketi. Sessizce bir sinifa itmek uzlasi
 # oranini SISIRIR ve tam da olcmek istedigimiz belirsizligi gizler.
 TIE = "tie"
+FRAME_MAIN = "main"
+KENDI_COCUGU = "KENDI_COCUGU"
+
+# `validation.reliability` degerleri. Baska bir deger UYGULANMADI ve gurultulu
+# hata verir - sessizce "none" gibi davranmak olculmemis bir seyi olculmus gibi
+# gosterirdi.
+RELIABILITY_MODES = ("fleiss", "none")
 
 
 def validation_report_path(cfg: Config, n: int) -> Path:
@@ -105,11 +129,13 @@ def load_labels(cfg: Config, n: int | None = None) -> pl.DataFrame:
         )
 
     cols = label_columns(df)
-    want = int(cfg.get("validation.n_annotators"))
-    if len(cols) != want:
+    tags, _ = annotator_mode(cfg)
+    want = [f"label_{t}" for t in tags]
+    if cols != want:
         raise ValueError(
-            f"{len(cols)} etiketleyici kolonu var, {want} bekleniyordu ({cols}). "
-            "Eksik bir sayfayla hesaplanan kappa yanlis olur."
+            f"{len(cols)} etiketleyici kolonu var ({cols}), config {want} bekliyor. "
+            "Eksik bir sayfayla hesaplanan kappa yanlis olur; fazla bir sayfa ise "
+            "config'te adi gecmeyen birinin etiketini sessizce olcume sokar."
         )
 
     eksik = df.filter(pl.any_horizontal(pl.col(c).is_null() for c in cols))
@@ -121,6 +147,41 @@ def load_labels(cfg: Config, n: int | None = None) -> pl.DataFrame:
             eksik.height,
         )
     return df
+
+
+def annotator_mode(cfg: Config) -> tuple[list[str], str]:
+    """(etiketleyici harfleri, guvenilirlik modu) - tutarsizsa gurultulu hata.
+
+    Tek etiketleyiciyle uyum OLCULEMEZ: `fleiss` istemek, hesaplanamayacak bir
+    kapiyi var gibi gostermek olurdu. Tersine, birden cok etiketleyici varken
+    `none` demek elde olan uyum bilgisini atmak olurdu - o da reddediliyor.
+    """
+    tags = [str(t) for t in cfg.get("validation.annotators")]
+    mode = str(cfg.get("validation.reliability"))
+    if mode not in RELIABILITY_MODES:
+        raise NotImplementedError(
+            f"validation.reliability='{mode}' uygulanmadi. Gecerli: {RELIABILITY_MODES}"
+        )
+    if not tags:
+        raise ValueError("validation.annotators bos")
+    if len(tags) == 1 and mode != "none":
+        raise ValueError(
+            f"Tek etiketleyiciyle (A) '{mode}' uyumu hesaplanamaz. "
+            "`validation.reliability: none` olmali ve kapi INCOMPLETE kalir."
+        )
+    if len(tags) > 1 and mode == "none":
+        raise ValueError(
+            f"{len(tags)} etiketleyici var ama reliability=none. Uyum olculebilirken "
+            "atilmaz; `fleiss` kullanin."
+        )
+    return tags, mode
+
+
+def reference_labels(df: pl.DataFrame, cols: list[str]) -> pl.Series:
+    """Referans etiket: tek etiketleyicide ONUN etiketi, cokta cogunluk uzlasisi."""
+    if len(cols) == 1:
+        return df[cols[0]].alias("reference")
+    return consensus(df, cols).alias("reference")
 
 
 def consensus(df: pl.DataFrame, cols: list[str]) -> pl.Series:
@@ -308,8 +369,233 @@ def _binary_gift(series: pl.Series, name: str) -> pl.Series:
     )
 
 
+# ---------------------------------------------- agirlik + bootstrap (2026-09-14)
+# Yontem A'nin etiketleri modelle karsilastirilmadan ONCE kaydedildi
+# (DECISIONS 2026-09-14). Buradaki hicbir secim sonuca bakilarak yapilmadi.
+
+def _confusion(ref: np.ndarray, pred: np.ndarray, w: np.ndarray, k: int) -> np.ndarray:
+    """Agirlikli karisiklik matrisi: satir = referans, sutun = tahmin."""
+    return np.bincount(ref * k + pred, weights=w, minlength=k * k).reshape(k, k)
+
+
+def _scores(conf: np.ndarray) -> dict[str, np.ndarray | float]:
+    """Karisiklik matrisinden dogruluk, sinif bazli P/R/F1, makro-F1.
+
+    Tanimsiz deger (sifira bolme) NaN - "0" degil. Bir sinifin hic referansi
+    yoksa recall'u 0 degil TANIMSIZDIR; 0 yazmak detektoru haksiz cezalandirir.
+    """
+    tp = np.diag(conf)
+    n_pred = conf.sum(axis=0)
+    n_ref = conf.sum(axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        precision = np.where(n_pred > 0, tp / n_pred, np.nan)
+        recall = np.where(n_ref > 0, tp / n_ref, np.nan)
+        f1 = np.where(
+            (precision + recall) > 0, 2 * precision * recall / (precision + recall), np.nan
+        )
+    toplam = conf.sum()
+    tanimli = ~np.isnan(f1)
+    return {
+        "accuracy": float(tp.sum() / toplam) if toplam else float("nan"),
+        "macro_f1": float(f1[tanimli].mean()) if tanimli.any() else float("nan"),
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "n_ref": n_ref,
+    }
+
+
+def population_counts(cfg: Config, categories: list[str]) -> dict[tuple[str, str], int]:
+    """(kategori, LLM sinifi) -> `main` cercevesindeki satir sayisi.
+
+    Populasyon: her kategorinin `main` cercevesi (10.000 satir). Dosyasi
+    olmayan kategori sozlukte YER ALMAZ; cagiran taraf bunu kontrol eder.
+    """
+    slug_to_role = {cfg.category_slug(r): r for r in cfg.category_roles()}
+    out: dict[tuple[str, str], int] = {}
+    for cat in categories:
+        role = slug_to_role.get(cat)
+        if role is None:
+            continue
+        path = annotation_path(cfg, role)
+        if not path.exists():
+            continue
+        main = pl.read_parquet(path, columns=["sample_frame", "purchase_type"]).filter(
+            pl.col("sample_frame") == FRAME_MAIN
+        )
+        for k, n in main.group_by("purchase_type").len().iter_rows():
+            out[(cat, k)] = int(n)
+    return out
+
+
+def ipw_weights(
+    categories: list[str], llm: list[str], pop: dict[tuple[str, str], int],
+    *, min_cell_n: int,
+) -> tuple[np.ndarray, dict]:
+    """Ters olasilik agirligi - onceden kaydedilmis kural.
+
+    Hucre (c, k) icin `w = N_main(c,k) / n_dogrulama(c,k)`. Dogrulama satiri
+    `min_cell_n`'den az olan (ya da hic olmayan) hucrenin populasyon kutlesi,
+    k sinifinin BUTUN kategorilerdeki dogrulama satirlarina esit dagitilir.
+    Hic dogrulama satiri olmayan sinifin kutlesi "kapsanmayan pay" olur.
+    """
+    n_cell: dict[tuple[str, str], int] = {}
+    for c, k in zip(categories, llm):
+        n_cell[(c, k)] = n_cell.get((c, k), 0) + 1
+    n_class: dict[str, int] = {}
+    for (_, k), n in n_cell.items():
+        n_class[k] = n_class.get(k, 0) + n
+
+    collapsed: list[str] = []
+    artik: dict[str, float] = {}      # sinif -> dagitilacak kutle
+    kapsanmayan = 0.0
+    for (c, k), big_n in sorted(pop.items()):
+        small_n = n_cell.get((c, k), 0)
+        if small_n >= min_cell_n:
+            continue
+        if n_class.get(k, 0) == 0:
+            kapsanmayan += big_n
+            continue
+        artik[k] = artik.get(k, 0.0) + big_n
+        collapsed.append(f"{c}/{k} (n={small_n})")
+
+    w = np.zeros(len(llm), dtype=float)
+    for i, (c, k) in enumerate(zip(categories, llm)):
+        small_n = n_cell[(c, k)]
+        if small_n >= min_cell_n:
+            w[i] += pop.get((c, k), 0) / small_n
+        if k in artik:
+            w[i] += artik[k] / n_class[k]
+
+    toplam_pop = float(sum(pop.values()))
+    return w, {
+        "min_cell_n": min_cell_n,
+        "population_rows": int(toplam_pop),
+        "collapsed_cells": collapsed,
+        "uncovered_share": round(kapsanmayan / toplam_pop, 6) if toplam_pop else None,
+    }
+
+
+def _strata_index(keys: list[tuple]) -> list[np.ndarray]:
+    gruplar: dict[tuple, list[int]] = {}
+    for i, key in enumerate(keys):
+        gruplar.setdefault(key, []).append(i)
+    return [np.asarray(v) for _, v in sorted(gruplar.items())]
+
+
+def bootstrap_scores(
+    ref: np.ndarray, pred: np.ndarray, w: np.ndarray, strata: list[np.ndarray],
+    *, k: int, n_boot: int, seed: int,
+) -> dict[str, np.ndarray]:
+    """Katman ICINDE yeniden ornekleme; her tekrarda skorlar yeniden hesaplanir.
+
+    Katmanlar agirlik hucreleriyle ayni oldugu icin hucre boyutlari her tekrarda
+    korunur ve agirliklar gecerli kalir.
+    """
+    rng = np.random.default_rng(seed)
+    acc = np.empty(n_boot)
+    macro = np.empty(n_boot)
+    p = np.empty((n_boot, k))
+    r = np.empty((n_boot, k))
+    f = np.empty((n_boot, k))
+    for b in range(n_boot):
+        idx = np.concatenate([s[rng.integers(0, len(s), len(s))] for s in strata])
+        s = _scores(_confusion(ref[idx], pred[idx], w[idx], k))
+        acc[b], macro[b] = s["accuracy"], s["macro_f1"]
+        p[b], r[b], f[b] = s["precision"], s["recall"], s["f1"]
+    return {"accuracy": acc, "macro_f1": macro, "precision": p, "recall": r, "f1": f}
+
+
+def _ci(values: np.ndarray, level: float = 0.95) -> list[float] | None:
+    ok = values[~np.isnan(values)]
+    if not len(ok):
+        return None
+    alt = (1 - level) / 2 * 100
+    return [round(float(np.percentile(ok, alt)), 4),
+            round(float(np.percentile(ok, 100 - alt)), 4)]
+
+
+def _r(x: float) -> float | None:
+    return None if x is None or np.isnan(x) else round(float(x), 4)
+
+
+def scored_measurement(
+    ref_labels: list[str], pred_labels: list[str], w: np.ndarray, strata_keys: list[tuple],
+    *, n_boot: int, seed: int, min_class_n: int,
+) -> dict:
+    """Nokta tahmini + bootstrap GA, sinif bazli. Agirliksiz icin `w` = 1."""
+    if not ref_labels:
+        # Ornek: uc etiketleyicinin her satirda farkli dedigi durumda butun
+        # satirlar `tie` olur. Bos kumeden skor uretmek yerine acikca soyle.
+        return {"skipped": True, "reason": "karsilastirilacak satir yok", "n_rows": 0}
+    classes = list(LABELS)
+    k = len(classes)
+    pos = {c: i for i, c in enumerate(classes)}
+    # dtype ACIK: bos olmayan listede bile varsayilan tipe guvenilmez;
+    # `np.bincount` yalnizca tamsayi kabul ediyor.
+    ref = np.asarray([pos[v] for v in ref_labels], dtype=np.int64)
+    pred = np.asarray([pos[v] for v in pred_labels], dtype=np.int64)
+    w = np.asarray(w, dtype=float)
+
+    nokta = _scores(_confusion(ref, pred, w, k))
+    boot = bootstrap_scores(
+        ref, pred, w, _strata_index(strata_keys), k=k, n_boot=n_boot, seed=seed,
+    )
+    ham_sayi = np.bincount(ref, minlength=k)
+
+    per_class = {}
+    for i, c in enumerate(classes):
+        per_class[c] = {
+            "n_reference": int(ham_sayi[i]),
+            "weighted_n_reference": _r(nokta["n_ref"][i]),
+            # Onceden kayitli kural: az ornekli sinif ISARETLENIR, hesaptan
+            # cikarilmaz. Esik kappa'nin seyrek sinif kuraliyla ayni sayi.
+            "sparse": bool(ham_sayi[i] < min_class_n),
+            "precision": {"value": _r(nokta["precision"][i]), "ci95": _ci(boot["precision"][:, i])},
+            "recall": {"value": _r(nokta["recall"][i]), "ci95": _ci(boot["recall"][:, i])},
+            "f1": {"value": _r(nokta["f1"][i]), "ci95": _ci(boot["f1"][:, i])},
+        }
+    return {
+        "n_rows": len(ref_labels),
+        "accuracy": {"value": _r(nokta["accuracy"]), "ci95": _ci(boot["accuracy"])},
+        "macro_f1": {"value": _r(nokta["macro_f1"]), "ci95": _ci(boot["macro_f1"])},
+        "per_class": per_class,
+        "bootstrap": {"n": n_boot, "seed": seed, "strata": "kategori x LLM sinifi"},
+    }
+
+
+def kendi_cocugu_table(df: pl.DataFrame, tag: str) -> dict | None:
+    """`KENDI_COCUGU` isaretli satirlarda insan ve LLM etiketinin dagilimi.
+
+    `household` karari (C1/C1b) kavramsal olarak verildi; bu tablo o sinirin
+    insanda ve modelde nerede durdugunu gosterir, karari degistirmez.
+    """
+    col = f"notes_{tag}"
+    if col not in df.columns:
+        return None
+    flagged = df.filter(pl.col(col) == KENDI_COCUGU)
+    if not flagged.height:
+        return {"n_flagged": 0}
+    ref = f"label_{tag}"
+    pairs = dict(
+        sorted(
+            ((f"{h}->{m}", int(n)) for h, m, n in
+             flagged.group_by(ref, "purchase_type").len().iter_rows()),
+            key=lambda kv: (-kv[1], kv[0]),
+        )
+    )
+    return {
+        "n_flagged": flagged.height,
+        "human_label": dict(sorted(flagged.group_by(ref).len().iter_rows())),
+        "llm_label": dict(sorted(flagged.group_by("purchase_type").len().iter_rows())),
+        "human_to_llm": pairs,
+    }
+
+
 # ------------------------------------------------------------------- figur
-def fig_llm_vs_human(cfg: Config, per_class: dict, out: Path) -> Path:
+def fig_llm_vs_human(
+    cfg: Config, per_class: dict, out: Path, *, n_annotators: int = 3
+) -> Path:
     """F18 - sinif bazli F1. Baslik OLCUMU yazar, sonuc ilan etmez."""
     viz.apply_style(cfg.get("eda.figure_dpi"))
     fig, ax = viz.plt.subplots(figsize=(7.6, 4.2))
@@ -323,17 +609,23 @@ def fig_llm_vs_human(cfg: Config, per_class: dict, out: Path) -> Path:
     ax.set_yticklabels([f"{c}\n(n={m})" for c, m in zip(names, n)])
     ax.invert_yaxis()
     ax.set_xlim(0, 1)
-    ax.set_xlabel("F1 (insan uzlasisina karsi)")
+    ax.set_xlabel("F1 (insan referansina karsi)")
     for bar, value in zip(bars, f1):
         ax.text(min(value + 0.02, 0.95), bar.get_y() + bar.get_height() / 2,
                 f"{value:.2f}", va="center", fontsize=9)
 
+    referans = (
+        "Tek etiketleyicinin (A) etiketi referans alindi; etiket guvenilirligi "
+        "OLCULMEDI."
+        if n_annotators == 1
+        else f"{n_annotators} bagimsiz etiketleyicinin cogunlugu referans alindi."
+    )
     viz.titles(
         ax,
-        f"F18 · LLM'in sinif bazli F1'i — {sum(n)} satir, insan uzlasisi referans",
-        "Uc bagimsiz etiketleyicinin cogunlugu referans alindi. Bu bir KAPI degil "
-        "olcumdur: F1 icin hicbir esik sabitlenmedi. Dogrulama seti yaygınlık "
-        "ornegi degildir - `household` ve `received` bilerek fazla temsil edildi.",
+        f"F18 · LLM'in sinif bazli F1'i — {sum(n)} satir",
+        f"{referans} Bu bir KAPI degil olcumdur: F1 icin hicbir esik sabitlenmedi. "
+        "Agirliksiz; dogrulama seti yaygınlık ornegi degildir - `household` ve "
+        "`received` bilerek fazla temsil edildi.",
     )
     ax.grid(axis="y", visible=False)
     return viz.save(fig, out, log)
@@ -342,54 +634,132 @@ def fig_llm_vs_human(cfg: Config, per_class: dict, out: Path) -> Path:
 # --------------------------------------------------------------------- kosu
 def evaluate(cfg: Config, n: int | None = None) -> dict:
     n = int(n if n is not None else cfg.get("validation.n"))
+    tags, mode = annotator_mode(cfg)
     df = load_labels(cfg, n)
     cols = label_columns(df)
-
-    kappa = kappa_report(
-        df, cols, min_class_n=int(cfg.get("validation.min_class_n_for_kappa"))
-    )
+    min_class_n = int(cfg.get("validation.min_class_n_for_kappa"))
     threshold = float(cfg.get("validation.kappa_min"))
-    # Karsilastirma YUVARLANMAMIS deger uzerinden. Bkz. `kappa_report`.
-    exact = kappa["kappa_exact"]
-    agreement = {
-        **kappa,
-        "threshold": threshold,
-        "passed": None if exact is None else bool(exact >= threshold),
-    }
+    n_boot = int(cfg.get("validation.bootstrap_n"))
+    seed = int(cfg.get("seed"))
 
-    df = df.with_columns(consensus(df, cols))
-    ref = df["consensus"]
+    kappa = None
+    if mode == "fleiss":
+        kappa = kappa_report(df, cols, min_class_n=min_class_n)
+        # Karsilastirma YUVARLANMAMIS deger uzerinden. Bkz. `kappa_report`.
+        exact = kappa["kappa_exact"]
+        agreement = {
+            **kappa,
+            "threshold": threshold,
+            "passed": None if exact is None else bool(exact >= threshold),
+        }
+    else:
+        # Tek etiketleyici: uyum OLCULEMEZ. `passed: None` -> INCOMPLETE.
+        # PASS yazmak olculmemis bir seyi gecmis gibi gosterirdi; FAIL yazmak
+        # ise olculmemis bir seyi basarisiz ilan ederdi. Ikisi de yanlis.
+        agreement = {
+            "skipped": True,
+            "passed": None,
+            "reason": (
+                f"tek etiketleyici ({', '.join(tags)}); etiket guvenilirligi "
+                "olculmedi - kullanici karari 2026-09-14 (DECISIONS)"
+            ),
+            "design": {
+                "planned_annotators": 3,
+                "planned_statistic": "Fleiss kappa",
+                "threshold": threshold,
+            },
+        }
+
+    df = df.with_columns(reference_labels(df, cols))
     # `tie` satirlari referans olamaz: uzlasi yok demek dogru cevap yok demek.
-    usable = df.filter(pl.col("consensus").is_not_null() & (pl.col("consensus") != TIE))
+    # Tek etiketleyicide tie olusmaz.
+    usable = df.filter(pl.col("reference").is_not_null() & (pl.col("reference") != TIE))
 
-    vs_llm = compare(usable["consensus"], usable["purchase_type"])
+    vs_llm = compare(usable["reference"], usable["purchase_type"])
     vs_proxy = compare(
-        _binary_gift(usable["consensus"], "consensus"),
+        _binary_gift(usable["reference"], "reference"),
         usable.select(_proxy_labels(usable))["proxy"],
     )
+
+    # --- onceden kayitli olcumler (2026-09-14)
+    sample_ci = scored_measurement(
+        usable["reference"].to_list(), usable["purchase_type"].to_list(),
+        np.ones(usable.height),
+        list(zip(usable["category"].to_list(), usable["purchase_type"].to_list())),
+        n_boot=n_boot, seed=seed, min_class_n=min_class_n,
+    )
+    sample_ci["note"] = (
+        "AGIRLIKSIZ - dogrulama LLM etiketine gore dengesiz cekildi; "
+        "populasyon duzeyi icin `llm_vs_human_main_weighted`"
+    )
+
+    main_rows = usable.filter(pl.col("sample_frame") == FRAME_MAIN)
+    kategoriler = sorted(set(main_rows["category"].to_list()))
+    pop = population_counts(cfg, kategoriler)
+    eksik = [c for c in kategoriler if not any(key[0] == c for key in pop)]
+    if not main_rows.height:
+        weighted: dict = {"skipped": True, "reason": "dogrulamada `main` satiri yok"}
+    elif eksik:
+        weighted = {"skipped": True, "reason": f"populasyon sayilari okunamadi: {eksik}"}
+    else:
+        w, meta = ipw_weights(
+            main_rows["category"].to_list(), main_rows["purchase_type"].to_list(), pop,
+            min_cell_n=int(cfg.get("validation.min_cell_n")),
+        )
+        weighted = {
+            **scored_measurement(
+                main_rows["reference"].to_list(), main_rows["purchase_type"].to_list(), w,
+                list(zip(main_rows["category"].to_list(), main_rows["purchase_type"].to_list())),
+                n_boot=n_boot, seed=seed, min_class_n=min_class_n,
+            ),
+            "population": "dort kategorinin `main` cercevesi (kategori basina esit)",
+            "weights": meta,
+        }
+
+    kendi = {t: kendi_cocugu_table(df, t) for t in tags}
+
+    limitations = []
+    if mode == "none":
+        emin_degil = sum(
+            int((df[f"notes_{t}"] == "EMIN_DEGIL").sum())
+            for t in tags if f"notes_{t}" in df.columns
+        )
+        limitations = [
+            "Referans tek etiketleyicinin yargisi; etiket guvenilirligi olculmedi.",
+            f"Belirsizlik isareti (EMIN_DEGIL) kullanilan satir: {emin_degil}.",
+            "Agirliksiz olcumler katmanlama nedeniyle household/gift_given yonunde "
+            "yanli; populasyon icin agirlikli olcum okunmali.",
+        ]
 
     report = {
         "meta": {
             "n": n,
+            "annotators": tags,
             "n_annotators": len(cols),
+            "reliability": mode,
             "model": df["model"][0] if "model" in df.columns else None,
             "prompt_version": df["prompt_version"][0] if "prompt_version" in df.columns else None,
             "thresholds_fixed": "2026-08-29, configs/base.yaml -> validation",
+            "methods_registered": "2026-09-14, DECISIONS (A modelle karsilastirilmadan once)",
         },
         # TEK kapi olcutu. Digerleri olcum.
         "criteria": {"1_annotator_agreement": agreement},
         "measurements": {
-            "n_tie": int((ref == TIE).sum()),
+            "n_tie": int((df["reference"] == TIE).sum()),
             "n_usable": usable.height,
-            "consensus_distribution": dict(
-                sorted(usable.group_by("consensus").len().iter_rows())
+            "reference_distribution": dict(
+                sorted(usable.group_by("reference").len().iter_rows())
             ),
             # DIKKAT: bunlar KAPI DEGIL. F1 icin hicbir esik sabitlenmedi ve
             # sonucu gordukten sonra esik uydurmak kapiyi sonradan kurmaktir.
             "llm_vs_human": vs_llm,
+            "llm_vs_human_sample_ci": sample_ci,
+            "llm_vs_human_main_weighted": weighted,
             # Vekilin ILK bagimsiz olcumu. Onceki 0,58/0,61 yazar destekliydi.
             "proxy_vs_human_gift_only": vs_proxy,
+            "kendi_cocugu": kendi,
         },
+        "limitations": limitations,
         "verdict": (
             "PASS" if agreement["passed"]
             else "INCOMPLETE" if agreement["passed"] is None
@@ -398,19 +768,25 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
     }
 
     if vs_llm["per_class"]:
-        fig_llm_vs_human(cfg, vs_llm["per_class"], figure_path(cfg, n))
+        fig_llm_vs_human(cfg, vs_llm["per_class"], figure_path(cfg, n), n_annotators=len(cols))
     write_json(report, validation_report_path(cfg, n), log)
 
     log.info("HAFTA 4 -> %s", report["verdict"])
-    log.info("  Fleiss kappa      %s (esik %.2f, %d satir)",
-             "hesaplanamadi" if kappa["kappa"] is None else f"{kappa['kappa']:.4f}",
-             threshold, kappa["n_rows_in_kappa"])
-    if kappa["sparse_classes"]:
-        log.info("  kappa disi sinif  %s (n < %d) - %d satir dusuruldu",
-                 ", ".join(kappa["sparse_classes"]), kappa["min_class_n"],
-                 kappa["n_rows_dropped_as_sparse"])
-    log.info("  LLM dogrulugu     %s (macro F1 %s) - OLCUM, kapi degil",
+    if kappa is not None:
+        log.info("  Fleiss kappa      %s (esik %.2f, %d satir)",
+                 "hesaplanamadi" if kappa["kappa"] is None else f"{kappa['kappa']:.4f}",
+                 threshold, kappa["n_rows_in_kappa"])
+        if kappa["sparse_classes"]:
+            log.info("  kappa disi sinif  %s (n < %d) - %d satir dusuruldu",
+                     ", ".join(kappa["sparse_classes"]), kappa["min_class_n"],
+                     kappa["n_rows_dropped_as_sparse"])
+    else:
+        log.info("  uyum              OLCULMEDI - %s", agreement["reason"])
+    log.info("  LLM dogrulugu     %s (macro F1 %s) - agirliksiz, OLCUM",
              vs_llm["accuracy"], vs_llm["macro_f1"])
+    if not weighted.get("skipped"):
+        log.info("  agirlikli (main)  dogruluk %s  macro F1 %s",
+                 weighted["accuracy"], weighted["macro_f1"])
     log.info("  vekil (gift ekseni) %s", vs_proxy["per_class"].get(GIFT))
     return report
 

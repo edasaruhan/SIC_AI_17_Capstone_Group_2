@@ -125,7 +125,12 @@ def cfg(tmp_path: Path) -> Config:
         # olmadigini sinamak, farkli bir deger uydurmak degil.
         "validation": {
             "n": 5,
-            "n_annotators": 3,
+            # Testler ÖZGÜN üç kişilik yolu sınıyor; tek etiketleyici yolu
+            # (production: [A] + none) testlerde config ezilerek sınanıyor.
+            "annotators": ["A", "B", "C"],
+            "reliability": "fleiss",
+            "min_cell_n": 5,
+            "bootstrap_n": 200,   # testte 2000 gereksiz yavaş
             "strata": {
                 "gift_given": 2, "household": 1,
                 "self": 1, "unclear": 1, "received": 0,

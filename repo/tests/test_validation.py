@@ -13,17 +13,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 import pytest
 
 from gift_contamination.analysis.validation import (
     TIE,
+    annotator_mode,
     compare,
     consensus,
     evaluate,
     fleiss,
+    ipw_weights,
     kappa_report,
+    kendi_cocugu_table,
     load_labels,
+    scored_measurement,
 )
 from gift_contamination.config import Config
 from gift_contamination.data.labelsheet import (
@@ -299,3 +304,169 @@ def test_the_reported_kappa_is_rounded_but_the_gate_uses_the_exact_value():
     for v in rapor["kappa_per_class"].values():
         if v is not None:
             assert len(str(v).split(".")[-1]) <= 4
+
+
+# ------------------------------------------ tek etiketleyici (2026-09-14)
+def _single(cfg: Config) -> Config:
+    """Production durumu: yalnizca A teslim etti, guvenilirlik olculmedi."""
+    cfg._data["validation"]["annotators"] = ["A"]
+    cfg._data["validation"]["reliability"] = "none"
+    return cfg
+
+
+def test_a_single_annotator_can_never_pass_the_gate(cfg: Config):
+    """Tek etiketleyiciyle uyum OLCULEMEZ - karar INCOMPLETE, asla PASS.
+
+    A modelle birebir ayni etiketlese bile: modelin dogrulugu yuksek diye
+    etiketin guvenilir oldugu sonucu cikmaz. PASS yazmak olculmemis bir seyi
+    gecmis gibi gosterirdi.
+    """
+    n = 24
+    etiket = ["gift_given", "self", "household", "unclear"] * (n // 4)
+    _write_labeled(cfg, {"A": etiket}, llm=etiket)
+    _single(cfg)
+
+    rapor = evaluate(cfg, n)
+
+    kriter = rapor["criteria"]["1_annotator_agreement"]
+    assert rapor["verdict"] == "INCOMPLETE"
+    assert kriter["passed"] is None
+    assert kriter["skipped"] is True
+    assert "tek etiketleyici" in kriter["reason"]
+    # Olcumler DOLU - kapi INCOMPLETE diye olcum atlanmiyor
+    assert rapor["measurements"]["llm_vs_human"]["accuracy"] == 1.0
+    assert rapor["measurements"]["llm_vs_human_sample_ci"]["accuracy"]["value"] == 1.0
+    assert rapor["measurements"]["n_tie"] == 0
+    assert rapor["limitations"], "sinirliliklar raporun kendisinde durmali"
+
+
+def test_reliability_mode_must_agree_with_the_annotator_count(cfg: Config):
+    cfg._data["validation"]["annotators"] = ["A"]
+    cfg._data["validation"]["reliability"] = "fleiss"
+    with pytest.raises(ValueError, match="hesaplanamaz"):
+        annotator_mode(cfg)
+
+    cfg._data["validation"]["annotators"] = ["A", "B", "C"]
+    cfg._data["validation"]["reliability"] = "none"
+    with pytest.raises(ValueError, match="atilmaz"):
+        annotator_mode(cfg)
+
+    cfg._data["validation"]["reliability"] = "intra"
+    with pytest.raises(NotImplementedError):
+        annotator_mode(cfg)
+
+
+def test_an_unconfigured_sheet_cannot_sneak_into_the_measurement(cfg: Config):
+    """Config yalnizca A diyorsa dosyadaki B kolonu olcume GIREMEZ."""
+    etiket = ["self"] * 8
+    _write_labeled(cfg, {"A": etiket, "B": etiket})
+    _single(cfg)
+
+    with pytest.raises(ValueError, match="config"):
+        load_labels(cfg, 8)
+
+
+def test_ipw_weights_match_a_hand_computed_example():
+    """Onceden kaydedilmis kural, elle hesaplanmis ornekte.
+
+    Hucreler (min_cell_n=5):
+      (X, gift) n=5 yeterli   N=100 -> 20 + tasinan
+      (Y, gift) n=2 SEYREK    N=40  -> kutlesi gift'in 7 satirina: 40/7
+      (X, self) n=6 yeterli   N=300 -> 50 + tasinan
+      (Y, self) n=0 SEYREK    N=60  -> kutlesi self'in 6 satirina: 60/6 = 10
+      (Z, unclear) hic satir yok N=50 -> KAPSANMAYAN pay 50/550
+    """
+    cats = ["X"] * 5 + ["Y"] * 2 + ["X"] * 6
+    llm = ["gift_given"] * 7 + ["self"] * 6
+    pop = {("X", "gift_given"): 100, ("Y", "gift_given"): 40,
+           ("X", "self"): 300, ("Y", "self"): 60, ("Z", "unclear"): 50}
+
+    w, meta = ipw_weights(cats, llm, pop, min_cell_n=5)
+
+    assert w[:5] == pytest.approx([20 + 40 / 7] * 5)
+    assert w[5:7] == pytest.approx([40 / 7] * 2)
+    assert w[7:] == pytest.approx([50 + 10] * 6)
+    # Her sinifin toplam agirligi populasyondaki satir sayisina esit
+    assert w[:7].sum() == pytest.approx(140)
+    assert w[7:].sum() == pytest.approx(360)
+    assert meta["uncovered_share"] == pytest.approx(50 / 550, abs=1e-6)
+    assert meta["collapsed_cells"] == ["Y/gift_given (n=2)", "Y/self (n=0)"]
+
+
+def test_uniform_weights_do_not_change_the_point_estimates():
+    """Agirliklarin olcegi degil ORANI onemli: w=1 ile w=7 ayni sonucu vermeli."""
+    ref = ["gift_given", "self", "household", "self", "gift_given", "unclear"] * 3
+    pred = ["gift_given", "self", "gift_given", "self", "self", "unclear"] * 3
+    keys = [("X", p) for p in pred]
+
+    bir = scored_measurement(ref, pred, np.ones(18), keys, n_boot=50, seed=1, min_class_n=2)
+    yedi = scored_measurement(ref, pred, np.full(18, 7.0), keys, n_boot=50, seed=1, min_class_n=2)
+
+    assert bir["accuracy"]["value"] == yedi["accuracy"]["value"]
+    assert bir["macro_f1"]["value"] == yedi["macro_f1"]["value"]
+    assert bir["per_class"]["household"]["recall"]["value"] == 0.0
+
+
+def test_the_bootstrap_interval_contains_the_point_estimate():
+    ref = (["gift_given"] * 12 + ["self"] * 12 + ["household"] * 12)
+    pred = (["gift_given"] * 9 + ["self"] * 3 + ["self"] * 11 + ["household"]
+            + ["household"] * 8 + ["gift_given"] * 4)
+    keys = [("X", p) for p in pred]
+
+    out = scored_measurement(ref, pred, np.ones(36), keys, n_boot=400, seed=42, min_class_n=5)
+
+    lo, hi = out["accuracy"]["ci95"]
+    assert lo <= out["accuracy"]["value"] <= hi
+    assert lo < hi, "yeniden ornekleme gercekten degisken olmali"
+
+
+def test_a_sparse_class_is_flagged_not_dropped():
+    """n < min_class_n olan sinif HESAPTAN CIKMAZ, isaretlenir (onceden kayit)."""
+    ref = ["self"] * 30 + ["received"] * 3
+    pred = ["self"] * 30 + ["received"] * 3
+    keys = [("X", p) for p in pred]
+
+    out = scored_measurement(ref, pred, np.ones(33), keys, n_boot=20, seed=1, min_class_n=20)
+
+    assert out["per_class"]["received"]["sparse"] is True
+    assert out["per_class"]["received"]["f1"]["value"] == 1.0
+    assert out["per_class"]["self"]["sparse"] is False
+
+
+def test_the_weighted_measurement_reads_the_main_frame_population(cfg: Config):
+    """Populasyon sayilari `main` cercevesinden gelir; boost satirlari sayilmaz."""
+    from gift_contamination.detection.llm_annotate import annotation_path
+
+    n = 24
+    etiket = ["gift_given", "self", "household", "unclear"] * (n // 4)
+    _write_labeled(cfg, {"A": etiket}, llm=etiket)
+    _single(cfg)
+
+    pop = annotation_path(cfg, "pilot")
+    pop.parent.mkdir(parents=True, exist_ok=True)
+    main = ["gift_given"] * 10 + ["self"] * 70 + ["household"] * 15 + ["unclear"] * 5
+    pl.DataFrame({
+        "sample_frame": ["main"] * 100 + ["boost"] * 50,
+        "purchase_type": main + ["gift_given"] * 50,
+    }).write_parquet(pop)
+
+    agirlikli = evaluate(cfg, n)["measurements"]["llm_vs_human_main_weighted"]
+
+    assert "skipped" not in agirlikli
+    assert agirlikli["weights"]["population_rows"] == 100   # boost'un 50'si YOK
+    assert agirlikli["per_class"]["self"]["weighted_n_reference"] == 70
+    assert agirlikli["accuracy"]["value"] == 1.0
+
+
+def test_kendi_cocugu_rows_are_cross_tabulated():
+    df = pl.DataFrame({
+        "label_A": ["household", "household", "gift_given", "self"],
+        "purchase_type": ["gift_given", "household", "gift_given", "self"],
+        "notes_A": ["KENDI_COCUGU", "KENDI_COCUGU", "KENDI_COCUGU", None],
+    })
+
+    out = kendi_cocugu_table(df, "A")
+
+    assert out["n_flagged"] == 3
+    assert out["human_label"] == {"gift_given": 1, "household": 2}
+    assert out["human_to_llm"]["household->gift_given"] == 1

@@ -211,23 +211,20 @@ gate1:
 # GÖRÜLMEDEN sabitlendi (Kapı 1'in eşikleriyle aynı disiplin).
 validation:
   n: 500
-  # GEÇİŞ: özgün tasarım (üç sayfa bu sayıyla üretildi). Faz 1'de okuyan kod
-  # `annotators` listesine geçince bu anahtar silinir.
-  n_annotators: 3
-  # Etiketi TOPLANAN etiketleyiciler. Tasarım üç kişiydi (A, B, C); yalnızca A
-  # teslim etti (2026-09-14). Sayfalar üç harfle üretildi ve öyle kalıyor —
-  # burada yalnızca okunacak olanlar yazılı. Bkz. DECISIONS 2026-09-14.
-  annotators: [A]      # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
-  # Etiket güvenilirliği ölçüldü mü. `none` -> Hafta 4 kapısı INCOMPLETE kalır,
-  # asla PASS yazılmaz. Başka bir değer (ör. inter/intra) henüz uygulanmadı ve
-  # verilirse kod gürültülü hata verir. Kullanıcı kararı, 2026-09-14.
-  reliability: none    # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
+  # Etiketi TOPLANAN etiketleyiciler. Tasarım üç kişiydi (A, B, C) ve sayfalar
+  # üç harfle üretildi; yalnızca A teslim etti (2026-09-14). Burada yalnızca
+  # okunacak olanlar yazılı — adı geçmeyen bir sayfa ölçüme GİREMEZ.
+  annotators: [A]
+  # Etiket güvenilirliği: `fleiss` (≥2 etiketleyici) ya da `none`. `none` ->
+  # Hafta 4 kapısı INCOMPLETE kalır, asla PASS yazılmaz. Etiketleyici sayısıyla
+  # tutarsız bir değer gürültülü hata verir. Kullanıcı kararı, 2026-09-14.
+  reliability: none
   # Ölçüm yöntemi (2026-09-14, A'nın etiketleri modelle karşılaştırılmadan ÖNCE):
   # ters olasılık ağırlığında bu değerin altındaki (kategori × LLM sınıfı)
   # hücresinin kütlesi o sınıfın bütün kategorilerine dağıtılır; kalibrasyonda
   # `main` satırı bu değerden az olan sınıf tüm çerçevelere düşer.
-  min_cell_n: 5       # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
-  bootstrap_n: 2000   # ⚠️ HENÜZ OKUNMUYOR - önceden kayıt; okuyan kod Faz 1'de
+  min_cell_n: 5
+  bootstrap_n: 2000
   # LLM ETİKETİNE göre katmanlı — sözcüksel vekile göre değil. Bu bir yaygınlık
   # örneği DEĞİL: `household` ve `received` bilerek fazla temsil ediliyor.
   # Gerekçe ölçüldü (2026-08-29 deneme koşusu): uyuşmazlıkların %42'si tek yönde,

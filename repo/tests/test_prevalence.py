@@ -127,16 +127,21 @@ def test_main_frame_is_required(annotated: Config):
 
 
 # ------------------------------------------------------------- iki tanim
-def test_the_broad_definition_adds_exactly_the_household_rows(annotated: Config):
-    """genis - dar = household. Iki tanim ayni satirlari iki kez saymamali."""
-    _relabel(annotated, ["gift_given", "household", "household", "self",
-                         "self", "unclear", "received", "self"])
+def test_the_broad_definition_adds_exactly_household_and_received(annotated: Config):
+    """genis - dar = household + received. Iki tanim ayni satiri iki kez saymamali.
+
+    `received` bilerek erken siraya konuyor: fixture'in `main` cercevesi kucuk
+    ve etiket listesinin sonu hic uygulanmayabilir - o durumda test sinadigi
+    seyi sinamadan gecerdi (onceki hali tam olarak boyleydi).
+    """
+    _relabel(annotated, ["gift_given", "received", "household", "self", "unclear"])
 
     d = category_stats(annotated, "pilot")
 
+    assert d["counts"].get("received", 0) >= 1, "test kurgusu received'i uygulayamadi"
     dar = d["definitions"]["narrow"]["k"]
     genis = d["definitions"]["broad"]["k"]
-    assert genis - dar == d["counts"].get("household", 0)
+    assert genis - dar == d["counts"].get("household", 0) + d["counts"].get("received", 0)
     assert genis >= dar
 
 
@@ -148,7 +153,9 @@ def test_neither_definition_is_silently_chosen():
     """
     assert set(DEFINITIONS) == {"narrow", "broad"}
     assert DEFINITIONS["narrow"] == ("gift_given",)
-    assert DEFINITIONS["broad"] == ("gift_given", "household")
+    # `received` 2026-09-14'te girdi: C1b "alici urunu kendisi secmedi" tanimi.
+    # Yayginlik ile deneyin C1b kosulu AYNI kumeyi kullanmali.
+    assert DEFINITIONS["broad"] == ("gift_given", "household", "received")
 
 
 # ------------------------------------------------------------ kuru kosu
@@ -164,21 +171,33 @@ def test_a_stub_run_cannot_produce_a_prevalence_table(cfg: Config):
 
 # ------------------------------------------- dogrulama iddiasi hesaplaniyor
 def test_human_validation_is_read_from_disk_not_asserted(annotated: Config):
-    """`human_validated` DISKTEN okunmali.
+    """Insan dogrulamasinin durumu DISKTEN okunmali.
 
-    Elle `true` yazilmis bir alan sessizce yalan soyler; dogrulama raporu
-    yoksa cevap hayir olmak zorunda (denetim bulgusu 7).
+    Elle yazilmis bir alan sessizce yalan soyler; dogrulama raporu yoksa
+    cevap hayir olmak zorunda (denetim bulgusu 7).
     """
+    import json
+
     rapor = evaluate(annotated, ["pilot"])
-    assert rapor["human_validated"] is False
+    assert rapor["human_validation"]["report_exists"] is False
     assert any("HENUZ YOK" in c for c in rapor["caveats"])
 
-    # Dogrulama raporu ortaya cikinca iddia da degismeli.
+    # Tek etiketleyicili bir rapor ortaya cikinca durum degismeli - ama
+    # "dogrulandi" DEMEMELI: guvenilirlik olculmedi.
     p = validation_report_path(annotated, int(annotated.get("validation.n")))
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text("{}", encoding="utf-8")
+    p.write_text(json.dumps({
+        "meta": {"n_annotators": 1},
+        "criteria": {"1_annotator_agreement": {"passed": None}},
+        "verdict": "INCOMPLETE",
+    }), encoding="utf-8")
 
-    assert evaluate(annotated, ["pilot"])["human_validated"] is True
+    durum = evaluate(annotated, ["pilot"])
+    assert durum["human_validation"] == {
+        "report_exists": True, "n_annotators": 1,
+        "reliability_measured": False, "verdict": "INCOMPLETE",
+    }
+    assert any("TEK etiketleyici" in c for c in durum["caveats"])
 
 
 def test_the_report_ranks_categories_by_the_narrow_rate(annotated: Config):
@@ -204,3 +223,88 @@ def test_no_pooled_rate_is_reported(annotated: Config):
     assert "pooled" not in rapor
     assert "overall" not in rapor
     assert set(rapor["categories"]) == {annotated.category_slug("pilot")}
+
+
+# ------------------------------------------- insan kalibrasyonu (2026-09-14)
+def test_calibrated_rate_matches_hand_arithmetic():
+    """`sum_k pay(k) * PPV_k`: 0,2*0,6 + 0,8*0,1 = 0,20."""
+    from gift_contamination.analysis.prevalence import calibrated_rate
+
+    assert calibrated_rate({"gift_given": 0.2, "self": 0.8},
+                           {"gift_given": 0.6, "self": 0.1}) == pytest.approx(0.20)
+
+
+def test_an_unmeasured_class_with_real_mass_makes_the_rate_undefined():
+    """PPV'si olmayan ama payi olan sinifi SIFIR saymak orani asagi ceker."""
+    import math
+
+    from gift_contamination.analysis.prevalence import calibrated_rate
+
+    out = calibrated_rate({"gift_given": 0.2, "unclear": 0.1, "self": 0.7},
+                          {"gift_given": 0.6, "unclear": float("nan"), "self": 0.1})
+    assert math.isnan(out)
+    # Payi SIFIR olan sinifin PPV'si tanimsiz olabilir - sonuc etkilenmez
+    assert calibrated_rate({"gift_given": 1.0, "unclear": 0.0},
+                           {"gift_given": 0.5, "unclear": float("nan")}) == 0.5
+
+
+def test_calibration_end_to_end_matches_a_hand_computed_case(cfg: Config):
+    """Kontrollu populasyon + kontrollu insan etiketi -> elle hesaplanan oran.
+
+    main: 20 gift_given, 80 self  ->  paylar 0,2 / 0,8
+    dogrulama (main): LLM=gift 10 satir -> insan 6 gift + 4 household
+                      LLM=self 10 satir -> insan 9 self + 1 gift
+    dar   = 0,2*0,6 + 0,8*0,1 = %20,0
+    genis = 0,2*1,0 + 0,8*0,1 = %28,0   (household geniste)
+    """
+    from gift_contamination.analysis.prevalence import evaluate as prev_eval
+    from gift_contamination.data.labelsheet import (
+        LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path,
+    )
+    from gift_contamination.data.sampling import validation_path
+
+    cfg._data["validation"].update(
+        {"annotators": ["A"], "reliability": "none", "n": 20, "bootstrap_n": 300}
+    )
+    main = ["gift_given"] * 20 + ["self"] * 80
+    dest = annotation_path(cfg, "pilot")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "sample_frame": ["main"] * 100,
+        "purchase_type": main,
+        "backend": ["vllm"] * 100,
+        "model": ["m"] * 100,
+        "prompt_version": ["v3"] * 100,
+    }).write_parquet(dest)
+
+    llm = ["gift_given"] * 10 + ["self"] * 10
+    insan = ["gift_given"] * 6 + ["household"] * 4 + ["self"] * 9 + ["gift_given"]
+    csv = labeled_path(validation_path(cfg, 20))
+    csv.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "val_id": list(range(1, 21)),
+        "category": [cfg.category_slug("pilot")] * 20,
+        "sample_frame": ["main"] * 20,
+        "purchase_type": llm,
+        "val_stratum": llm,
+        "label_A": insan,
+        "notes_A": [None] * 20,
+        LABEL_SOURCE_COLUMN: [LABEL_SOURCE] * 20,
+    }).write_csv(csv)
+
+    kal = prev_eval(cfg, ["pilot"])["calibration"]
+    slug = cfg.category_slug("pilot")
+
+    assert kal["by_category"][slug]["narrow"]["calibrated_pct"] == pytest.approx(20.0)
+    assert kal["by_category"][slug]["broad"]["calibrated_pct"] == pytest.approx(28.0)
+    lo, hi = kal["by_category"][slug]["narrow"]["ci95_pct"]
+    assert lo <= 20.0 <= hi
+    assert kal["ppv"]["narrow"]["gift_given"] == {"value": 0.6, "n": 10, "source": "main"}
+    assert kal["reference"] == {"annotators": ["A"], "reliability_measured": False}
+
+
+def test_calibration_is_skipped_not_invented_without_labels(annotated: Config):
+    """Dogrulama etiketi yoksa kalibrasyon UYDURULMAZ; blok acikca atlanir."""
+    kal = evaluate(annotated, ["pilot"])["calibration"]
+
+    assert kal == {"skipped": True, "reason": "dogrulama etiketleri henuz yok"}
