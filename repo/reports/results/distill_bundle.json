@@ -1,0 +1,28 @@
+{
+  "code_version": "9dc6324",
+  "categories": [
+    "All_Beauty",
+    "Toys_and_Games",
+    "Video_Games",
+    "Grocery_and_Gourmet_Food"
+  ],
+  "n_llm_labels": 47200,
+  "n_excluded_validation_rows": 500,
+  "n_excluded_parse_failures": 45,
+  "n_rows": 46655,
+  "split_counts": {
+    "holdout": 4667,
+    "train": 41988
+  },
+  "label_counts_train": {
+    "gift_given": 7868,
+    "household": 4260,
+    "received": 501,
+    "self": 26877,
+    "unclear": 2482
+  },
+  "n_holdout_in_kcore": 546,
+  "n_human_rows": 500,
+  "seed": 42,
+  "note": "Metin TASIYAN parquet'ler git'e girmez. Dogrulama satirlari (category,row_id) cifti uzerinden dislandi - sayi raporda."
+}
