@@ -1815,3 +1815,87 @@ yorumlayıcıda testle kilitli.
 `test_experiment_labels`, `test_run_experiment`), CLAUDE.md §2/§7/§10, README,
 GENEL_BAKIS §6/§8
 **Kim:** Ekip
+
+---
+
+### 2026-09-14 — Faz 4 kodu: Kapı 2 değerlendiricisi, eşli bootstrap, Kaggle deney betiği (HİÇBİR DENEY KOŞULMADAN)
+
+> Kapı 2'nin ölçütleri ve karşıtlıklar bu günün ilk kaydında önceden yazılmıştı. Aşağıdakiler
+> o kaydın **yazmadığı uygulama ayrıntıları**; hepsi gerçek etiketle tek bir koşu yapılmadan,
+> sentetik veriyle sınanarak verildi.
+
+#### Ne kuruldu
+
+| parça | ne yapar |
+|---|---|
+| `analysis/experiment_stats.py` | koşu raporları + kullanıcı başı dosyalar → `gate2.json` (kategori × model başına dört ölçüt) ve `experiment_stats.json` (karşıtlıklar, doz–yanıt, etiket kalitesi) |
+| `recsys/run_experiment.py` | test çiftlerinin özeti · koşu süresi · kod sürümü · bitmiş koşuyu atlama (`--force`) · iki GPU hatası (aşağıda) · checkpoint silme |
+| `scripts/kaggle_experiment.py` | RecBole'u ayrı klasöre kurar, koşulları atomic dosyadan üretir, koşuları iki T4'e dağıtır; `PLAN = "probe"` zaman sondası (Faz 4.1), `"matrix"` matris |
+
+#### Uygulama kararları
+
+1. **Kapı 2, ölçüt 1:** test (kullanıcı, ürün) çiftlerinin sıra bağımsız sha256 özeti, koşu
+   anında RecBole'a verilen test dosyasından. Bir model içinde bütün koşullar ve seed'ler
+   aynı olmalı. (Duman testinde BPR ile SASRec'in özeti de aynı çıktı.)
+2. **Ölçüt 1–2 hangi koşullara bakar:** çekirdek C0 · C1 · C4 · C1b · C4b koşmamışsa ölçüt
+   `null`. C3 koştuysa kontrole girer; koşmadıysa kapıyı bekletmez — Grocery'de C3 kesme
+   sırasında.
+3. **Ölçüt 3:** kullanıcı başı metrik önce iki koşulun **ortak** seed'leri üzerinden ortalanır,
+   sonra kullanıcılar yeniden örneklenerek eşli bootstrap (`gate2.bootstrap_n`, `gate2.ci`).
+   Bootstrap seed'i `crc32` ile (kategori, model, karşıtlık) adından.
+4. **Ölçüt 4:** RecBole'un C0 test metriği; config'teki **her** seed koşmuş olmalı (en az 2),
+   yoksa `null`. Değişim katsayısı = örneklem standart sapması (ddof=1) ÷ ortalama.
+5. **Karşıtlıklar** (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b): `experiment.bootstrap_iters`
+   (1.000) ve yeni anahtar `experiment.ci` (0,95). Bütün metrikler **aynı** kullanıcı
+   örneklemiyle yeniden örneklenir. Göreli fark da yazılır. Plasebo karşıtlıklarına (C1−C4,
+   C1b−C4b) önceden kayıtlı yorum etiketi eklenir — `alt_sinir` / `saptanamadi` / `negatif`;
+   diğerlerine yalnızca yön.
+6. **Doz–yanıt:** plasebo karşıtlığının kullanıcı başı farkı Toys'ta ve Grocery'de; iki
+   kategori farklı kullanıcılar olduğu için **bağımsız** bootstrap, fark GA'sı. Önceden kayıt
+   C1−C4'ü adlandırıyordu; aynı hesap C1b−C4b için de yazılıyor (sonuç görülmeden eklendi).
+7. **Kapı 2 PASS değilse** o kategori × modelin karşıtlıkları yine hesaplanır ama
+   `interpretable: false` damgası taşır.
+8. Sonuç dosyasında iki eksenin Hafta 4'te ölçülen popülasyon K/D/F1'i yanında durur
+   (yorum kuralının istediği gibi). Koşulardan biri bile `llm`/`distilled` dışındaysa
+   iki dosya da `reportable: false`.
+
+#### GPU koşusundan ÖNCE RecBole kaynağını okuyarak bulunan hatalar
+
+1. **İki paralel koşu aynı karta düşerdi.** RecBole `gpu_id`'yi (varsayılan `'0'`)
+   `CUDA_VISIBLE_DEVICES`'a **yazıyor**; ikinci karta verilen koşu sessizce birinci karta
+   geçerdi. `gpu_id` artık ortamdaki değerden veriliyor.
+2. **BPR'nin tam sıralaması kullanıcı başına bir grup koşardı.** RecBole'un
+   `eval_batch_size`'ı (4.096) genel modellerde ürün sayısına bölünüyor; ölçülen 5-core ürün
+   sayısı Toys **103.618**, Grocery **94.863** (kullanıcı 268.652 / 268.991). Her doğrulama
+   turu ~269 bin grup olurdu. `experiment.eval_score_cells: 67108864` (grup başına en fazla
+   64M skor hücresi ≈ 256 MB) — mühendislik ayarı; sıralama skorları aynı.
+3. **Koşu idempotent değildi** (CLAUDE.md §7). Rapor ve kullanıcı başı dosya varsa atlanıyor.
+4. **Checkpoint'ler diski doldururdu** (~70 koşu × 100–300 MB, Kaggle 20 GB). Model yeniden
+   kullanılmıyor — M1/M2 kullanıcı başı top-K listelerinden — koşu bitince siliniyor.
+5. `code_version` `utils.io`'ya taşındı: RecBole ortamı `llm_annotate`'i (pydantic) import
+   edemez.
+
+#### Kaggle kurulumu
+
+Kaggle imajının numpy 2 / pandas 3 yığını RecBole'u ilk satırda çökertiyor. Tarif: `.venv-
+recbole`'un `pip freeze`'indeki pinler (torch hariç) `pip install --no-deps --target` ile ayrı
+bir klasöre; alt süreçlerde `PYTHONPATH`'in başına. **Yerelde sınandı:** torch 2.14 + numpy
+2.5 + pandas 3 kurulu bir ortamda bu klasörle 24 duman koşusu `.venv-recbole` (torch 2.13) ile
+**birebir aynı** sayıları verdi. Betiğin akışı yerelde CPU'da tek işçiyle simüle edildi:
+kurulum kontrolü → koşul üretimi → sonda → küçük matris → önceki oturumun çıktısını atlama.
+
+#### Doğrulanan / doğrulanmayan
+
+- **Doğrulandı:** 374 test · 24 koşuluk RecBole duman testi (BPR + SASRec × altı koşul × iki
+  seed, sentetik): özet hepsinde aynı, kullanıcı başı ortalama RecBole'a eşit, bitmiş koşu
+  1,4 sn'de atlandı; `experiment_stats` bu çıktılardan `gate2.json`/`experiment_stats.json`
+  üretti (sentetik 3 epoch'ta seed kararlılığı beklendiği gibi FAIL).
+- **Doğrulanmadı:** Kaggle imajında kurulum, CUDA, iki GPU'nun paralel işleyişi, gerçek
+  boyutta süre ve bellek. Zaman sondası (Kaggle, `PLAN = "probe"`) matrisi bütçelemeden önce
+  koşulacak.
+
+**Etkilediği bölüm:** `analysis/experiment_stats.py`, `recsys/run_experiment.py`,
+`utils/io.py`, `detection/llm_annotate.py`, `scripts/kaggle_experiment.py`,
+`configs/base.yaml` (`seeds`, `experiment.categories/ci/eval_score_cells`, `gate2` okunuyor),
+`tests/test_experiment_stats.py`, CLAUDE.md §2/§7/§10, README, GENEL_BAKIS §8
+**Kim:** Ekip

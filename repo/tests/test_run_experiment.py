@@ -14,6 +14,7 @@ from gift_contamination.recsys.conditions import SHADOW_SUFFIX
 from gift_contamination.recsys.run_experiment import (
     UserItemMask,
     eval_mask_pairs,
+    hash_test_pairs,
     per_user_topk_metrics,
     sequential_parts,
     shadow_item_ids,
@@ -184,6 +185,15 @@ def test_mask_pairs_ignore_validation_and_test_rows():
     kosul = c0.filter(pl.col("split") == "train")   # valid/test yok sayilmali
 
     assert eval_mask_pairs(c0, kosul).height == 0
+
+
+def test_test_pair_hash_ignores_row_order_and_extra_columns():
+    a = pl.DataFrame({"user_id": ["u1", "u2"], "item_id": ["x", "y"], "timestamp": [1.0, 2.0]})
+    b = pl.DataFrame({"user_id": ["u2", "u1"], "item_id_list": ["p", "q"], "item_id": ["y", "x"]})
+    c = pl.DataFrame({"user_id": ["u1", "u2"], "item_id": ["x", "z"]})
+
+    assert hash_test_pairs(a) == hash_test_pairs(b)
+    assert hash_test_pairs(a) != hash_test_pairs(c)
 
 
 def test_user_item_mask_lookup_returns_batch_rows():

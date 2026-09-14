@@ -83,6 +83,9 @@ src/gift_contamination/
     prevalence.py        # RQ1: kategori bazlı yaygınlık + Wilson GA (F19).
                          #   YALNIZCA `main` çerçevesi; C1 ve C1b tanımlarının
                          #   İKİSİNİ de yazar, hiçbirini seçmez.
+    experiment_stats.py  # Kapı 2 (dört ölçüt) + eşli bootstrap karşıtlıkları
+                         #   (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b, doz–yanıt).
+                         #   Ana ortamda koşar; kullanıcı başı parquet'leri okur
   recsys/
     atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
                          #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu).
@@ -371,7 +374,11 @@ python -m gift_contamination.recsys.atomic     --config configs/base.yaml --cate
 python -m gift_contamination.recsys.atomic     --config configs/base.yaml --category high --labels distilled --force
 python -m gift_contamination.recsys.conditions --config configs/base.yaml --category high --condition all --force
 python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
-       --category high --condition C0 --model SASRec --seed 42
+       --category high --condition C0 --model SASRec --seed 42   # .venv-recbole; biten koşuyu atlar
+# Matris Kaggle'da: scripts/kaggle_experiment.py (önce PLAN="probe" = zaman sondası).
+# Kapı 2 + karşıtlıklar — koşu raporları reports/results/, kullanıcı başı dosyalar
+# data/processed/recbole/<kategori>/peruser/ altına konduktan sonra, ANA ortamda:
+python -m gift_contamination.analysis.experiment_stats --config configs/base.yaml
 ```
 
 **Henüz YAZILMADI — hedef sözleşme.** Aşağıdakiler çalışmaz; modülleri yok.
@@ -456,7 +463,11 @@ Kurallar:
 - `test_run_experiment.py` — kullanıcı başı metrik elle hesaba eşit mi; SASRec bölme
   dosyaları RecBole'un genişletme kuralına uyuyor mu (son N ürün, boş valid geçmişi);
   C0 alınmış ürün maskesi koşulun kaybettiği çiftler mi; koşucu pydantic çekmeden
-  import ediliyor mu
+  import ediliyor mu; test çifti özeti sıradan bağımsız mı
+- `test_experiment_stats.py` — **kritik**: eşli bootstrap bilinen farkı buluyor mu;
+  plasebo C0'ı geçince, test çiftleri farklıyken Kapı 2 FAIL mi; eksik seed/koşulda
+  INCOMPLETE mi (asla PASS değil); önceden kayıtlı yorum kuralı doğru etiketliyor mu;
+  vekil etiketli koşu `reportable: false` mu
 - `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
   genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık

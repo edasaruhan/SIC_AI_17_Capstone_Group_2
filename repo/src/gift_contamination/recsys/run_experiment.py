@@ -56,6 +56,7 @@ from pathlib import Path
 import numpy as np
 
 from ..config import Config
+from ..utils.io import code_version
 from ..utils.logging import get_logger
 from .atomic import SPLIT_TEST, SPLIT_TRAIN, SPLIT_VALID
 from .conditions import SHADOW_SUFFIX, condition_path, condition_report_path
@@ -311,6 +312,24 @@ def sequential_parts(df, *, max_len: int) -> tuple[dict, dict]:
             {"n_valid_dropped_empty_history": n_valid_bos, "max_item_list_length": max_len})
 
 
+def hash_test_pairs(test_part) -> str:
+    """Degerlendirilen (kullanici, urun) ciftlerinin sira bagimsiz ozeti.
+
+    Kapi 2, olcut 1: bu ozet butun kosullarda (ve seed'lerde) AYNI olmali. Kosu
+    aninda, RecBole'a verilen test dosyasinin kendisinden hesaplaniyor.
+    """
+    import hashlib  # noqa: PLC0415
+
+    import polars as pl  # noqa: PLC0415
+
+    ciftler = (test_part.select(pl.col("user_id").cast(pl.String), pl.col("item_id").cast(pl.String))
+               .sort("user_id", "item_id"))
+    h = hashlib.sha256()
+    for u, i in ciftler.iter_rows():
+        h.update(f"{u}\t{i}\n".encode())
+    return h.hexdigest()
+
+
 def read_condition(cfg: Config, role: str, code: str):
     """Kosulun `.inter` dosyasi; kimlikler METIN (sayiya benzeyen ASIN bozulmasin)."""
     import polars as pl  # noqa: PLC0415
@@ -401,6 +420,7 @@ def write_benchmark_files(cfg: Config, role: str, code: str, *,
         **sayilar,
         "n_test_before_self_rule": n_test_all,
         "n_test_dropped_not_self": n_test_all - sayilar["test"],
+        "test_pairs_sha256": hash_test_pairs(parcalar["test"]),
         **ek,
     }
     log.info(
@@ -419,13 +439,22 @@ def run(
     *,
     seed: int | None = None,
     epochs: int | None = None,
+    force: bool = False,
 ) -> dict:
     """Tek kosu: bir kategori, bir kosul, bir model, bir seed."""
+    import time  # noqa: PLC0415
+
+    seed = int(seed if seed is not None else cfg.get("seed"))
+    dest = experiment_path(cfg, role, code, model, seed)
+    if dest.exists() and peruser_path(cfg, role, code, model, seed).exists() and not force:
+        # Kaggle oturumu kesilince matris bastan kosmasin (CLAUDE.md 7: idempotent).
+        log.info("atlaniyor (rapor ve kullanici basi dosya var, --force ile ezilir): %s", dest.name)
+        return json.loads(dest.read_text(encoding="utf-8"))
+
     from recbole.config import Config as RecConfig  # noqa: PLC0415
     from recbole.data import create_dataset, data_preparation  # noqa: PLC0415
     from recbole.utils import ModelType, get_model, get_trainer, init_seed  # noqa: PLC0415
 
-    seed = int(seed if seed is not None else cfg.get("seed"))
     sirali = get_model(model).type == ModelType.SEQUENTIAL
     folder, meta = write_benchmark_files(cfg, role, code, sequential=sirali)
 
@@ -452,6 +481,9 @@ def run(
         "eval_args": {"split": {"LS": "valid_and_test"}, "order": "TO", "mode": "full"},
         "metric_decimal_place": METRIC_DECIMALS,
         "show_progress": False,
+        # RecBole `gpu_id`i CUDA_VISIBLE_DEVICES'a YAZIYOR (varsayilan '0'). Kaggle'da
+        # ikinci karta verilen kosu boylece sessizce birinci karta dusuyordu.
+        "gpu_id": os.environ.get("CUDA_VISIBLE_DEVICES", "0"),
     }
     if epochs is not None:
         params["epochs"] = int(epochs)
@@ -470,6 +502,11 @@ def run(
     init_seed(conf["seed"], conf["reproducibility"])
 
     dataset = create_dataset(conf)
+    # Degerlendirme grubu SKOR HUCRESIYLE sinirli (GPU bellegi). RecBole'un varsayilani
+    # (4.096) genel modellerde urun sayisina bolunuyor: urun sayisi bunu asinca tam
+    # siralama kullanici basina BIR grup kosuyordu. Sonucu degistirmez.
+    hucre = int(cfg.get("experiment.eval_score_cells"))
+    conf["eval_batch_size"] = max(1, hucre // dataset.item_num) if sirali else max(hucre, dataset.item_num)
     train_data, valid_data, test_data = data_preparation(conf, dataset)
 
     net = get_model(conf["model"])(conf, train_data._dataset).to(conf["device"])
@@ -486,15 +523,18 @@ def run(
             log.info("C0 alinmis urun maskesine %s cift eklendi", f"{c0_maske.n_pairs:,}")
     kanca = _EvalHook(trainer, dataset, golge, max(topk), c0_maske)
     with _torch_load_full():
+        t0 = time.time()
         # `fit` (skor, sonuc sozlugu) doner - ikisi ayri sey.
         best_score, best_valid = trainer.fit(
             train_data, valid_data, saved=True, show_progress=False
         )
+        t1 = time.time()
         kanca.active = True
         test_result = trainer.evaluate(
             test_data, load_best_model=True, show_progress=False
         )
         kanca.active = False
+        sure = {"fit": round(t1 - t0, 1), "test": round(time.time() - t1, 1)}
 
     peruser, tutarlilik = _write_peruser(cfg, role, code, model, seed, dataset, kanca,
                                          topk, dict(test_result), golge, c0_maske)
@@ -508,6 +548,10 @@ def run(
             "seed": seed,
             "epochs": conf["epochs"],
             "device": str(conf["device"]),
+            "eval_batch_size": int(conf["eval_batch_size"]),
+            # Zaman sondasi (Faz 4.1) bu sayilarla matrisi butceliyor.
+            "runtime_seconds": sure,
+            "code_version": code_version(),
             # Vekil etiketten uretilmis kosu RAPORLANAMAZ.
             "label_source": kosul_raporu.get("label_source"),
             "reportable": kosul_raporu.get("reportable", False),
@@ -530,10 +574,12 @@ def run(
             report["meta"]["label_source"],
         )
 
-    dest = experiment_path(cfg, role, code, model, seed)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     log.info("yazildi: %s", dest.name)
+    # Checkpoint yeniden kullanilmiyor: M1/M2 kullanici basi top-K listelerinden
+    # hesaplaniyor. Matris ~70 kosu x ~100-300 MB; Kaggle'in 20 GB diskini doldururdu.
+    Path(trainer.saved_model_file).unlink(missing_ok=True)
     for k, v in report["test"].items():
         log.info("  %-16s %.6f", k, v)
     return report
@@ -596,12 +642,14 @@ def main(argv: list[str] | None = None) -> int:
         "--epochs", type=int, default=None,
         help="Duman testi icin dusuk tutun (or. 5). Bos birakilirsa RecBole varsayilani.",
     )
+    parser.add_argument("--force", action="store_true",
+                        help="Rapor ve kullanici basi dosya varsa bile yeniden kos.")
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
     run(
         cfg, args.category, args.condition, args.model,
-        seed=args.seed, epochs=args.epochs,
+        seed=args.seed, epochs=args.epochs, force=args.force,
     )
     return 0
 

@@ -28,6 +28,30 @@ def relative_to_repo(path: Path) -> str:
         return Path(path).name
 
 
+def code_version() -> str | None:
+    """Kosan kodun git surumu; belirlenemezse None.
+
+    Neden rapora giriyor: Kaggle notebook'u depoyu bir kez klonlayip bir daha
+    guncellemiyordu ve kosu sessizce eski kodla devam ediyordu (2026-08-28).
+    Fark ancak cikti formatindan sezilebiliyordu. Artik ciktilar bir kod
+    surumune baglanabiliyor - notebook ciktisi kaybolsa bile.
+
+    Sessizce None doner: git yoksa veya depo degilse kosu durmamali, bu bir
+    kayit alani, bir kapi degil. Burada durmasinin sebebi RecBole ortami:
+    `llm_annotate` pydantic cekiyor, deney kosucusu cekemez.
+    """
+    import subprocess  # noqa: PLC0415
+
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() or None
+
+
 def ensure_parent(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     return path

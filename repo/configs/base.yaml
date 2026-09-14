@@ -1,8 +1,9 @@
 # Tek doğruluk kaynağı. Kodda hardcode parametre YOK.
 
 seed: 42
-# ⚠️ HENÜZ OKUNMUYOR. Çoklu seed Hafta 7'de (bootstrap + varyans); bugün her
-# koşu tek `seed` kullanıyor. TBD: 3 mü 5 mi — koşu süresine göre.
+# Deney matrisinin seed'leri. `analysis.experiment_stats` okur: Kapı 2'nin 4. ölçütü
+# (C0'ın seed kararlılığı) BURADAKİ HER seed koşmadan karar vermez. Tek bir koşu
+# `run_experiment --seed` ile; verilmezse `seed`. TBD: 3 mü 5 mi — koşu süresine göre.
 seeds: [42, 1337, 2024]
 
 paths:
@@ -151,8 +152,9 @@ experiment:
   # Toys × SASRec × C3 (DECISIONS 2026-09-14). C2 uygulanmadı (açık hata verir);
   # onun `soft_weights` anahtarı bu yüzden kaldırıldı.
   conditions: [C0, C1, C4, C1b, C4b, C3]
-  # ⚠️ HENÜZ OKUNMUYOR: `run_experiment` modeli `--model` ile CLI'dan alıyor.
-  # Bu liste Hafta 7'de tüm kombinasyonları süren koşucu yazılınca okunacak.
+  # Deney matrisi (plan Faz 4.3): {Toys, Grocery} × modeller × seeds. Tek koşu
+  # modeli `--model` ile alır; `experiment_stats` bu listeleri tarar.
+  categories: [high, low]
   models: [SASRec, BPR]                      # MVP. Pop/ItemKNN/GRU4Rec sonra.
   topk: [10, 20]
   metrics: [Recall, NDCG, HitRate]
@@ -160,6 +162,11 @@ experiment:
   # dosyaları geçmişi hazır taşıdığı için kırpma `run_experiment` tarafından, SON
   # N ürün tutularak yapılıyor (RecBole'un `seq_len`'i İLK N'i tutardı).
   max_item_list_length: 50
+  # Bir değerlendirme grubundaki en fazla skor hücresi (kullanıcı × ürün; fp32'de
+  # 64M ≈ 256 MB). Mühendislik ayarı, sonucu değiştirmez: RecBole'un varsayılan
+  # `eval_batch_size`'ı (4.096) genel modellerde ürün sayısına bölünüyor ve ürün
+  # sayısı 4.096'yı aşınca tam sıralama kullanıcı başına BİR grup koşuyordu.
+  eval_score_cells: 67108864
   split: temporal_leave_one_out
   # ⚠️ HENÜZ OKUNMUYOR — ve okunmaması KASITLI. İki kural da koda GÖMÜLÜ olarak
   # uygulanıyor, config'ten gelmiyor: `run_experiment.write_benchmark_files`
@@ -170,10 +177,12 @@ experiment:
   eval_rule:
     test_item_must_be: self                  # DEĞİŞTİRİLEMEZ
     freeze_universe_on: C0                   # DEĞİŞTİRİLEMEZ
-  # ⚠️ HENÜZ OKUNMUYOR. Bootstrap güven aralıkları Hafta 7.
+  # Karşıtlıkların (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b, doz–yanıt) eşli bootstrap'ı
+  # (`analysis.experiment_stats`). Kapı 2'nin kendi tekrar sayısı `gate2.bootstrap_n`.
   bootstrap_iters: 1000
+  ci: 0.95
 
-# ⚠️ BU BLOĞUN TAMAMI HENÜZ OKUNMUYOR — önceden kayıt; okuyan kod Faz 4'te.
+# Okuyan: `analysis.experiment_stats` (Faz 4).
 # Kapı 2 — deneyin KURULUMU geçerli mi? ETKİYİ ölçmez. Eşikler 2026-09-14'te,
 # HİÇBİR DENEY KOŞUSU YAPILMADAN yazıldı (Kapı 1 ile aynı disiplin). Kategori ×
 # model başına dört ölçüt; biri eksikse karar INCOMPLETE:

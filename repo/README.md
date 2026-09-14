@@ -101,6 +101,9 @@ python -m gift_contamination.recsys.conditions --category high --condition all -
 # data/processed/recbole/<kategori>/peruser/ altına yazılır (git'e girmez).
 PYTHONPATH=src .venv-recbole/Scripts/python.exe \
   -m gift_contamination.recsys.run_experiment --category high --condition C1 --model SASRec --seed 42
+# Bütün matris Kaggle'da: scripts/kaggle_experiment.py (önce PLAN = "probe").
+# Hafta 7 — Kapı 2 + eşli bootstrap (ana ortam; koşu çıktıları yerine konduktan sonra)
+python -m gift_contamination.analysis.experiment_stats   # -> gate2.json, experiment_stats.json
 ```
 
 Örneklem **üç ayrı çerçeve** üretir ve bu ayrım korunmak zorundadır:
@@ -145,7 +148,7 @@ Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış so
 | `data/annotations/<kategori>_inferred.parquet` | öğrencinin 5-core etiketleri + sınıf olasılıkları (metin yok; parquet olduğu için yine git'e girmez) |
 | `models/distill/` | eğitilmiş öğrenci — git'e girmez |
 | `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları, koşullar (C0 · C1 · C4 · C1b · C4b · C3) ve `peruser/` kullanıcı başı metrikler + top-K |
-| `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları |
+| `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları, Kapı 2 (`gate2.json`), karşıtlıklar (`experiment_stats.json`) |
 | `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) |
 | `../data-research/data-research.md` | Data Research teslimi |
 

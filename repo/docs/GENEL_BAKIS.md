@@ -147,7 +147,7 @@ sıradaki adımlar için **§8**.
 | LLM–insan uyumu, C1 ekseni (popülasyon) | F1 **0,72** · kesinlik 0,65 |
 | Kapı 1 | 4 kategoride **PASS (4/4)** |
 | Hafta 4 | **INCOMPLETE** — tek etiketleyici (A), 500 satır |
-| Geçen test | **357** |
+| Geçen test | **374** |
 
 ### Hangi veri, ne kadar
 
@@ -281,7 +281,7 @@ C1 = yalnızca `gift_given` (birincil). C1b = `gift_given` + `household` + `rece
 | 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | 🔄 annotation ✅ (4/4, Kapı 1 PASS) · damıtma + çıkarım kodu ✅ (CPU duman testi) · **Kaggle koşusu bekliyor** |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 kod ✅ (gerçek etiket yolu, BPR + SASRec, sentetik duman testi) · **damıtılmış etiket bekliyor** |
-| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi ⏳ |
+| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi ✅ · Kaggle deney betiği ✅ · **koşular bekliyor** |
 | 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ⏳ |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
@@ -396,21 +396,21 @@ yayınlanamaz.
 | Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | sentetik duman testi geçti | `.venv-recbole`, CPU, 3 epoch, C0/C3/C4b: kullanıcı başı ortalama RecBole toplamına birebir eşit, gölge ürün top-K'da 0 |
 | **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
 | Damıtma + çıkarım **GPU yolu** (`train`, `run`) | yalnızca CPU duman testi | küçük rastgele ModernBERT ve DeBERTa, transformers 5.17: eğitim → kapı → rapor → parça parça çıkarım uçtan uca; **T4 üzerinde henüz koşmadı** |
-| Test paketi | **357 test geçiyor** | `pytest tests -q` |
+| **Kapı 2 + eşli bootstrap** (`experiment_stats`) | kod tamam, **gerçek koşu yok** | `test_experiment_stats`; 24 sentetik koşunun çıktısından `gate2.json` üretildi |
+| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | yerelde CPU simülasyonu | kurulum tarifi torch 2.14 + numpy 2.5 ortamında `.venv-recbole` ile birebir aynı sayıları verdi; **Kaggle'da henüz koşmadı** |
+| Test paketi | **374 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
 - **Öneri deneyi gerçek etiketi bekliyor.** `atomic --labels distilled` yazıldı ama
   girdisi (`*_inferred.parquet`) Kaggle koşusundan gelecek. O zamana kadar üretilen her
   deney çıktısı `label_source: proxy` ve `reportable: false` damgalı — bilinçli bir kilit.
-- **Deney koşucusu gerçek boyutta hiç koşmadı.** Toys 5-core'da BPR'nin tam sıralaması
-  RecBole'un varsayılan `eval_batch_size`'ıyla kullanıcı başına bir grup koşabilir;
-  süre zaman sondasında (Faz 4.1) ölçülecek.
+- **Deney gerçek boyutta hiç koşmadı.** Süre ve bellek zaman sondasında (Kaggle,
+  `PLAN = "probe"`) ölçülecek; matris ondan sonra bütçelenir.
 
 ### Yazılmadı
 
-`recsys/marketing_metrics.py` · eşli bootstrap (`analysis/experiment_stats.py`) · Kapı 2
-değerlendiricisi · bütün matrisi süren Kaggle deney betiği. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
+`recsys/marketing_metrics.py` (M1/M2/M3) · sonuç figürleri F20–F23 · `docs/SONUCLAR.md`. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
 işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
 
 ### Bilinen sınırlar
@@ -456,8 +456,18 @@ DECISIONS 2026-09-14 "Hafta 6 kodu".
 
 **3 · DENEY — Kapı 2** (Hafta 6–7) — {Toys, Grocery} × {SASRec, BPR} × 3 seed;
 C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulardan önce yazıldı.
+**Kod hazır; damıtılmış etiketi bekliyor.** Adımlar (1. adımın çıktısı geldikten sonra):
+1. Yerelde: `recsys.atomic --category high --labels distilled --force` (ve `low`).
+2. `data/processed/recbole/<kategori>/` altındaki `<kategori>.inter` + `split.json`
+   dosyalarını (iki kategori, dört dosya) **özel** bir Kaggle dataset'ine yükleyin.
+3. `scripts/kaggle_experiment.py`'yi `PLAN = "probe"` ile çalıştırın (zaman sondası),
+   süreye göre `PLAN = "matrix"`. Oturum kesilirse önceki `out/`'u ikinci dataset olarak
+   ekleyip `PREVIOUS_OUT_PATH`'i doldurun — biten koşular atlanır.
+4. `out/`'u indirin: `*.json` → `reports/results/`, `peruser/<kategori>/` →
+   `data/processed/recbole/<kategori>/peruser/`.
 
-**4 · İSTATİSTİK** — seed'ler üzerinden eşli bootstrap: C1−C4, C3−C1, C1b−C4b.
+**4 · İSTATİSTİK** — ✅ kod hazır: `analysis.experiment_stats` → `gate2.json` +
+`experiment_stats.json` (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b, doz–yanıt; eşli bootstrap).
 
 **5 · PAZARLAMA METRİKLERİ** (Hafta 8) — M1 israf oranı · M2 yarı ömür · M3 segment.
 
