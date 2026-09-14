@@ -147,13 +147,19 @@ distill:
     max_drop_vs_teacher_on_human: 0.05   # öğrenci vs insan C1 F1'i, öğretmeninkinden en fazla bu kadar düşük
 
 experiment:
-  conditions: [C0, C1, C4]                   # MVP. C2/C3 sonra.
-  soft_weights: [0.25, 0.5, 0.75]            # C2 için, TBD
+  # `conditions --condition all` bu sırayla üretir. Kesilmez: C0/C1/C4, C1b/C4b,
+  # Toys × SASRec × C3 (DECISIONS 2026-09-14). C2 uygulanmadı (açık hata verir);
+  # onun `soft_weights` anahtarı bu yüzden kaldırıldı.
+  conditions: [C0, C1, C4, C1b, C4b, C3]
   # ⚠️ HENÜZ OKUNMUYOR: `run_experiment` modeli `--model` ile CLI'dan alıyor.
   # Bu liste Hafta 7'de tüm kombinasyonları süren koşucu yazılınca okunacak.
   models: [SASRec, BPR]                      # MVP. Pop/ItemKNN/GRU4Rec sonra.
   topk: [10, 20]
   metrics: [Recall, NDCG, HitRate]
+  # Sıralı modellerin (SASRec) gördüğü en uzun geçmiş — RecBole varsayılanı. Bölme
+  # dosyaları geçmişi hazır taşıdığı için kırpma `run_experiment` tarafından, SON
+  # N ürün tutularak yapılıyor (RecBole'un `seq_len`'i İLK N'i tutardı).
+  max_item_list_length: 50
   split: temporal_leave_one_out
   # ⚠️ HENÜZ OKUNMUYOR — ve okunmaması KASITLI. İki kural da koda GÖMÜLÜ olarak
   # uygulanıyor, config'ten gelmiyor: `run_experiment.write_benchmark_files`

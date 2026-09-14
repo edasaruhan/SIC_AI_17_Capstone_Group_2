@@ -21,8 +21,14 @@ DEGERLENDIRME KISITI: test item'i `self` OLMALI (CLAUDE.md 5 kural 2). Iddia
 hediyeyse olculen sey bu degildir. Uygun olmayan kullanicilar degerlendirmeden
 cikarilir ama EVRENDE kalir - evren donduruldu.
 
+ETIKET KAYNAGI:
+  --labels proxy      sozcuksel vekil. DUMAN TESTI - cikti `reportable: false`.
+  --labels distilled  damitilmis ogrencinin 5-core etiketleri (Hafta 5). Yalnizca
+                      sadakat kapisi PASS ve etiketler gercek modelden geliyorsa.
+
 Kullanim:
-    python -m gift_contamination.recsys.atomic --config configs/base.yaml --category mid
+    python -m gift_contamination.recsys.atomic --config configs/base.yaml --category high \\
+           --labels distilled
 """
 
 from __future__ import annotations
@@ -34,12 +40,13 @@ import polars as pl
 
 from ..config import Config, add_standard_args, resolve_roles
 from ..data.preprocess import kcore_parquet_path
-from ..utils.io import should_skip, write_json
+from ..utils.io import read_json, should_skip, write_json
 from ..utils.logging import get_logger, log_output
 
 log = get_logger("recsys.atomic")
 
 SELF = "self"
+LABEL_SOURCES = ("proxy", "distilled")
 # RecBole atomic file basligi: `alan:tip`. Sekans modelleri zaman damgasini
 # float bekliyor.
 # `split` de dosyaya YAZILIYOR. RecBole kendi bolmesini yapabilir ama kosullar
@@ -99,6 +106,53 @@ def eval_eligible(df: pl.DataFrame, label_col: str = "purchase_type") -> pl.Seri
     return test.filter(pl.col(label_col) == SELF)["user_id"]
 
 
+# ------------------------------------------------------------------ etiketler
+def load_distilled_labels(cfg: Config, role: str) -> pl.DataFrame:
+    """Ogrencinin 5-core etiketleri - ancak uc kontrolden gecerse.
+
+    1. Etiketler gercek modelden (`label_source == distilled`, stub degil).
+    2. Cikarim raporu sadakat kapisini PASS kaydetmis.
+    3. O modelin kendi damitma raporu (reports/results) de PASS diyor - cikarim
+       raporundaki damga tek basina yeterli sayilmaz; kapinin kaniti diskte olmali.
+    """
+    from ..detection.distill import report_path as distill_report_path  # noqa: PLC0415
+    from ..detection.inference import (  # noqa: PLC0415
+        LABEL_SOURCE_REAL,
+        inference_report_path,
+        inferred_path,
+    )
+
+    path = inferred_path(cfg, role)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path.name} yok - Kaggle'daki `inference run` ciktisini data/annotations/ altina koyun"
+        )
+    labels = pl.read_parquet(path, columns=["row_id", "purchase_type", "label_source"])
+    kaynaklar = labels["label_source"].unique().to_list()
+    if kaynaklar != [LABEL_SOURCE_REAL]:
+        raise RuntimeError(
+            f"{path.name} etiket kaynagi {kaynaklar} - yalnizca '{LABEL_SOURCE_REAL}' "
+            "deneye girebilir (stub ciktisi duman testidir)."
+        )
+    rapor_yolu = inference_report_path(cfg, role)
+    if not rapor_yolu.exists():
+        raise FileNotFoundError(f"{rapor_yolu.name} yok - cikarim raporu da indirilmeli")
+    rapor = read_json(rapor_yolu)
+    model_key = rapor.get("model_key")
+    kapi_yolu = distill_report_path(cfg, model_key)
+    kapi = read_json(kapi_yolu).get("verdict") if kapi_yolu.exists() else None
+    if rapor.get("distill_gate_verdict") != "PASS" or kapi != "PASS":
+        raise RuntimeError(
+            f"sadakat kapisi gecilmemis: cikarim raporu {rapor.get('distill_gate_verdict')}, "
+            f"{kapi_yolu.name} {kapi}. Kapiyi gecmemis ogrencinin etiketi deneye giremez."
+        )
+    if rapor.get("n_rows") != labels.height:
+        raise RuntimeError(
+            f"{path.name} {labels.height} satir, rapor {rapor.get('n_rows')} diyor - dosyalar karismis"
+        )
+    return labels.select("row_id", "purchase_type")
+
+
 # ------------------------------------------------------------------- uretim
 def build_atomic(
     cfg: Config,
@@ -111,10 +165,24 @@ def build_atomic(
     """kcore korpusundan RecBole `.inter` dosyasi + dondurulmus bolme.
 
     `labels` verilmezse sozcuksel vekil kullanilir ve `label_source` "proxy"
-    kalir. O cikti DUMAN TESTI icindir: `conditions.freeze` vekil kaynakli
-    girdiden raporlanabilir sonuc uretmeyi reddeder.
+    kalir. O cikti DUMAN TESTI icindir: `conditions` kaynagi
+    `REPORTABLE_LABEL_SOURCES` disinda olan kosulu `reportable: false` damgalar.
     """
+    if (labels is None) != (label_source == "proxy"):
+        raise ValueError(
+            f"label_source={label_source!r} ama etiket {'verilmedi' if labels is None else 'verildi'} - "
+            "vekil etiketi 'proxy' disinda bir adla damgalanamaz (ya da tersi)."
+        )
     dest = inter_path(cfg, role)
+    if dest.exists() and not force and split_path(cfg, role).exists():
+        # BAYAT DOSYA KORUMASI: vekille uretilmis dosya varken `--labels distilled`
+        # istemek "zaten var" diye atlanirsa deney sessizce vekille kosar.
+        eski = read_json(split_path(cfg, role)).get("label_source")
+        if eski != label_source:
+            raise RuntimeError(
+                f"{dest.name} '{eski}' etiketiyle uretilmis, '{label_source}' isteniyor. "
+                "`--force` ile yeniden uretin (kosul dosyalari da yeniden uretilmeli)."
+            )
     if should_skip(dest, force, log):
         return dest
 
@@ -212,12 +280,15 @@ def load_atomic(cfg: Config, role: str) -> pl.DataFrame:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     add_standard_args(parser)
+    parser.add_argument("--labels", default="proxy", choices=LABEL_SOURCES,
+                        help="proxy = duman testi (raporlanamaz); distilled = Hafta 5 ogrencisi")
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
     for role in resolve_roles(cfg, args.category):
         log.info("=== kategori: %s (%s) ===", role, cfg.category_slug(role))
-        build_atomic(cfg, role, force=args.force)
+        labels = load_distilled_labels(cfg, role) if args.labels == "distilled" else None
+        build_atomic(cfg, role, labels, label_source=args.labels, force=args.force)
     return 0
 
 

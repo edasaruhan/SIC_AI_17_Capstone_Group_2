@@ -61,6 +61,8 @@ src/gift_contamination/
                          #   körleme: vekil VE LLM'in cevabı sayfaya girmez
                          #   --annotators N ile üç ayrı sayfa (Hafta 4)
   detection/
+    contamination.py     # C1 (`narrow`) / C1b (`broad`) etiket kümeleri — TEK yer,
+                         #   bağımlılıksız (RecBole ortamında pydantic yok)
     schema.py            # Pydantic modelleri (etiket şeması)
     prompting.py         # prompt yükleme/render
     llm_annotate.py      # vLLM batch annotation (veri paralel) + deneme koşusu
@@ -84,10 +86,13 @@ src/gift_contamination/
   recsys/
     atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
                          #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu).
-                         #   BUGÜN yalnızca sözcüksel vekille koşuyor - `labels`
-                         #   parametresi var ama dolduran CLI yolu yok (§7)
-    conditions.py        # C0–C4 + C1b (gift+household, sağlamlık kontrolü)
-    run_experiment.py    # deney koşucusu — .venv-recbole altında koşar
+                         #   `--labels distilled` öğrenci etiketi (yalnızca sadakat
+                         #   kapısı PASS); `--labels proxy` duman testi, raporlanamaz
+    conditions.py        # C0 · C1 · C4 · C1b · C4b · C3 (gölge token `<id>::gift`).
+                         #   C2 çağrılırsa açık hata (uygulanmadı, §13)
+    run_experiment.py    # deney koşucusu — .venv-recbole altında koşar. Gölge ürün
+                         #   maskesi + C0 alınmış ürün maskesi (BPR), SASRec için hazır
+                         #   geçmişli bölme dosyaları, kullanıcı başı metrik/top-K parquet
     marketing_metrics.py # ⛔ YAZILMADI - M1, M2, M3              (Hafta 8)
   utils/
     io.py, logging.py
@@ -186,6 +191,11 @@ Sequential recommendation, leave-one-out.
 | C2 | Hediye etkileşimleri loss'ta w ∈ {0.25, 0.5, 0.75} ile ağırlıklandırılır |
 | C3 | Hediye bayrağı feature/token olarak eklenir (silinmez) |
 | C4 | **PLASEBO** — hediye sayısı kadar *rastgele* etkileşim çıkarılır |
+
+> **2026-09-14 (DECISIONS):** C2 **uygulanmadı** (çağrılırsa açık hata). C3 = gölge token.
+> Sağlamlık için **C1b** (`gift_given` + `household` + `received`) ve kendi plasebosu
+> **C4b** eklendi. Kodda koşulan liste: `experiment.conditions`. Değerlendirmede alınmış
+> ürün maskesi bütün koşullarda C0'ın.
 
 ### Bu dört kural ihlal edilirse deney geçersizdir
 
@@ -355,10 +365,11 @@ python -m gift_contamination.detection.distill   train   --model fallback   # YA
 python -m gift_contamination.detection.inference prepare --config configs/base.yaml --category high
 python -m gift_contamination.detection.inference run     --config configs/base.yaml --category high  # GPU, kapı PASS
 # Hafta 6 — deney. Atomic dosya ve koşullar RecBole GEREKTİRMEZ; yalnızca
-# run_experiment gerektirir. Etiket verilmezse sözcüksel vekil kullanılır ve
+# run_experiment gerektirir. `--labels proxy` (varsayılan) sözcüksel vekil kullanır ve
 # çıktı `reportable: false` damgası taşır — sonuç tablosuna giremez.
-python -m gift_contamination.recsys.atomic     --config configs/base.yaml --category mid
-python -m gift_contamination.recsys.conditions --config configs/base.yaml --category mid --condition all
+python -m gift_contamination.recsys.atomic     --config configs/base.yaml --category mid   # duman testi
+python -m gift_contamination.recsys.atomic     --config configs/base.yaml --category high --labels distilled --force
+python -m gift_contamination.recsys.conditions --config configs/base.yaml --category high --condition all --force
 python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
        --category high --condition C0 --model SASRec --seed 42
 ```
@@ -372,14 +383,14 @@ geldiği anlamına gelir.
 python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
 ```
 
-> **`recsys.atomic` bugün YALNIZCA sözcüksel vekille koşuyor.** `build_atomic`
-> bir `labels` parametresi taşıyor ama onu dolduran bir CLI yolu yok ve hiçbir
-> çağıran vermiyor — çıktı bu yüzden `label_source: proxy` damgalı ve
-> `reportable: false`. Gerçek etiketler `detection.inference` tam korpusu
-> etiketledikten sonra gelecek: `build_atomic` kcore'un **her** satırı için
-> etiket bekliyor (satır sayısı tutmazsa gürültülü hata veriyor), yani 11.800
-> satırlık annotation örneği tek başına yetmez. Zincir: Hafta 4 doğrulama →
-> Hafta 5 damıtma + çıkarım → Hafta 6 gerçek deney.
+> **`recsys.atomic --labels distilled` kod olarak hazır, girdisi henüz yok
+> (2026-09-14).** `data/annotations/<kategori>_inferred.parquet` Kaggle'daki
+> `inference run`'dan gelecek. Üç kontrol: etiket gerçek modelden (stub değil),
+> çıkarım raporu kapıyı PASS kaydetmiş, o modelin damıtma raporu diskte PASS.
+> `build_atomic` kcore'un **her** satırı için etiket bekliyor (satır sayısı
+> tutmazsa hata). Vekille üretilmiş dosya varken `--labels distilled` istenirse
+> "zaten var" diye atlanmaz, `--force` ister — koşullar da `--force` ile yeniden
+> üretilmeli. Zincir: Hafta 5 damıtma + çıkarım (Kaggle) → atomic → koşullar → deney.
 
 Kurallar:
 - Her komut **idempotent** olmalı; çıktı varsa `--force` olmadan yeniden hesaplamamalı.
@@ -436,9 +447,16 @@ Kurallar:
 - `test_schema.py` — Pydantic şeması geçerli/geçersiz JSON'ları doğru ayırıyor mu
 - `test_preprocess.py` — 5-core gerçekten 5-core mu; sekanslar kronolojik mi
 - `test_conditions.py` — **kritik**: hiçbir koşul C0'ın evrenine kullanıcı/ürün
-  EKLEMİYOR mu (tek yönlü kapsama); C4 tam olarak C1 kadar etkileşim mi çıkarıyor
+  EKLEMİYOR mu (tek yönlü kapsama); C4 tam olarak C1, C4b tam olarak C1b kadar
+  etkileşim mi çıkarıyor; C3 gölge id'leri yalnızca eğitimde mi; C2 açık hata mı
 - `test_no_leakage.py` — **kritik**: bölme zaman bazlı mı; test item'ı eğitimde
-  geçmiyor mu; test item'ları `self` etiketli mi
+  geçmiyor mu; test item'ları `self` etiketli mi; gölge id valid/test'e hiç girmiyor mu
+- `test_experiment_labels.py` — `atomic --labels distilled` stub'ı ve kapıyı geçmemiş
+  öğrenciyi reddediyor mu; bayat atomic/koşul dosyası sessizce yeniden kullanılıyor mu
+- `test_run_experiment.py` — kullanıcı başı metrik elle hesaba eşit mi; SASRec bölme
+  dosyaları RecBole'un genişletme kuralına uyuyor mu (son N ürün, boş valid geçmişi);
+  C0 alınmış ürün maskesi koşulun kaybettiği çiftler mi; koşucu pydantic çekmeden
+  import ediliyor mu
 - `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
   genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık

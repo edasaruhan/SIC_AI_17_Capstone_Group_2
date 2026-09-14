@@ -92,12 +92,15 @@ python -m gift_contamination.detection.inference prepare --category low    # Gro
 # (Kaggle) distill train  -> reports/results/distill_report_base.json (sadakat kapısı)
 # (Kaggle) inference run  -> data/annotations/<kategori>_inferred.parquet  (yalnızca kapı PASS ise)
 
-# Hafta 6 — deney iskelesi (bugün SÖZCÜKSEL VEKİL etiketiyle; çıktı
-# `reportable: false` damgalı). run_experiment .venv-recbole altında koşar.
-python -m gift_contamination.recsys.atomic     --category mid
-python -m gift_contamination.recsys.conditions --category mid --condition all
+# Hafta 6 — deney. Gerçek etiket: öğrencinin çıktısı data/annotations/ altına
+# konduktan SONRA (kapı PASS değilse atomic reddeder). `--labels` verilmezse
+# sözcüksel vekil kullanılır ve çıktı `reportable: false` damgalıdır (duman testi).
+python -m gift_contamination.recsys.atomic     --category high --labels distilled --force
+python -m gift_contamination.recsys.conditions --category high --condition all --force  # C0 C1 C4 C1b C4b C3
+# run_experiment .venv-recbole altında koşar; SASRec ve BPR. Kullanıcı başı metrikler
+# data/processed/recbole/<kategori>/peruser/ altına yazılır (git'e girmez).
 PYTHONPATH=src .venv-recbole/Scripts/python.exe \
-  -m gift_contamination.recsys.run_experiment --category mid --condition C0 --model BPR
+  -m gift_contamination.recsys.run_experiment --category high --condition C1 --model SASRec --seed 42
 ```
 
 Örneklem **üç ayrı çerçeve** üretir ve bu ayrım korunmak zorundadır:
@@ -141,7 +144,7 @@ Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış so
 | `data/processed/distill/` | öğrenci eğitim paketi + 5-core çıkarım girdileri — birebir metin, **git'e girmez** |
 | `data/annotations/<kategori>_inferred.parquet` | öğrencinin 5-core etiketleri + sınıf olasılıkları (metin yok; parquet olduğu için yine git'e girmez) |
 | `models/distill/` | eğitilmiş öğrenci — git'e girmez |
-| `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları ve koşullar (C0–C4) |
+| `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları, koşullar (C0 · C1 · C4 · C1b · C4b · C3) ve `peruser/` kullanıcı başı metrikler + top-K |
 | `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları |
 | `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) |
 | `../data-research/data-research.md` | Data Research teslimi |

@@ -80,19 +80,19 @@ flowchart TD
     A["Temiz korpus<br/>12.417.784 review · Toys_and_Games"]
     B["Etiketlenecek örnek<br/>47.200 satır · 4 kategori"]
     C["LLM etiketleri<br/>self · gift_given · household<br/>received · unclear"]
-    H["İnsan etiketi<br/>500 satır · 3 annotator · Hafta 4"]
+    H["İnsan etiketi<br/>500 satır · tek etiketleyici (A) · Hafta 4"]
     G1{"KAPI 1<br/>Aralık–Ocak tepesi var mı?"}
     P["prompt v3 / model değişikliği<br/>tam annotation'a geçilmez"]
     D["ModernBERT — hızlı model<br/>149M parametre · yerel GPU"]
     E["Etiketlenmiş tam korpus<br/>12.417.784 etkileşim, hediye bayraklı"]
-    F["RecBole deneyi<br/>C0 · C1 · C2 · C3 · C4"]
+    F["RecBole deneyi<br/>C0 · C1 · C4 · C1b · C4b · C3"]
     G2{"KAPI 2<br/>C0 ile C4 arasında fark YOK mu?"}
     R["Sonuçlar yorumlanabilir"]
     INV["Kurulum bozuk<br/>hiçbir sonuç yorumlanamaz"]
 
     A -->|"katmanlı örnekleme"| B
     B -->|"Qwen3-4B · vLLM · Kaggle T4"| C
-    H -->|"Fleiss κ · sınıf bazlı F1"| C
+    H -->|"sınıf bazlı F1 · κ ölçülmedi"| C
     C --> G1
     G1 -->|"geçti: eğitim verisi"| D
     G1 -->|"geçemedi"| P
@@ -147,7 +147,7 @@ sıradaki adımlar için **§8**.
 | LLM–insan uyumu, C1 ekseni (popülasyon) | F1 **0,72** · kesinlik 0,65 |
 | Kapı 1 | 4 kategoride **PASS (4/4)** |
 | Hafta 4 | **INCOMPLETE** — tek etiketleyici (A), 500 satır |
-| Geçen test | **311** |
+| Geçen test | **357** |
 
 ### Hangi veri, ne kadar
 
@@ -280,8 +280,8 @@ C1 = yalnızca `gift_given` (birincil). C1b = `gift_given` + `household` + `rece
 | 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
 | 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | 🔄 annotation ✅ (4/4, Kapı 1 PASS) · damıtma + çıkarım kodu ✅ (CPU duman testi) · **Kaggle koşusu bekliyor** |
-| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 iskele ✅ + duman koşusu geçti · gerçek koşu ⏳ |
-| 7 | C1/C2/C3 koşulları, bootstrap güven aralıkları, çoklu seed | ⏳ |
+| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 kod ✅ (gerçek etiket yolu, BPR + SASRec, sentetik duman testi) · **damıtılmış etiket bekliyor** |
+| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi ⏳ |
 | 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ⏳ |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
@@ -377,7 +377,7 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Son güncelleme **2026-09-14** (Hafta 4 kapanışı + Hafta 5 damıtma/çıkarım kodu). "Çalışıyor" yazan her satır ya bir
+> Son güncelleme **2026-09-14** (Hafta 4 kapanışı + Hafta 5 damıtma/çıkarım kodu + Hafta 6 koşul kodu). "Çalışıyor" yazan her satır ya bir
 > testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
 > aşağıda ayrıca yazıyor.
 
@@ -392,26 +392,25 @@ yayınlanamaz.
 | **Kapı 1** | 4 kategoride de **PASS (4/4)** | eşikler koşudan önce sabit; `reports/results/gate1_*.json` |
 | **Hafta 4 — insan doğrulaması** | **INCOMPLETE** · tek etiketleyici (A), 500 satır | yöntemler `8c697a8`, kod `eed7f35` — ikisi de sonuçtan önce push'landı; `validation_500.json`, F18 |
 | **RQ1 yaygınlık** — ham + insan kalibrasyonlu, F19 | tamam | `prevalence.json`; kalibrasyon elle hesaplanmış örnekle test ediliyor |
-| RecBole iskelesi (atomic, C0–C4 + C1b) | tamam | `test_conditions`, `test_no_leakage` |
-| Deney koşucusu (BPR, C0/C1/C4) | duman testi geçti | `.venv-recbole`, 5 epoch, tek seed |
+| Koşullar (C0 · C1 · C4 · C1b · C4b · C3 gölge token; C2 açık hata) + `atomic --labels distilled` | kod tamam, **gerçek etiketle koşmadı** | `test_conditions`, `test_no_leakage`, `test_experiment_labels` |
+| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | sentetik duman testi geçti | `.venv-recbole`, CPU, 3 epoch, C0/C3/C4b: kullanıcı başı ortalama RecBole toplamına birebir eşit, gölge ürün top-K'da 0 |
 | **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
 | Damıtma + çıkarım **GPU yolu** (`train`, `run`) | yalnızca CPU duman testi | küçük rastgele ModernBERT ve DeBERTa, transformers 5.17: eğitim → kapı → rapor → parça parça çıkarım uçtan uca; **T4 üzerinde henüz koşmadı** |
-| Test paketi | **331 test geçiyor** | `pytest tests -q` |
+| Test paketi | **357 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
-- **Öneri deneyi yalnızca sözcüksel vekille koşuyor.** `build_atomic` bir `labels`
-  parametresi taşıyor ama onu dolduran CLI yolu yok. Bütün deney çıktıları bu yüzden
-  `label_source: proxy` ve `reportable: false` damgalı — bilinçli bir kilit, arıza değil.
-- **C1b tanımı değişti ama koşul kodu henüz değişmedi.** Karar (2026-09-14): C1b =
-  `gift_given` + `household` + `received`. Yaygınlık ve doğrulama bu tanımı
-  `detection.schema.CONTAMINATION`'dan okuyor; `recsys/conditions.py` hâlâ eski ikili
-  kümeyi taşıyor ve Faz 3'te aynı yerden okuyacak şekilde değişecek.
+- **Öneri deneyi gerçek etiketi bekliyor.** `atomic --labels distilled` yazıldı ama
+  girdisi (`*_inferred.parquet`) Kaggle koşusundan gelecek. O zamana kadar üretilen her
+  deney çıktısı `label_source: proxy` ve `reportable: false` damgalı — bilinçli bir kilit.
+- **Deney koşucusu gerçek boyutta hiç koşmadı.** Toys 5-core'da BPR'nin tam sıralaması
+  RecBole'un varsayılan `eval_batch_size`'ıyla kullanıcı başına bir grup koşabilir;
+  süre zaman sondasında (Faz 4.1) ölçülecek.
 
 ### Yazılmadı
 
-`recsys/marketing_metrics.py` · C4b (C1b'nin plasebosu) · C3'ün gölge token
-uygulaması · kullanıcı başı deney çıktısı · eşli bootstrap · Kapı 2 değerlendiricisi. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
+`recsys/marketing_metrics.py` · eşli bootstrap (`analysis/experiment_stats.py`) · Kapı 2
+değerlendiricisi · bütün matrisi süren Kaggle deney betiği. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
 işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
 
 ### Bilinen sınırlar
@@ -450,8 +449,10 @@ Grocery 5-core'unun her satırı (4,6 milyon) etiketlenir. Adımlar:
 3. `out/` klasörünü indirin: `*.json` → `reports/results/`, `*_inferred.parquet` →
    `data/annotations/`.
 
-**2 · KOŞUL KODU** — C1b tanımı + **C4b** plasebosu · **C3 gölge token** (RQ3) · C2'nin
-açık hatayla kilitlenmesi · `build_atomic --labels distilled` · kullanıcı başı metrikler.
+**2 · KOŞUL KODU** — ✅ **yazıldı (2026-09-14)**: C1b + **C4b** plasebosu · **C3 gölge
+token** (RQ3) · C2 açık hatayla kilitli · `atomic --labels distilled` · kullanıcı başı
+metrikler · SASRec yolu · alınmış ürün maskesi bütün koşullarda C0'ın. Gerekçe:
+DECISIONS 2026-09-14 "Hafta 6 kodu".
 
 **3 · DENEY — Kapı 2** (Hafta 6–7) — {Toys, Grocery} × {SASRec, BPR} × 3 seed;
 C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulardan önce yazıldı.

@@ -1706,3 +1706,112 @@ Akış tek hücrede: `scripts/kaggle_distill.py`. Kapı PASS değilse çıkarım
 `scripts/kaggle_distill.py`, `configs/base.yaml` (`distill`, `paths.models`),
 `reports/results/distill_bundle.json`, CLAUDE.md §2/§6/§7/§10, README, GENEL_BAKIS §6/§8
 **Kim:** Ekip
+
+---
+
+### 2026-09-14 — Hafta 6 kodu: koşullar gerçek etikete bağlandı, C3 gölge token, değerlendirme maskesi (HİÇBİR DENEY KOŞULMADAN)
+
+> Damıtılmış etiketler henüz yok (Kaggle koşusu bekliyor), yani gerçek etiketle **hiçbir**
+> deney koşulmadı. Bu kayıttaki her karar sonuç görülmeden verildi ve yalnızca sentetik
+> duman verisiyle sınandı.
+
+#### Ne kuruldu
+
+| parça | ne yapar |
+|---|---|
+| `detection/contamination.py` | C1 (`narrow`) ve C1b (`broad`) etiket kümeleri **tek yerde**, bağımlılıksız. `schema` yeniden dışa aktarıyor; yaygınlık, doğrulama ve koşullar aynı kümeyi okuyor |
+| `recsys/conditions.py` | C0 · C1 · C4 · **C1b** · **C4b** (C1b kadar rastgele eğitim satırı) · **C3** (gölge token) · C2 → `NotImplementedError` · raporlanabilir kaynak `{llm, distilled}` · bayat koşul koruması |
+| `recsys/atomic.py` | `--labels distilled`: öğrencinin 5-core etiketleri, üç kontrolle (aşağıda) · bayat atomic koruması · vekil etiketi `proxy` dışında bir adla damgalanamaz |
+| `recsys/run_experiment.py` | gölge ürün maskesi · C0 alınmış ürün maskesi · kullanıcı başı metrik + top-K (parquet) + RecBole toplamıyla tutarlılık kontrolü · SASRec yolu |
+
+#### Koşudan önce verilen kararlar
+
+1. **C2 kilitli.** Önceki kod bir `weight` kolonu ekliyordu ama RecBole onu hiç okumuyordu —
+   koşulsa C0'ın aynısı "C2" diye raporlanırdı. Artık çağrılırsa açık hata veriyor.
+   `experiment.soft_weights` bu yüzden config'ten kaldırıldı.
+2. **C3 = gölge token.** C1'in etiket kümesi (`gift_given`) aynen kullanılır — RQ3'ün
+   "silmek mi, söylemek mi" karşılaştırması aynı satırlar üzerinde. Yalnızca **eğitim**
+   satırlarında ürün `<id>::gift` olur; valid/test'e dokunulmaz. Sıralı modelde gölge
+   token geçmişte kalır ve eğitimde hedef de olabilir (gölge gömmesi böyle öğreniliyor);
+   gerçek ürünün gömmesi ve hedefi kirlenmez. Değerlendirmede (valid + test) gölge
+   ürünlerin skoru `-inf`. Gerçek kimliğiyle eğitimden kaybolan ürün C1'deki gibi sayılır.
+3. **C4b'nin satır sayısı C1b'den türetilir**, elle girilmez; seed `crc32` ile koşul
+   adından (`conditions._seed_for`).
+4. **Alınmış ürün maskesi bütün koşullarda C0'ın (genel modeller: BPR).** Duman testinde
+   bulundu. RecBole tam sıralamada kullanıcının eğitimde gördüğü ürünleri öneriden
+   çıkarıyor — ama **koşulun kendi** eğitiminden. C1/C4/C1b/C4b'de silinen satırın ürünü
+   ve C3'te gölgeye dönen gerçek kimlik maskeden düşüp top-K'da yer kaplıyordu. Yani koşul
+   yalnızca eğitimi değil **değerlendirmeyi** de değiştiriyordu; ve bu C1−C4'te bile
+   simetrik değil (silinen hediye ürünleri rastgele silinen ürünlerden farklı bir
+   popülerlik dağılımına sahip olabilir). Düzeltme: C0 eğitiminde olup koşulun eğitiminde
+   gerçek kimliğiyle olmayan (kullanıcı, ürün) çiftleri maskeye eklenir. **C0'ın sonucu
+   değişmez.** Maskelenen bir çift valid/test pozitifiyle çakışırsa koşu durur (kullanıcı
+   + ürün tekil olduğu için olmamalı); maskedeki ürün top-K'ya girerse koşu durur.
+   Sentetik veride etkisi küçük değildi: BPR × C3 Recall@10 0,1016 → 0,1049 (bu bir sonuç
+   değil, yalnızca maskenin sayıyı değiştirdiğinin kanıtı). **Sıralı modellerde RecBole hiç
+   maskelemiyor** — her koşulda aynı, dokunulmadı.
+5. **SASRec yolu — SASRec bu projede hiç koşmamıştı.** İki kurulum hatası:
+   (a) SASRec'in kaybı CE ve RecBole'un genel varsayılanı (1 negatif) CE ile birlikte
+   verilince kurulumda hata veriyor → `train_neg_sample_args: None`, modelin kendi
+   `properties` dosyasındaki `loss_type`'tan okunarak. (b) `benchmark_filename` verilince
+   RecBole sekansları kendisi genişletmiyor; her satır hazır `item_id_list` taşımalı →
+   `run_experiment.sequential_parts`, RecBole'un kendi genişletme kuralıyla (eğitim: her
+   ürün önceki eğitim ürünleriyle; valid: bütün eğitim ürünleri; test: eğitim + valid).
+6. **`experiment.max_item_list_length: 50`** (RecBole varsayılanı). Kırpma bizim tarafta ve
+   **son** 50 ürün tutuluyor; RecBole'un `seq_len`'i ilk N'i tutardı (`dataset.py`'de
+   `seq[:seq_len]`, okundu).
+7. **Boş geçmişli valid satırı.** C1/C1b bir kullanıcının bütün eğitim satırlarını
+   silebilir; SASRec boş geçmişi işleyemez. O satır **yalnızca erken durdurma setinden**
+   düşer ve `n_valid_dropped_empty_history` olarak raporlanır. Test satırının geçmişi
+   valid ürününü içerdiği için hiçbir zaman boş değil — test çiftleri koşullar arasında
+   aynı kalıyor (boşsa koşu durur).
+8. **Kullanıcı başı çıktı.** Eşli bootstrap ve M1/M2 kullanıcı başı sayı istiyor, RecBole
+   yalnızca ortalama veriyor. Test değerlendirmesi sırasında RecBole'un **kendi** skor
+   tensöründen aynı `topk` çağrısıyla yakalanıyor; kullanıcı başı ortalama RecBole'un
+   toplamına 5e-7 içinde eşit değilse (`metric_decimal_place: 6`) koşu durur. Parquet
+   `data/processed/recbole/<kategori>/peruser/` altında (git'e girmez); rapora yalnızca
+   dosya **adı** yazılıyor, mutlak yol değil.
+9. **`atomic --labels distilled` üç kontrol:** etiketlerin kaynağı gerçek model (stub
+   değil); çıkarım raporu kapıyı PASS kaydetmiş; **ve** o modelin kendi damıtma raporu
+   diskte PASS diyor. Satır sayısı raporla tutmazsa durur.
+10. **Bayat dosya korumaları.** Vekille üretilmiş atomic dosya varken `--labels distilled`
+    istenirse ya da koşul dosyası başka bir etiket kaynağından/satır sayısından kalmışsa
+    "zaten var" diye atlanmıyor, `--force` isteniyor. Atlansaydı deney sessizce vekil
+    etiketle koşardı.
+
+#### Bulunan hata: koşucu RecBole ortamında ilk satırda çöküyordu
+
+`conditions` etiket kümesini `detection.schema`'dan okumaya başlayınca import zinciri
+pydantic'i çekti; `.venv-recbole`'da pydantic yok. Ana ortamdaki testler bunu göremezdi,
+ancak RecBole duman testi yakaladı. Kümeler bağımlılıksız `detection/contamination.py`'ye
+taşındı; koşucunun pydantic/matplotlib/statsmodels/scipy çekmeden import edildiği taze bir
+yorumlayıcıda testle kilitli.
+
+#### Doğrulanan / doğrulanmayan
+
+- **Doğrulandı:** 357 test (`.venv`) · RecBole duman testi (`.venv-recbole`, CPU, sentetik
+  400 kullanıcı / 120 ürün, 3 epoch, `label_source: distilled` damgalı sentetik etiket):
+  BPR ve SASRec × C0/C3/C4b. Altı koşunun altısında kullanıcı başı ortalama RecBole
+  toplamına **birebir** eşit (en büyük fark 0,0) · 119 gölge ürün maskelendi, top-K'da 0 ·
+  C0 maskesine eklenen çift sayısı C3'te gölgeye dönen satır sayısına (618) ve C4b'de
+  silinen satır sayısına (862) eşit · C0'ın sayısı maske eklenmeden öncekiyle aynı.
+- **Doğrulanmadı:** gerçek veriyle hiçbir koşu, GPU, süre. Genel modellerde RecBole'un
+  `eval_batch_size`'ı (varsayılan 4.096) ürün sayısına bölünüyor; ürün sayısı 4.096'yı
+  aşarsa tam sıralama **kullanıcı başına bir grup** koşar ve yavaş olabilir. Zaman sondası
+  (Faz 4.1) ölçecek; bu sonuçtan bağımsız bir mühendislik parametresi.
+
+#### Bilinen sınırlar
+
+- C3'te gölge ürün ile gerçek ürünün gömmesi bilgi paylaşmıyor (tasarımın bedeli).
+- SASRec son 50 ürünü görüyor; daha uzun geçmişli kullanıcının erken ürünleri modele girmez
+  (her koşulda aynı kural).
+- C1/C1b'de gerçek kimliğiyle eğitimden tamamen kaybolan ürün değerlendirmede hâlâ cold
+  item; sayısı koşul raporunda (`n_items_lost_from_training`).
+
+**Etkilediği bölüm:** `detection/contamination.py`, `detection/schema.py`,
+`recsys/atomic.py`, `recsys/conditions.py`, `recsys/run_experiment.py`,
+`configs/base.yaml` (`experiment.conditions`, `experiment.max_item_list_length`,
+`soft_weights` kaldırıldı), testler (`test_conditions`, `test_no_leakage`,
+`test_experiment_labels`, `test_run_experiment`), CLAUDE.md §2/§7/§10, README,
+GENEL_BAKIS §6/§8
+**Kim:** Ekip

@@ -11,9 +11,15 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
+from gift_contamination.config import Config
+from gift_contamination.detection.schema import CONTAMINATION
 from gift_contamination.recsys.atomic import SPLIT_TEST, SPLIT_TRAIN, SPLIT_VALID
 from gift_contamination.recsys.conditions import (
     CONDITIONS,
+    PLACEBO_OF,
+    REMOVED_LABELS,
+    SHADOW_LABELS,
+    SHADOW_SUFFIX,
     apply_condition,
     universe,
 )
@@ -24,8 +30,9 @@ SEED = 42
 def _frame() -> pl.DataFrame:
     """Dort kullanici, karisik etiketler. Her kullanicinin son satiri `self`.
 
-    Egitim satirlarinda bilerek hem `gift_given` hem `household` var: C1 ile
-    C1b'nin gercekten farkli davrandigi gorunsun.
+    Egitim satirlarinda bilerek `gift_given`, `household` ve `received` var: C1
+    ile C1b'nin gercekten farkli davrandigi gorunsun. `i10` yalnizca u4'un
+    `received` satirinda geciyor - C1b onu egitimden tamamen siler, C1 silmez.
     """
     rows = [
         # user, item, ts, label, split
@@ -41,6 +48,7 @@ def _frame() -> pl.DataFrame:
         ("u3", "i9", 2, "gift_given", SPLIT_TRAIN),
         ("u3", "i1", 3, "self",       SPLIT_VALID),
         ("u3", "i2", 4, "self",       SPLIT_TEST),
+        ("u4", "i10", 0, "received",  SPLIT_TRAIN),
         ("u4", "i9", 1, "household",  SPLIT_TRAIN),
         ("u4", "i3", 2, "self",       SPLIT_TRAIN),
         ("u4", "i5", 3, "self",       SPLIT_VALID),
@@ -123,6 +131,19 @@ def test_c4_removes_exactly_as_many_rows_as_c1():
     assert c4["n_removed"] == c1["n_removed"] > 0
 
 
+def test_c4b_removes_exactly_as_many_rows_as_c1b():
+    """C1b, C1'in ~iki kati satir cikariyor; C4 ile karsilastirmak iki farkli
+    veri kaybini karistirirdi. C4b'nin sayisi C1b'den TURETILIYOR."""
+    df = _frame()
+
+    _, c1b = apply_condition(df, "C1b", seed=SEED)
+    _, c4b = apply_condition(df, "C4b", seed=SEED)
+    _, c4 = apply_condition(df, "C4", seed=SEED)
+
+    assert c4b["n_removed"] == c1b["n_removed"] > c4["n_removed"]
+    assert c4b["placebo_of"] == "C1b"
+
+
 def test_c4_removes_at_random_not_by_label():
     """Plasebo etikete BAKMAMALI - baksa plasebo olmaz, ikinci bir C1 olur."""
     df = _frame()
@@ -162,22 +183,43 @@ def test_a_different_seed_selects_different_rows():
 
 
 # ---------------------------------------------------------------- C1 vs C1b
-def test_c1_removes_only_gifts_c1b_also_removes_household():
-    """`household` korpusun %20'si; iki tanim arasindaki fark buyuk.
-
-    Karar KAVRAMSAL ve ekipte (CLAUDE.md 13). Kod ikisini de kosabilmeli ki
-    sonuc HER IKI tanim altinda raporlanabilsin.
-    """
+def test_c1_removes_only_gifts_c1b_also_removes_household_and_received():
+    """C1 = `gift_given`; C1b = "alici urunu kendisi secmedi" (DECISIONS 2026-09-14)."""
     df = _frame()
 
     c1, r1 = apply_condition(df, "C1", seed=SEED)
     c1b, r1b = apply_condition(df, "C1b", seed=SEED)
 
     assert set(c1.filter(pl.col("split") == SPLIT_TRAIN)["label"]) == {
-        "self", "household",
+        "self", "household", "received",
     }
     assert set(c1b.filter(pl.col("split") == SPLIT_TRAIN)["label"]) == {"self"}
     assert r1b["n_removed"] > r1["n_removed"]
+
+
+def test_condition_label_sets_come_from_the_single_definition():
+    """Yayginlik, dogrulama ekseni ve deney AYNI kumeyi okumali.
+
+    Tanim uc yerde ayri yazilirsa biri degisir, digerleri degismez: yayginlik
+    bir seyi, deney baska bir seyi olcer ve bunu hicbir test fark etmez.
+    """
+    assert REMOVED_LABELS["C1"] == CONTAMINATION["narrow"]
+    assert REMOVED_LABELS["C1b"] == CONTAMINATION["broad"]
+    assert "received" in REMOVED_LABELS["C1b"]
+    # RQ3 "silmek mi, soylemek mi": C3 C1'in satirlarini golge yapar
+    assert SHADOW_LABELS["C3"] == REMOVED_LABELS["C1"]
+    assert PLACEBO_OF == {"C4": "C1", "C4b": "C1b"}
+
+
+def test_every_configured_condition_is_implemented():
+    """`experiment.conditions` listesindeki her kod gercekten kosabilmeli."""
+    from pathlib import Path
+
+    gercek = Config.load(Path(__file__).resolve().parents[1] / "configs" / "base.yaml")
+
+    istenen = list(gercek.get("experiment.conditions"))
+    assert set(istenen) <= set(CONDITIONS)
+    assert {"C0", "C1", "C4", "C1b", "C4b", "C3"} <= set(istenen)
 
 
 def test_c0_removes_nothing():
@@ -213,28 +255,50 @@ def test_items_that_vanish_from_training_are_reported():
     assert r1b["n_items_lost_from_training"] > report["n_items_lost_from_training"]
 
 
-# ------------------------------------------------------- C2 / C3 satir silmez
-def test_c2_weights_instead_of_removing():
+# ------------------------------------------------------------- C2 kilitli
+def test_c2_is_locked_instead_of_silently_training_c0():
+    """Onceki C2 bir `weight` kolonu ekliyordu ve RecBole onu hic okumuyordu:
+    kosulsa C0'in aynisi "C2" diye raporlanirdi."""
+    with pytest.raises(NotImplementedError, match="UYGULANMADI"):
+        apply_condition(_frame(), "C2", seed=SEED)
+    assert "C2" not in CONDITIONS
+
+
+# -------------------------------------------------------- C3 golge token
+def test_c3_turns_training_gifts_into_shadow_items_without_removing_rows():
     df = _frame()
 
-    out, report = apply_condition(df, "C2", seed=SEED, weights={"gift": 0.25})
+    out, report = apply_condition(df, "C3", seed=SEED)
 
-    assert out.height == df.height
-    assert report["gift_weight"] == 0.25
-    hediye = out.filter(
-        (pl.col("split") == SPLIT_TRAIN) & (pl.col("label") == "gift_given")
+    assert out.height == df.height and report["n_removed"] == 0
+    golge = out.filter(pl.col("item_id").str.ends_with(SHADOW_SUFFIX))
+    egitim_hediye = df.filter((pl.col("split") == SPLIT_TRAIN) & (pl.col("label") == "gift_given"))
+    assert golge.height == egitim_hediye.height == report["n_shadow_rows"] == 3
+    assert set(golge["label"]) == {"gift_given"}
+    assert set(golge["split"]) == {SPLIT_TRAIN}
+    # Sekans sirasi korunur: ayni kullanici, ayni zaman damgasi, yalnizca kimlik degisti
+    assert golge.select("user_id", "timestamp").sort("user_id", "timestamp").equals(
+        egitim_hediye.select("user_id", "timestamp").sort("user_id", "timestamp")
     )
-    assert (hediye["weight"] == 0.25).all()
-    assert (out.filter(pl.col("label") == "self")["weight"] == 1.0).all()
 
 
-def test_c3_adds_a_feature_instead_of_removing():
+def test_c3_leaves_household_received_and_non_training_rows_real():
+    """C3 yalnizca C1'in kumesini golge yapar; digerleri ve test/valid gercek kalir."""
     df = _frame()
 
     out, _ = apply_condition(df, "C3", seed=SEED)
 
-    assert out.height == df.height
-    assert out.filter(pl.col("label") == "gift_given")["is_gift"].to_list() == [1, 1, 1]
+    gercek = out.filter(~pl.col("item_id").str.ends_with(SHADOW_SUFFIX))
+    assert {"household", "received", "self"} <= set(gercek["label"])
+    assert not out.filter(pl.col("split") != SPLIT_TRAIN)["item_id"].str.ends_with(SHADOW_SUFFIX).any()
+
+
+def test_c3_reports_items_whose_real_embedding_is_no_longer_trained():
+    """i2 egitimde yalnizca hediye olarak geciyor: C3'te gercek kimligi hic
+    egitilmiyor (yalnizca golgesi var) - C1 ile ayni cold item durumu."""
+    _, report = apply_condition(_frame(), "C3", seed=SEED)
+
+    assert report["items_lost_sample"] == ["i2"]
 
 
 def test_unknown_condition_fails_loudly():

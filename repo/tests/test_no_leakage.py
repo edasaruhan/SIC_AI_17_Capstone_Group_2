@@ -25,7 +25,12 @@ from gift_contamination.recsys.atomic import (
     eval_eligible,
     load_atomic,
 )
-from gift_contamination.recsys.conditions import CONDITIONS, apply_condition
+from gift_contamination.recsys.conditions import (
+    CONDITIONS,
+    SHADOW_SUFFIX,
+    apply_condition,
+    real_item,
+)
 
 SEED = 42
 
@@ -106,20 +111,36 @@ def test_ties_on_timestamp_are_broken_stably():
 # --------------------------------------------------- test item egitimde mi
 @pytest.mark.parametrize("code", CONDITIONS)
 def test_the_test_interaction_never_appears_in_training(code: str):
-    """Ayni (kullanici, urun) cifti hem testte hem egitimde olamaz."""
+    """Ayni (kullanici, GERCEK urun) cifti hem testte hem egitimde olamaz.
+
+    Gercek kimlik uzerinden: C3'te egitimdeki `i::gift` ile testteki `i` ayni
+    urundur - sonek bir sizintiyi gizlememeli.
+    """
     df = assign_splits(_sequences()).rename({"purchase_type": "label"})
 
     out, _ = apply_condition(df, code, seed=SEED)
 
-    test = set(
-        zip(*out.filter(pl.col("split") == SPLIT_TEST)
-            .select("user_id", "item_id").to_dict(as_series=False).values())
-    )
-    egitim = set(
-        zip(*out.filter(pl.col("split") == SPLIT_TRAIN)
-            .select("user_id", "item_id").to_dict(as_series=False).values())
-    )
-    assert not (test & egitim)
+    def ciftler(split: str) -> set:
+        return set(
+            out.filter(pl.col("split") == split)
+            .select("user_id", real_item(pl.col("item_id")))
+            .iter_rows()
+        )
+
+    assert not (ciftler(SPLIT_TEST) & ciftler(SPLIT_TRAIN))
+
+
+def test_shadow_items_never_reach_test_or_validation():
+    """C3'un golge kimligi YALNIZCA egitimde. Test urunu hep gercek ve `self`."""
+    df = assign_splits(_sequences()).rename({"purchase_type": "label"})
+    # u2'nin egitimdeki hediyesi + u1'in egitimdeki hediyesi golge olacak
+    out, report = apply_condition(df, "C3", seed=SEED)
+
+    assert report["n_shadow_rows"] > 0
+    disari = out.filter(pl.col("split") != SPLIT_TRAIN)
+    assert not disari["item_id"].str.ends_with(SHADOW_SUFFIX).any()
+    # Degerlendirme kurali golge donusumunden etkilenmiyor
+    assert set(eval_eligible(out, "label").to_list()) == set(eval_eligible(df, "label").to_list())
 
 
 # ------------------------------------------------- test item'i `self` olmali

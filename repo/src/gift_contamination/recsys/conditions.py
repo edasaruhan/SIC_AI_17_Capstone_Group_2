@@ -1,27 +1,34 @@
-"""C0-C4 kosullari (Hafta 6-7). Deneyin gecerliligi bu modulde duruyor.
+"""Deney kosullari (Hafta 6-7). Deneyin gecerliligi bu modulde duruyor.
 
 Kosullar YALNIZCA EGITIM satirlarina dokunur. Test ve validasyon satirlari
 C0'da donduruldu ve hicbir kosul onlara dokunmaz - dokunursa C0 ile C1 farkli
 test setleri uzerinde karsilastirilir ve olculen sey mudahale olmaktan cikar.
 
-| kod  | ne yapar                                                    |
-|------|-------------------------------------------------------------|
-| C0   | baseline - butun etkilesimler                                |
-| C1   | `gift_given` egitimden cikarilir                             |
-| C1b  | `gift_given` + `household` cikarilir  (SAGLAMLIK KONTROLU)   |
-| C2   | hediye etkilesimleri loss'ta w ile agirliklandirilir         |
-| C3   | hediye bayragi FEATURE olarak eklenir, satir silinmez        |
-| C4   | PLASEBO - C1 kadar RASTGELE satir cikarilir                  |
+| kod  | ne yapar                                                          | rol       |
+|------|-------------------------------------------------------------------|-----------|
+| C0   | baseline - butun etkilesimler                                     | taban     |
+| C1   | `gift_given` egitimden cikarilir                                  | birincil  |
+| C4   | PLASEBO - C1 kadar RASTGELE egitim satiri cikarilir               | C1'e      |
+| C1b  | `gift_given` + `household` + `received` cikarilir                 | saglamlik |
+| C4b  | PLASEBO - C1b kadar RASTGELE egitim satiri cikarilir              | C1b'ye    |
+| C3   | C1'in satirlari silinmez, GOLGE TOKEN olur (`<urun>::gift`)       | RQ3       |
+| C2   | UYGULANMADI - cagrilirsa NotImplementedError                      | -         |
+
+Etiket kumeleri TEK YERDEN: `detection.contamination.CONTAMINATION` (yayginlik
+ve dogrulama eksenleri de ayni kumeyi okuyor). DECISIONS 2026-09-14.
 
 C4 OPSIYONEL DEGIL. C1 kazaniyorsa C4'ten de kazanmak zorunda; yoksa gordugumuz
-sey hediye etkisi degil "veri azaldi" etkisidir. Juri'deki ilk akilli kisi bunu
-soracak.
+sey hediye etkisi degil "veri azaldi" etkisidir. C1b, C1'in ~iki kati satir
+cikardigi icin kendi plasebosu C4b ile karsilastirilir.
 
-C1b NEDEN VAR: `household` korpusun %20,2'si ve projenin kendi kontaminasyon
-tanimina ("alan kisi urunu kendisi icin secmedi") gore o da kontaminasyon.
-Karar KAVRAMSAL ve ekipte (CLAUDE.md 13). Kod ikisini de kosabilir olsun diye
-buradalar; sonuc HER IKI tanim altinda raporlanacak - hangisi iyi cikarsa o
-secilmeyecek.
+C3 NEDEN GOLGE TOKEN. Bayragi feature olarak eklemek hediye urununu egitimde
+TAHMIN HEDEFI birakirdi; kirlilik cikis katmanindan oneri listesine geri sizardi.
+Golge token hediye olayini sekansta tutar ama gercek urunun ne gommesini ne
+hedefini kirletir. Degerlendirmede golge urunlerin skoru -inf yapilir
+(`run_experiment`). Bedeli: golge ile gercek urun gommesi bilgi paylasmaz.
+
+C2 NEDEN KILITLI. Onceki kod bir `weight` kolonu ekliyordu ama hicbir sey onu
+okumuyordu - kosulsa C0'in aynisi egitilir ve "C2" diye raporlanirdi.
 
 Kullanim:
     python -m gift_contamination.recsys.conditions --config configs/base.yaml \\
@@ -37,11 +44,13 @@ from pathlib import Path
 import polars as pl
 
 from ..config import Config, add_standard_args, resolve_roles
+# `detection.schema` DEGIL: bu modul `.venv-recbole` altinda da import ediliyor
+# (run_experiment) ve orada pydantic yok.
+from ..detection.contamination import CONTAMINATION
 from ..utils.io import read_json, write_json
 from ..utils.logging import get_logger, log_output
 from .atomic import (
     SPLIT_TRAIN,
-    inter_path,
     load_atomic,
     recbole_dir,
     split_path,
@@ -49,23 +58,33 @@ from .atomic import (
 
 log = get_logger("recsys.conditions")
 
-GIFT = "gift_given"
-HOUSEHOLD = "household"
-
-# Her kosulun EGITIMDEN cikardigi etiketler. C0/C2/C3 satir silmez.
+# Her kosulun EGITIMDEN cikardigi etiketler. C0/C3 satir silmez; C4/C4b
+# etikete BAKMAZ, sayilarini `PLACEBO_OF`daki kosuldan alir.
 REMOVED_LABELS: dict[str, tuple[str, ...]] = {
     "C0": (),
-    "C1": (GIFT,),
-    "C1b": (GIFT, HOUSEHOLD),
-    "C2": (),
+    "C1": CONTAMINATION["narrow"],
+    "C4": (),
+    "C1b": CONTAMINATION["broad"],
+    "C4b": (),
     "C3": (),
-    "C4": (),  # rastgele - etikete BAKMAZ, sayisi C1'den gelir
 }
+PLACEBO_OF = {"C4": "C1", "C4b": "C1b"}
+# C3: bu etiketlerin EGITIM satirlari golge token olur. C1 ile AYNI kume -
+# RQ3 "silmek mi, soylemek mi" karsilastirmasi ayni satirlar uzerinde.
+SHADOW_LABELS = {"C3": CONTAMINATION["narrow"]}
+SHADOW_SUFFIX = "::gift"
 CONDITIONS = tuple(REMOVED_LABELS)
+NOT_IMPLEMENTED = {
+    "C2": (
+        "C2 (loss agirliklandirma) UYGULANMADI. Onceki kod bir `weight` kolonu "
+        "ekliyordu ama RecBole onu hic okumuyordu - kosulsa C0'in aynisi 'C2' diye "
+        "raporlanirdi. RQ3 C3 ile cevaplaniyor (DECISIONS 2026-09-14)."
+    ),
+}
 
-# Vekil etiketten uretilmis cikti raporlanabilir DEGILDIR. `gate1`in backend
-# guard'iyla ayni desen: duman testi sonucu sonuc tablosuna giremez.
-REPORTABLE_LABEL_SOURCE = "llm"
+# Vekil ya da stub etiketten uretilmis cikti raporlanabilir DEGILDIR. `gate1`in
+# backend guard'iyla ayni desen: duman testi sonucu sonuc tablosuna giremez.
+REPORTABLE_LABEL_SOURCES = frozenset({"llm", "distilled"})
 
 
 def condition_path(cfg: Config, role: str, code: str) -> Path:
@@ -86,79 +105,87 @@ def _seed_for(base: int, key: str) -> int:
 
 
 def gift_mask(code: str) -> pl.Expr:
-    """Kosulun EGITIMDEN cikardigi satirlar. C4 icin anlamsiz (rastgele secer)."""
+    """Kosulun EGITIMDEN cikardigi etiketler. C4/C4b icin anlamsiz (rastgele secer)."""
     labels = REMOVED_LABELS[code]
     if not labels:
         return pl.lit(False)
     return pl.col("label").is_in(list(labels))
 
 
-def apply_condition(
-    df: pl.DataFrame,
-    code: str,
-    *,
-    seed: int,
-    weights: dict[str, float] | None = None,
-) -> tuple[pl.DataFrame, dict]:
-    """Kosulu uygular; (etkilesimler, rapor) doner.
-
-    `df` C0'in TAM cikitisi olmali - bolme kolonu dahil. Cikarma yalnizca
-    `split == train` satirlarina uygulanir.
-    """
+def _check_code(code: str) -> None:
+    if code in NOT_IMPLEMENTED:
+        raise NotImplementedError(NOT_IMPLEMENTED[code])
     if code not in CONDITIONS:
         raise ValueError(f"bilinmeyen kosul: {code}. Gecerli: {', '.join(CONDITIONS)}")
 
+
+def real_item(expr: pl.Expr) -> pl.Expr:
+    """Golge soneki soyulmus urun kimligi - evren karsilastirmasi gercek urun uzerinden."""
+    return expr.cast(pl.String).str.strip_suffix(SHADOW_SUFFIX)
+
+
+def apply_condition(df: pl.DataFrame, code: str, *, seed: int) -> tuple[pl.DataFrame, dict]:
+    """Kosulu uygular; (etkilesimler, rapor) doner.
+
+    `df` C0'in TAM cikitisi olmali - bolme kolonu dahil. Degisiklik yalnizca
+    `split == train` satirlarina uygulanir.
+    """
+    _check_code(code)
     train = pl.col("split") == SPLIT_TRAIN
     n_train = int(df.filter(train).height)
+    report: dict = {"condition": code, "removed_labels": list(REMOVED_LABELS[code])}
 
-    if code == "C4":
-        # PLASEBO: C1'in cikardigi KADAR satiri rastgele cikar. Sayiyi C1'den
-        # turetiyoruz ki "ayni kadar" iddiasi hesaplanmis olsun, elle girilmis
-        # degil (denetim bulgusu 7: hesaplanmamis iddia sessizce yalan soyler).
-        n_remove = int(df.filter(train & gift_mask("C1")).height)
+    if code in PLACEBO_OF:
+        # PLASEBO: kaynagin cikardigi KADAR egitim satirini rastgele cikar. Sayi
+        # kaynaktan TURETILIYOR ki "ayni kadar" iddiasi hesaplanmis olsun, elle
+        # girilmis degil (denetim bulgusu 7: hesaplanmamis iddia sessizce yalan soyler).
+        kaynak = PLACEBO_OF[code]
+        n_remove = int(df.filter(train & gift_mask(kaynak)).height)
         indexed = df.with_row_index("_row")
         aday = indexed.filter(train)["_row"]
         drop = (
-            aday.sample(n_remove, seed=_seed_for(seed, "C4"), shuffle=True).to_list()
+            aday.sample(n_remove, seed=_seed_for(seed, code), shuffle=True)
             if n_remove
-            else []
+            else pl.Series("_row", [], dtype=aday.dtype)
         )
-        out = indexed.filter(~pl.col("_row").is_in(drop)).drop("_row")
+        out = indexed.join(drop.to_frame(), on="_row", how="anti").sort("_row").drop("_row")
+        report["placebo_of"] = kaynak
+    elif code in SHADOW_LABELS:
+        golge = train & pl.col("label").is_in(list(SHADOW_LABELS[code]))
+        out = df.with_columns(
+            pl.when(golge)
+            .then(pl.col("item_id").cast(pl.String) + pl.lit(SHADOW_SUFFIX))
+            .otherwise(pl.col("item_id").cast(pl.String))
+            .alias("item_id")
+        )
+        report["shadow_labels"] = list(SHADOW_LABELS[code])
+        report["shadow_suffix"] = SHADOW_SUFFIX
+        report["n_shadow_rows"] = int(df.filter(golge).height)
+        report["n_shadow_items"] = int(
+            out.filter(pl.col("item_id").str.ends_with(SHADOW_SUFFIX))["item_id"].n_unique()
+        )
     else:
         out = df.filter(~(train & gift_mask(code)))
 
     n_removed = df.height - out.height
-    report = {
-        "condition": code,
-        "removed_labels": list(REMOVED_LABELS[code]),
+    report.update({
         "n_before": df.height,
         "n_after": out.height,
         "n_removed": n_removed,
         "n_train_before": n_train,
         "removal_share_of_train": round(n_removed / n_train, 4) if n_train else 0.0,
-    }
-
-    if code == "C2":
-        # Satir silinmiyor; loss agirligi kolonu ekleniyor.
-        w = (weights or {}).get("gift", 0.5)
-        out = out.with_columns(
-            pl.when(pl.col("label").is_in([GIFT, HOUSEHOLD]) & train)
-            .then(pl.lit(float(w)))
-            .otherwise(pl.lit(1.0))
-            .alias("weight")
-        )
-        report["gift_weight"] = float(w)
-    if code == "C3":
-        # Bayrak FEATURE olarak giriyor - Wang et al. yaklasiminin testi.
-        out = out.with_columns(
-            (pl.col("label") == GIFT).cast(pl.Int8).alias("is_gift")
-        )
+    })
 
     # --- CLAUDE.md 9: sessizce gecilecek bir detay DEGIL.
-    # C0'da var olup bu kosulun EGITIMINDE hic kalmayan urunler eval'de cold
-    # item olur ve C1 ile C0 farkinin bir kismini aciklayabilir.
-    c0_items = set(df.filter(train)["item_id"].unique().to_list())
-    kalan = set(out.filter(train)["item_id"].unique().to_list())
+    # C0'da var olup bu kosulun EGITIMINDE GERCEK kimligiyle hic kalmayan urunler
+    # eval'de cold item olur ve kosul ile C0 farkinin bir kismini aciklayabilir.
+    # C3'te yalnizca golge kimligiyle kalan urun de buraya sayilir: gercek
+    # gommesi egitilmiyor.
+    c0_items = set(df.filter(train)["item_id"].cast(pl.String).unique().to_list())
+    kalan = set(
+        out.filter(train & ~pl.col("item_id").cast(pl.String).str.ends_with(SHADOW_SUFFIX))
+        ["item_id"].cast(pl.String).unique().to_list()
+    )
     kaybolan = sorted(c0_items - kalan)
     report["n_items_lost_from_training"] = len(kaybolan)
     report["share_items_lost"] = (
@@ -167,17 +194,17 @@ def apply_condition(
     report["items_lost_sample"] = kaybolan[:20]
     if kaybolan:
         log.warning(
-            "%s: %d urun egitimden tamamen kayboldu (%.2f%%) - eval'de cold item",
+            "%s: %d urun egitimden gercek kimligiyle kayboldu (%.2f%%) - eval'de cold item",
             code, len(kaybolan), 100 * len(kaybolan) / len(c0_items),
         )
     return out, report
 
 
 def universe(df: pl.DataFrame) -> tuple[set, set]:
-    """Kullanici ve urun evreni. C0'da donar, her kosulda AYNI kalmali."""
+    """Kullanici ve GERCEK urun evreni (golge soneki soyulmus). C0'da donar."""
     return (
         set(df["user_id"].unique().to_list()),
-        set(df["item_id"].unique().to_list()),
+        set(df.select(real_item(pl.col("item_id")))["item_id"].unique().to_list()),
     )
 
 
@@ -185,20 +212,30 @@ def build_condition(
     cfg: Config, role: str, code: str, *, force: bool = False
 ) -> Path:
     """Kosulun `.inter` dosyasini uretir ve raporunu yazar."""
+    _check_code(code)
     dest = condition_path(cfg, role, code)
+    meta = read_json(split_path(cfg, role))
+    if dest.exists() and not force:
+        # BAYAT KOSUL KORUMASI. Atomic dosya baska bir etiket kaynagiyla yeniden
+        # uretildiyse (vekil -> damitilmis) eski kosul dosyasini "zaten var" diye
+        # atlamak, deneyi sessizce ESKI etiketlerle kosturur.
+        rapor_yolu = condition_report_path(cfg, role, code)
+        eski = read_json(rapor_yolu) if rapor_yolu.exists() else {}
+        if (eski.get("label_source"), eski.get("n_before")) != (
+            meta.get("label_source"), meta.get("n_interactions")
+        ):
+            raise RuntimeError(
+                f"{dest.name} bayat: etiket kaynagi {eski.get('label_source')} / "
+                f"{eski.get('n_before')} satir, atomic dosya {meta.get('label_source')} / "
+                f"{meta.get('n_interactions')} satir. `--force` ile yeniden uretin."
+            )
     if should_skip_condition(dest, force):
         return dest
 
-    meta = read_json(split_path(cfg, role))
     df = load_atomic(cfg, role)
     # `label` kolonu atomic dosyada `label:token` olarak yaziliyor ve
     # `load_atomic` sadelestiriyor.
-    out, report = apply_condition(
-        df,
-        code,
-        seed=int(cfg.get("seed")),
-        weights={"gift": (cfg.get("experiment.soft_weights") or [0.5])[0]},
-    )
+    out, report = apply_condition(df, code, seed=int(cfg.get("seed")))
 
     # Evren C0'da DONDU ve RecBole'a oradan verilecek. Burada kilitlenen sey
     # tek yonlu: hicbir kosul C0'da olmayan bir kullanici/urun EKLEYEMEZ.
@@ -217,7 +254,7 @@ def build_condition(
             "Test/valid satirlari korunuyorsa bu imkansiz - bolme bozulmus olabilir."
         )
     report["label_source"] = meta.get("label_source")
-    report["reportable"] = meta.get("label_source") == REPORTABLE_LABEL_SOURCE
+    report["reportable"] = meta.get("label_source") in REPORTABLE_LABEL_SOURCES
     if not report["reportable"]:
         log.warning(
             "label_source=%s - bu cikti DUMAN TESTIDIR ve sonuc tablosuna giremez",
