@@ -106,6 +106,7 @@ PYTHONPATH=src .venv-recbole/Scripts/python.exe \
 python -m gift_contamination.analysis.experiment_stats   # -> gate2.json, experiment_stats.json
 # Hafta 8 — pazarlama metrikleri (yeniden eğitim yok; top-K listelerinden)
 python -m gift_contamination.recsys.marketing_metrics    # -> marketing_metrics.json (M1/M2/M3)
+python -m gift_contamination.analysis.result_figures     # -> F20–F23
 ```
 
 Örneklem **üç ayrı çerçeve** üretir ve bu ayrım korunmak zorundadır:
@@ -151,7 +152,7 @@ Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış so
 | `models/distill/` | eğitilmiş öğrenci — git'e girmez |
 | `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları, koşullar (C0 · C1 · C4 · C1b · C4b · C3) ve `peruser/` kullanıcı başı metrikler + top-K |
 | `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları, Kapı 2 (`gate2.json`), karşıtlıklar (`experiment_stats.json`), pazarlama metrikleri (`marketing_metrics.json`) |
-| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) |
+| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) · F20–F23 sonuç figürleri (damıtma sadakati, koşul karşıtlıkları, M2, M1) — gerçek koşulardan sonra |
 | `../data-research/data-research.md` | Data Research teslimi |
 
 ## Veri

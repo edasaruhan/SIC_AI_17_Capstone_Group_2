@@ -1983,3 +1983,30 @@ bu durumu kilitliyor.
 **Etkilediği bölüm:** `recsys/marketing_metrics.py`, `configs/base.yaml` (`marketing`),
 `tests/test_marketing_metrics.py`, CLAUDE.md §2/§7/§10/§13, README, GENEL_BAKIS §8
 **Kim:** Ekip (M2 tanımı "varsayıldı" — ekip onayı bekliyor)
+
+---
+
+### 2026-09-14 — Sonuç figürleri F20–F23: kodlama kuralları (HİÇBİR SONUÇ GÖRÜLMEDEN)
+
+`analysis/result_figures.py` yalnızca raporlanmış JSON'ları çiziyor; hiçbir sayı figürde
+üretilmiyor. Sunum kararları sonuç görülmeden verildi ki figür sonuca göre şekillenmesin:
+
+- **F21 yalnızca birincil metriği** (`gate2.metric`, Recall@10) gösterir; öteki metrikler
+  `experiment_stats.json`'da. Satır sırası önceden kayıtlı karşıtlık sırası (C1−C4 en üstte).
+- **Kapı 2 PASS olmayan nokta içi boş** çizilir ve alt başlık bunu söyler; M1/M2'de Kapı 2
+  değerlendirilmemişse de içi boş.
+- `reportable: false` girdiden (vekil/sentetik) çizilen figürün başlığında **"SMOKE TEST —
+  NOT REPORTABLE"** yazar; stub öğrencinin F20'si de öyle.
+- **Renk:** kategori `viz.ROLE_COLOR` (Toys mavi, Grocery aqua), eksen C1/C1b doğrulanmış
+  sıradaki komşu slotlar (mavi/turuncu). İki kategori rengi, beceri paketinin doğrulayıcısının
+  Python'a aktarılmış hesabıyla **ölçüldü**: CVD ΔE 23,1 (eşik 8), normal görüş ΔE 24,0 (eşik
+  15) — geçti. Grocery'nin aqua'sı açık yüzeyde 2,74:1 (3:1 altı) → her seride **marker şekli**
+  ikinci kodlama ve ilk satırda doğrudan etiket.
+- Duman çıktısıyla çizildi ve **göz ile** kontrol edildi; ilk hâlinde üç yerleşim hatası vardı
+  (başlık ile alt başlık çakışıyordu, legend veri noktalarının üstüne biniyordu, M2 eğrisi
+  kullanıcısı olmayan kovayı köprülüyordu) — düzeltildi. F20 ayrıca yerel model klasörünün
+  mutlak yolunu başlığa yazıyordu (kullanıcı adı sızıntısı); artık yalnızca son parça.
+
+**Etkilediği bölüm:** `analysis/result_figures.py`, `tests/test_result_figures.py`, CLAUDE.md
+§2/§7/§10, README, GENEL_BAKIS §8
+**Kim:** Ekip

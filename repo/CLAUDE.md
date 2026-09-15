@@ -38,12 +38,12 @@ Amazon Reviews 2023 (HF, kategori bazlı)
    ├─ [A] preprocess + 5-core + kronolojik sekans      → data/interim/
    ├─ [B] katmanlı örnekleme (40-60K)                  → data/interim/
    ├─ [C] LLM annotation (Qwen3-4B-Instruct, vLLM)      → data/annotations/
-   ├─ [D] insan doğrulama (500, 3 annotator)           → data/annotations/human/
+   ├─ [D] insan doğrulama (500, tek etiketleyici)      → data/annotations/human/
    ├─ [E] ModernBERT distillation                      → models/
    ├─ [F] tam korpus inference                         → data/processed/
    │
    ├─ [G] betimsel analiz + doğrulama (V1–V5)          → reports/figures/
-   └─ [H] RecBole deneyi (C0–C4) + pazarlama metrikleri→ reports/results/
+   └─ [H] RecBole deneyi (C0 C1 C4 C1b C4b C3) + M1–M3 → reports/results/
 ```
 
 ### Paket yapısı
@@ -86,6 +86,8 @@ src/gift_contamination/
     experiment_stats.py  # Kapı 2 (dört ölçüt) + eşli bootstrap karşıtlıkları
                          #   (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b, doz–yanıt).
                          #   Ana ortamda koşar; kullanıcı başı parquet'leri okur
+    result_figures.py    # F20 damıtma sadakati · F21 koşul karşıtlıkları · F22 M2 ·
+                         #   F23 M1. Yalnızca raporlanmış JSON'u çizer, hesap yapmaz
   recsys/
     atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
                          #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu).
@@ -382,10 +384,12 @@ python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
 python -m gift_contamination.analysis.experiment_stats --config configs/base.yaml
 # Hafta 8 — pazarlama metrikleri M1/M2/M3 (ana ortam; yeniden eğitim yok, top-K listelerinden)
 python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
+# Sonuç figürleri F20–F23 (girdi JSON'u olmayan figür atlanır)
+python -m gift_contamination.analysis.result_figures --config configs/base.yaml
 ```
 
 > Bütün modüller yazıldı (2026-09-14). Henüz yazılmamış olan yalnızca sonuç raporu
-> (`docs/SONUCLAR.md`) ve sonuç figürleri F20–F23 — gerçek koşulardan sonra.
+> (`docs/SONUCLAR.md`) — gerçek koşuların sayılarıyla yazılacak.
 
 > **`recsys.atomic --labels distilled` kod olarak hazır, girdisi henüz yok
 > (2026-09-14).** `data/annotations/<kategori>_inferred.parquet` Kaggle'daki
@@ -469,6 +473,8 @@ Kurallar:
   sayıyor (self satırı olan alt kategori dışarıda); geçmişte olmayan önerilen ürünün alt
   kategorisi kayboluyor mu; M2 bilinen yarı ömrü (1 etkileşim) buluyor mu, fazla yoksa
   tanımsız mı; M3 dilimleri ve yorum etiketi doğru mu
+- `test_result_figures.py` — dört figür rapor JSON'undan çiziliyor mu; verisi olmayan
+  figür boş çizilmek yerine atlanıyor mu; yerel model yolu figüre sızıyor mu
 - `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
   genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık

@@ -147,7 +147,7 @@ sıradaki adımlar için **§8**.
 | LLM–insan uyumu, C1 ekseni (popülasyon) | F1 **0,72** · kesinlik 0,65 |
 | Kapı 1 | 4 kategoride **PASS (4/4)** |
 | Hafta 4 | **INCOMPLETE** — tek etiketleyici (A), 500 satır |
-| Geçen test | **380** |
+| Geçen test | **384** |
 
 ### Hangi veri, ne kadar
 
@@ -399,7 +399,8 @@ yayınlanamaz.
 | **Kapı 2 + eşli bootstrap** (`experiment_stats`) | kod tamam, **gerçek koşu yok** | `test_experiment_stats`; 24 sentetik koşunun çıktısından `gate2.json` üretildi |
 | Kaggle deney betiği (`scripts/kaggle_experiment.py`) | yerelde CPU simülasyonu | kurulum tarifi torch 2.14 + numpy 2.5 ortamında `.venv-recbole` ile birebir aynı sayıları verdi; **Kaggle'da henüz koşmadı** |
 | Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | kod tamam, **gerçek koşu yok** | `test_marketing_metrics` (M2 bilinen yarı ömrü buluyor); duman koşularının top-K dosyalarıyla uçtan uca |
-| Test paketi | **380 test geçiyor** | `pytest tests -q` |
+| Sonuç figürleri F20–F23 (`result_figures`) | kod tamam | `test_result_figures`; duman çıktısından çizilip göz ile kontrol edildi |
+| Test paketi | **384 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
@@ -411,7 +412,7 @@ yayınlanamaz.
 
 ### Yazılmadı
 
-Sonuç figürleri F20–F23 · `docs/SONUCLAR.md` — ikisi de gerçek koşuların çıktısını bekliyor. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
+`docs/SONUCLAR.md` — gerçek koşuların sayılarını bekliyor. (F20–F23 figür kodu hazır: `analysis.result_figures`.) Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
 işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
 
 ### Bilinen sınırlar
