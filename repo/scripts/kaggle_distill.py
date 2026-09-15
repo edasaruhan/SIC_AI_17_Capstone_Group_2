@@ -24,7 +24,9 @@ ON KOSULLAR (Kaggle arayuzunde, elle):
         data/processed/distill/infer_Grocery_and_Gourmet_Food.parquet      (~278 MB)
         data/annotations/Toys_and_Games_llm.parquet                        (istege bagli,
         data/annotations/Grocery_and_Gourmet_Food_llm.parquet               ortusme sagdamasi)
-     Ekledikten sonra sag panelde gorunen TAM yolu DATASET_PATH'e yazin.
+     Dataset'in adi onemsiz: DATASET_PATH = None iken dosyalar /kaggle/input altinda
+     aranir (Kaggle'in baglama yolu surumden surume degisiyor; elle yazilan yol en sik
+     hata kaynagiydi). Bulunan yollar hucrede yazdirilir.
      Ogretmenin C1 F1'i (kapinin 3. olcutu) depodaki reports/results/validation_500.json'dan
      okunur - dataset'e koymaniz gerekmez.
 
@@ -42,7 +44,7 @@ gecemezse deney DURUR - sonucu ekiple paylasin.
 """
 
 # ---------------------------------------------------------------- ayarlar
-DATASET_PATH = "/kaggle/input/recsys-distill"
+DATASET_PATH = None     # None: /kaggle/input altinda aranir · or. "/kaggle/input/recsys-distill"
 REPO = "https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_2.git"
 MODEL = "base"          # "base" = ModernBERT-base · "fallback" = DeBERTa-v3 (yalnizca base FAIL ise)
 FP16 = True             # egitim kaybi NaN verirse False (fp32; ~2x yavas)
@@ -108,7 +110,10 @@ if eksik:
 print("transformers:", tf, "->", "guncellendi" if eksik else "yeterli")
 
 # ------------------------------------------------------- girdileri yerlestir
-src = Path(DATASET_PATH)
+src = Path(DATASET_PATH or "/kaggle/input")
+if not src.exists():
+    print(f"!! {src} yok - /kaggle/input altinda araniyor")
+    src = Path("/kaggle/input")
 distill_dir = REPO_DIR / "data" / "processed" / "distill"
 ann_dir = REPO_DIR / "data" / "annotations"
 distill_dir.mkdir(parents=True, exist_ok=True)
@@ -121,9 +126,12 @@ for ad in gerekli:
     bulunan = sorted(src.rglob(ad))
     if not bulunan:
         raise SystemExit(
-            f"{ad} dataset'te yok: {src}\nYerelde `prepare` adimlarini kosup dataset'e "
-            "ekleyin; DATASET_PATH'i sag paneldeki TAM yolla degistirin."
+            f"{ad} bulunamadi: {src}\nDataset notebook'a eklendi mi (sag panel > Add Input)? "
+            "Yerelde `prepare` adimlarini kosup dataset'e ekleyin."
         )
+    if len(bulunan) > 1:
+        print(f"!! {ad} birden fazla yerde; ilki kullaniliyor: {[str(p) for p in bulunan]}")
+    print(f"{ad} <- {bulunan[0]}")
     shutil.copy(bulunan[0], distill_dir / ad)
 for f in sorted(src.rglob("*_llm.parquet")):
     shutil.copy(f, ann_dir / f.name)

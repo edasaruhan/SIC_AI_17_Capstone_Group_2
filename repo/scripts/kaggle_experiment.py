@@ -25,6 +25,7 @@ ON KOSULLAR (Kaggle arayuzunde, elle):
         data/processed/recbole/Toys_and_Games/Toys_and_Games.inter             + split.json
         data/processed/recbole/Grocery_and_Gourmet_Food/Grocery_and_Gourmet_Food.inter + split.json
      `.inter` review metni tasimaz ama kullanici kimligi tasir - yine OZEL.
+     Dataset'in adi onemsiz: DATASET_PATH = None iken /kaggle/input altinda aranir.
   3. (istege bagli) Onceki oturumun out/ klasorunu ikinci bir dataset olarak ekleyin:
      icindeki experiment_*.json + peruser/*.parquet yerlestirilir ve o kosular ATLANIR.
 
@@ -39,7 +40,7 @@ ONCELIK (plan: kesme sirasi M3 -> BPR'nin ek seed'leri -> Grocery'de C3):
 """
 
 # ---------------------------------------------------------------- ayarlar
-DATASET_PATH = "/kaggle/input/recsys-experiment"
+DATASET_PATH = None           # None: /kaggle/input altinda aranir · or. "/kaggle/input/recsys-experiment"
 PREVIOUS_OUT_PATH = None      # or. "/kaggle/input/recsys-experiment-out1" - biten kosular atlanir
 REPO = "https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_2.git"
 PLAN = "probe"                # "probe" (once bu!) · "matrix"
@@ -134,15 +135,20 @@ kosullar = CONDITIONS or CFG["experiment"]["conditions"]
 seedler = [int(s) for s in (SEEDS or CFG["seeds"])]
 
 # ------------------------------------------------------- girdileri yerlestir
-src = Path(DATASET_PATH)
+src = Path(DATASET_PATH or "/kaggle/input")
+if not src.exists():
+    print(f"!! {src} yok - /kaggle/input altinda araniyor")
+    src = Path("/kaggle/input")
 for rol in kategoriler:
     slug = SLUG[rol]
     hedef = REPO_DIR / "data" / "processed" / "recbole" / slug
     hedef.mkdir(parents=True, exist_ok=True)
     inter = sorted(src.rglob(f"{slug}.inter"))
     if not inter:
-        raise SystemExit(f"{slug}.inter dataset'te yok: {src}. Yerelde `recsys.atomic --labels distilled` "
-                         "kosup yukleyin; DATASET_PATH'i sag paneldeki TAM yolla degistirin.")
+        raise SystemExit(f"{slug}.inter bulunamadi: {src}. Dataset notebook'a eklendi mi (Add Input)? "
+                         "Yerelde `recsys.atomic --labels distilled` kosup yukleyin.")
+    if len(inter) > 1:
+        print(f"!! {slug}.inter birden fazla yerde; ilki kullaniliyor: {[str(p) for p in inter]}")
     split = [p for p in (inter[0].parent / "split.json", *src.rglob(f"{slug}_split.json")) if p.exists()]
     if not split:
         raise SystemExit(f"{slug} icin split.json yok (ayni klasorde ya da `{slug}_split.json` adiyla).")
