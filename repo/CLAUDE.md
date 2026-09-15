@@ -465,7 +465,9 @@ Kurallar:
   dosyaları RecBole'un genişletme kuralına uyuyor mu (son N ürün, boş valid geçmişi);
   C0 alınmış ürün maskesi koşulun kaybettiği çiftler mi; koşucu pydantic çekmeden
   import ediliyor mu; test çifti özeti sıradan bağımsız mı; paralel koşular aynı checkpoint
-  klasörünü paylaşmıyor mu (RecBole'un dosya adı saniye çözünürlüklü)
+  klasörünü paylaşmıyor mu (RecBole'un dosya adı saniye çözünürlüklü); kırık
+  `torch.utils.tensorboard` boş yazıcıyla değişiyor mu — çalışana ve torch'suz ortama
+  dokunmadan (Kaggle protobuf çakışması, DECISIONS 2026-09-16)
 - `test_experiment_stats.py` — **kritik**: eşli bootstrap bilinen farkı buluyor mu;
   plasebo C0'ı geçince, test çiftleri farklıyken Kapı 2 FAIL mi; eksik seed/koşulda
   INCOMPLETE mi (asla PASS değil); önceden kayıtlı yorum kuralı doğru etiketliyor mu;

@@ -442,6 +442,75 @@ def write_benchmark_files(cfg: Config, role: str, code: str, *,
     return out, meta
 
 
+_TB_STUB_SEBEP: str | None = None
+
+
+def stub_tensorboard_if_broken() -> str | None:
+    """RecBole `torch.utils.tensorboard`i KOSULSUZ import ediyor; kirikse bos yazici konur.
+
+    Kaggle (2026-09-15): imajin protobuf'u 5.29.5 ama pin listemizdeki tensorboard
+    2.21.0 protobuf 6.31.1 gencode'uyla derlenmis - import RecBole'a varmadan
+    `VersionError` veriyor ve butun kosular ilk saniyede cokuyor. Kendi
+    protobuf'umuz sys.path'te once olsa da GORUNMUYOR: imajin `google` paketi
+    duzenli paket (`__init__.py`), bizim `google/protobuf` portumuz namespace
+    olarak hic devreye girmiyor.
+
+    Cozum surum avi degil: TENSORBOARD KAYDINI KULLANMIYORUZ. RecBole yalnizca
+    egitim kaybini `SummaryWriter`a yaziyor; olculen her sayi JSON ve parquet'ten
+    geliyor. Yazici bos kalinca hicbir metrik degismez - yalnizca okumadigimiz
+    event dosyasi yazilmaz. Calisan bir tensorboard varsa DOKUNULMAZ.
+
+    Doner: yerine kondu ise sebep metni, gerek yoktuysa None.
+    """
+    global _TB_STUB_SEBEP  # noqa: PLW0603
+
+    import importlib  # noqa: PLC0415
+    import types  # noqa: PLC0415
+
+    if _TB_STUB_SEBEP is not None:
+        # Ayni surecte ikinci kosu: import artik "calisiyor" gorunur (sys.modules'ta
+        # bizim sahte modul duruyor). Rapora "ok" yazmak yanlis olurdu.
+        return _TB_STUB_SEBEP
+    try:
+        torch_utils = importlib.import_module("torch.utils")
+    except Exception:  # noqa: BLE001
+        # torch'un kendisi yok/kirik: yerine bir sey koymak hatayi GIZLER, birkac
+        # satir sonraki gercek import anlasilir sekilde patlasin.
+        return None
+    try:
+        importlib.import_module("torch.utils.tensorboard")
+    except Exception as hata:  # noqa: BLE001 - sebep ne olursa olsun yazici bos kalabilir
+        sebep = f"{type(hata).__name__}: {hata}"
+    else:
+        return None
+
+    class _BosYazici:
+        """`SummaryWriter` arayuzu: her cagri hicbir sey yapmaz."""
+
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def __getattr__(self, _ad):
+            return lambda *_a, **_k: None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc) -> bool:
+            return False
+
+    sahte = types.ModuleType("torch.utils.tensorboard")
+    sahte.SummaryWriter = _BosYazici
+    # `from torch.utils.tensorboard import SummaryWriter` once sys.modules'a bakar;
+    # nitelik de konuyor ki `import torch.utils.tensorboard` bicimi de calissin.
+    sys.modules["torch.utils.tensorboard"] = sahte
+    torch_utils.tensorboard = sahte
+    log.warning("torch.utils.tensorboard import edilemedi (%s) - bos yazici kondu, "
+                "TensorBoard kaydi tutulmuyor; metrikler etkilenmez", sebep)
+    _TB_STUB_SEBEP = sebep
+    return sebep
+
+
 def run(
     cfg: Config,
     role: str,
@@ -462,6 +531,7 @@ def run(
         log.info("atlaniyor (rapor ve kullanici basi dosya var, --force ile ezilir): %s", dest.name)
         return json.loads(dest.read_text(encoding="utf-8"))
 
+    tb_sebep = stub_tensorboard_if_broken()
     from recbole.config import Config as RecConfig  # noqa: PLC0415
     from recbole.data import create_dataset, data_preparation  # noqa: PLC0415
     from recbole.utils import ModelType, get_model, get_trainer, init_seed  # noqa: PLC0415
@@ -562,6 +632,9 @@ def run(
             "epochs": conf["epochs"],
             "device": str(conf["device"]),
             "eval_batch_size": int(conf["eval_batch_size"]),
+            # Bos yazici kondu mu (bkz. `stub_tensorboard_if_broken`) - sebep metni
+            # surum numaralari tasiyor, mutlak yol tasimiyor.
+            "tensorboard": tb_sebep or "ok",
             # Zaman sondasi (Faz 4.1) bu sayilarla matrisi butceliyor.
             "runtime_seconds": sure,
             "code_version": code_version(),

@@ -10,6 +10,7 @@ import numpy as np
 import polars as pl
 import pytest
 
+from gift_contamination.recsys import run_experiment
 from gift_contamination.recsys.conditions import SHADOW_SUFFIX
 from gift_contamination.recsys.run_experiment import (
     UserItemMask,
@@ -19,6 +20,7 @@ from gift_contamination.recsys.run_experiment import (
     per_user_topk_metrics,
     sequential_parts,
     shadow_item_ids,
+    stub_tensorboard_if_broken,
 )
 
 G = SHADOW_SUFFIX
@@ -76,6 +78,67 @@ def test_the_runner_imports_without_main_environment_packages():
     )
     sonuc = subprocess.run([sys.executable, "-c", kod], capture_output=True, text=True)
     assert sonuc.returncode == 0, sonuc.stderr[-800:]
+
+
+def test_a_broken_tensorboard_is_replaced_by_a_silent_writer(monkeypatch):
+    """Kaggle 2026-09-15: protobuf uyusmazligi RecBole'un import'unu kiriyordu.
+
+    RecBole `torch.utils.tensorboard`i kosulsuz import ediyor; biz TensorBoard
+    kaydini okumuyoruz. Kirik import kosuyu dusurmesin diye yerine hicbir sey
+    yapmayan bir yazici konuyor - ve bu RAPORA yaziliyor, sessiz kalmiyor.
+    """
+    import sys
+    import types
+
+    sahte_torch = types.ModuleType("torch")
+    sahte_utils = types.ModuleType("torch.utils")
+    sahte_torch.utils = sahte_utils
+    monkeypatch.setitem(sys.modules, "torch", sahte_torch)
+    monkeypatch.setitem(sys.modules, "torch.utils", sahte_utils)
+    monkeypatch.setitem(sys.modules, "torch.utils.tensorboard", None)  # import'u kirar
+    monkeypatch.setattr(run_experiment, "_TB_STUB_SEBEP", None)
+
+    sebep = stub_tensorboard_if_broken()
+
+    assert sebep, "kirik import fark edilmedi"
+    yazici = sys.modules["torch.utils.tensorboard"].SummaryWriter("bir/klasor")
+    assert yazici.add_scalar("kayip", 1.0, 1) is None  # RecBole'un cagirdigi bicim
+    assert yazici.close() is None
+    assert sahte_utils.tensorboard is sys.modules["torch.utils.tensorboard"]
+    # Ayni surecteki ikinci kosu "ok" degil, ayni sebebi gormeli.
+    assert stub_tensorboard_if_broken() == sebep
+
+
+def test_a_working_tensorboard_is_left_alone(monkeypatch):
+    import sys
+    import types
+
+    sahte_torch = types.ModuleType("torch")
+    sahte_utils = types.ModuleType("torch.utils")
+    calisan = types.ModuleType("torch.utils.tensorboard")
+    calisan.SummaryWriter = object
+    sahte_torch.utils = sahte_utils
+    sahte_utils.tensorboard = calisan
+    monkeypatch.setitem(sys.modules, "torch", sahte_torch)
+    monkeypatch.setitem(sys.modules, "torch.utils", sahte_utils)
+    monkeypatch.setitem(sys.modules, "torch.utils.tensorboard", calisan)
+    monkeypatch.setattr(run_experiment, "_TB_STUB_SEBEP", None)
+
+    assert stub_tensorboard_if_broken() is None
+    assert sys.modules["torch.utils.tensorboard"] is calisan
+
+
+def test_a_missing_torch_is_not_papered_over(monkeypatch):
+    """torch'un kendisi yoksa yama HATAYI GIZLEMEZ - gercek import patlasin."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "torch", None)
+    monkeypatch.setitem(sys.modules, "torch.utils", None)
+    monkeypatch.setattr(run_experiment, "_TB_STUB_SEBEP", None)
+
+    assert stub_tensorboard_if_broken() is None
+    assert "torch.utils.tensorboard" not in sys.modules
+    assert run_experiment._TB_STUB_SEBEP is None
 
 
 def test_shadow_ids_are_found_by_suffix_only():

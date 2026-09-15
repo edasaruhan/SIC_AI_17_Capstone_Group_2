@@ -2129,3 +2129,58 @@ görüldü; kullanıcı başı tutarlılık farkı 0,0.
 `recsys/run_experiment.py` (`checkpoint_dir`), `tests/test_run_experiment.py`, GENEL_BAKIS
 §5/§6/§8, CLAUDE.md §7/§10, README
 **Kim:** Ekip
+
+### 2026-09-16 — Kaggle deney matrisi 1. deneme: RecBole'un import'u protobuf yüzünden çöktü (SONUÇ YOK)
+
+Kaggle'daki ilk deney oturumu 96 saniyede bitti: **hiçbir koşu tamamlanmadı, hiçbir sonuç
+üretilmedi.** Aşağıdaki hiçbir sayı sonuç değildir.
+
+**Belirti.** Kurulum doğrulaması geçti (`numpy 1.26.4 | torch 2.10.0+cu128 | recbole 1.2.0 |
+cuda True`, Python 3.12, görünen GPU 2), altı koşul iki kategori için yazıldı (Toys C1b
+eğitimin **%52,82**'sini çıkardı — yereldeki sayının aynısı), sonra başlatılan üç koşunun
+üçü de aynı yerde çöktü:
+`google.protobuf.runtime_version.VersionError: … gencode 6.31.1 runtime 5.29.5`, zincir
+`recbole.config` → `recbole.utils` → `torch.utils.tensorboard` → `tensorboard.compat.proto`.
+Fail-fast devreye girdi: kalan 69 koşu başlatılmadı, GPU kotasından ~2 dakika gitti, `out/`
+(loglar + `oturum_ozeti.json` + `condition_*.json`) yine de yazıldı.
+
+**Kök neden.** Pin listemizdeki tensorboard 2.21.0 protobuf **6.31.1 gencode**'uyla derlenmiş;
+Kaggle imajının protobuf'u **5.29.5**. Kendi protobuf 7.36.0'ımız `--target` klasöründe ve
+PYTHONPATH'te önde olmasına rağmen **görünmüyor**: imajın `google` paketi düzenli paket
+(`__init__.py` var), bizim `google/protobuf` portumuz namespace parçası olarak hiç devreye
+girmiyor. Pin'i yükseltip düşürmek çözmezdi — imajın protobuf'u her hâlükârda kazanıyor.
+
+**Kurulum doğrulaması neden yakalamadı.** `_dogrula()` `import recbole` yapıyor; RecBole'un
+`__init__.py`'si yalnızca sürüm satırı, tensorboard zincirine hiç girmiyor. Ortam "kurulu"
+göründü, koşular çöktü. Bu zayıflık **duruyor**: betik kullanıcının yapıştırdığı hücrenin
+kendisi (değiştirmek yeniden yapıştırma demek) ve koşuların fail-fast'i ucuz — iki traceback,
+~2 dakika.
+
+**Düzeltme (depo kodunda; yapıştırılan hücre değişmiyor, klon her koşuda güncelleniyor).**
+`run_experiment.stub_tensorboard_if_broken()`: RecBole `torch.utils.tensorboard`'ı koşulsuz
+import ediyor, biz TensorBoard kaydını hiç okumuyoruz — import kırıksa yerine hiçbir şey
+yapmayan bir `SummaryWriter` konuyor. Ölçülen hiçbir sayı değişmez; yalnızca okumadığımız
+event dosyası yazılmaz. Çalışan bir tensorboard varsa **dokunulmaz**; torch'un kendisi yoksa
+yama **yapılmaz** (gerçek hata gizlenmesin). Durum sessiz kalmıyor: koşu raporunda
+`meta.tensorboard` = `ok` ya da sebep metni (sürüm numaraları taşır, mutlak yol taşımaz).
+
+**Doğrulama (bu makinede gerçekten koşturuldu).**
+- Kaggle hatası yerelde birebir üretildi: `tensorboard/compat/proto/event_pb2` importunda aynı
+  `VersionError`'ı veren sahte bir tensorboard paketi PYTHONPATH'e konunca
+  `from recbole.config import Config` aynı mesajla çöküyor.
+- Aynı kırık tensorboard altında sentetik veriyle iki **gerçek** RecBole koşusu (BPR/C0 ve
+  SASRec/C3, 1 epoch) uçtan uca geçti: kullanıcı başı ortalama RecBole toplamına birebir eşit
+  (fark 0,0), gölge ürün maskesi çalıştı (119 gölge ürün, top-K'ya sızma yok), test çiftleri
+  özeti iki koşuda aynı, raporlarda `meta.tensorboard` sebep metnini taşıyor.
+- RecBole'un `get_tensorboard`'ı boş yazıcıyı aldı; `add_scalar`/`close` sessizce geçti, yeni
+  event dosyası yazılmadı.
+- 388 test geçiyor (yeni üçü: kırık import → boş yazıcı ve aynı süreçteki ikinci koşu "ok"
+  demez · çalışan tensorboard'a dokunulmaz · torch yoksa yama yok).
+
+**Hâlâ doğrulanmadı:** Kaggle imajında import zincirinin tensorboard'dan sonraki kısmı
+(`recbole.model`, `recbole.trainer`), GPU'da koşu süresi ve belleği, iki kartta paralellik ve
+deney sonuçlarının kendisi.
+
+**Etkilediği bölüm:** `recsys/run_experiment.py` (`stub_tensorboard_if_broken`,
+`meta.tensorboard`), `tests/test_run_experiment.py`, GENEL_BAKIS §8
+**Kim:** Ekip

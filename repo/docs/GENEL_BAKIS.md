@@ -403,7 +403,8 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Son güncelleme **2026-09-15** (Hafta 5 damıtma kapısı PASS + deney girdileri gerçek etiketle). "Çalışıyor" yazan her satır ya bir
+> Son güncelleme **2026-09-16** (Kaggle deney matrisinin 1. denemesi import hatasıyla düştü —
+> **sonuç yok**; hata bulunup düzeltildi). "Çalışıyor" yazan her satır ya bir
 > testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
 > aşağıda ayrıca yazıyor.
 
@@ -423,10 +424,10 @@ yayınlanamaz.
 | **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
 | **Damıtma + tam korpus çıkarımı** (Kaggle, T4) | **sadakat kapısı PASS (3/3)** · 4.598.612 satır | `distill_report_base.json`, `inference_*.json`, F20; indirilen etiketler 5-core'la satır satır aynı küme, boş değer yok, olasılıklar toplamı 1 |
 | **Kapı 2 + eşli bootstrap** (`experiment_stats`) | kod tamam, **gerçek koşu yok** | `test_experiment_stats`; 24 sentetik koşunun çıktısından `gate2.json` üretildi |
-| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | yerelde CPU simülasyonu | kurulum tarifi torch 2.14 + numpy 2.5 ortamında `.venv-recbole` ile birebir aynı sayıları verdi; **Kaggle'da henüz koşmadı** |
+| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | **Kaggle'da 1 kez koştu, koşular düştü** | 2026-09-16: kurulum, klon, altı koşulun üretimi (Toys C1b %52,82 — yereldekinin aynısı) ve fail-fast çalıştı; RecBole import'u imajın protobuf'uyla çakışan tensorboard yüzünden çöktü, **hiçbir koşu tamamlanmadı**. Düzeltme depo kodunda (`stub_tensorboard_if_broken`), hata yerelde birebir taklit edilip iki gerçek koşuyla sınandı — DECISIONS 2026-09-16 |
 | Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | kod tamam, **gerçek koşu yok** | `test_marketing_metrics` (M2 bilinen yarı ömrü buluyor); duman koşularının top-K dosyalarıyla uçtan uca |
 | Sonuç figürleri F20–F23 (`result_figures`) | kod tamam | `test_result_figures`; duman çıktısından çizilip göz ile kontrol edildi |
-| Test paketi | **385 test geçiyor** | `pytest tests -q` |
+| Test paketi | **388 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
@@ -435,6 +436,10 @@ yayınlanamaz.
 - **Deney GPU'da hiç koşmadı.** Gerçek veriyle yalnızca yerel CPU ön uçuşu (1 epoch, sonuç
   değil) yapıldı — ayrıntı DECISIONS 2026-09-15. Süreler matrisin ilk iki koşusundan
   ölçülecek.
+- **Kaggle'daki 1. deneme (2026-09-16) hiçbir koşu tamamlamadan düştü:** RecBole'un import'u
+  imajın protobuf 5.29.5'iyle çakışan tensorboard 2.21.0'da patladı. Fail-fast kalan 69 koşuyu
+  başlatmadı (~2 dakika kota). Düzeltme yerelde sınandı, Kaggle'da **denenmedi** —
+  DECISIONS 2026-09-16.
 
 ### Yazılmadı
 
@@ -485,6 +490,8 @@ C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulard
    sondasının kendisi) "Save & Run All" ile çalıştırın. Hiçbir yol yazılmaz: dataset ve
    önceki oturumun çıktısı `/kaggle/input` altında aranır. Bitmeyen koşular için ikinci
    oturumda önceki versiyonun çıktısını girdi olarak ekleyin — biten koşular atlanır.
+   Betik depoyu her koşuda güncellediği için 2026-09-16 düzeltmesi yapıştırılan hücre
+   değişmeden gelir; hücre yeniden yapıştırılmak zorunda değil.
 4. `out/`'u indirin: `*.json` → `reports/results/`, `peruser/<kategori>/` →
    `data/processed/recbole/<kategori>/peruser/`.
 
