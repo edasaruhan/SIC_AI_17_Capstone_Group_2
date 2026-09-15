@@ -1,0 +1,318 @@
+{
+  "meta": {
+    "model": "answerdotai/ModernBERT-base",
+    "model_key": "base",
+    "backend": "hf",
+    "fp16": true,
+    "code_version": "79e6b80",
+    "epochs": 3,
+    "max_length": 1024,
+    "n_train": 41988,
+    "n_holdout": 4667,
+    "n_human": 500,
+    "thresholds_fixed": "2026-09-14, configs/base.yaml -> distill.fidelity (egitimden once)",
+    "model_selection": "yok - sabit epoch, ara kontrol noktasi secilmedi",
+    "training": {
+      "n_gpu": 1,
+      "effective_batch_size": 32,
+      "gradient_checkpointing": true,
+      "fp16_active": true,
+      "training_loss": 0.27614,
+      "train_runtime_s": 1683.4,
+      "gpu": "Tesla T4",
+      "transformers": "5.0.0",
+      "torch": "2.10.0+cu128",
+      "attn_implementation": "sdpa"
+    }
+  },
+  "student_vs_teacher_holdout": {
+    "axes": {
+      "C1": {
+        "positive_labels": [
+          "gift_given"
+        ],
+        "n_rows": 4667,
+        "n_reference_positive": 874,
+        "precision": {
+          "value": 0.9135,
+          "ci95": [
+            0.895,
+            0.9319
+          ]
+        },
+        "recall": {
+          "value": 0.9062,
+          "ci95": [
+            0.889,
+            0.9243
+          ]
+        },
+        "f1": {
+          "value": 0.9098,
+          "ci95": [
+            0.8968,
+            0.923
+          ]
+        }
+      },
+      "C1b": {
+        "positive_labels": [
+          "gift_given",
+          "household",
+          "received"
+        ],
+        "n_rows": 4667,
+        "n_reference_positive": 1403,
+        "precision": {
+          "value": 0.9254,
+          "ci95": [
+            0.9127,
+            0.9388
+          ]
+        },
+        "recall": {
+          "value": 0.9373,
+          "ci95": [
+            0.925,
+            0.9493
+          ]
+        },
+        "f1": {
+          "value": 0.9313,
+          "ci95": [
+            0.9221,
+            0.9406
+          ]
+        }
+      }
+    },
+    "five_class": {
+      "n_compared": 4667,
+      "accuracy": 0.8867,
+      "macro_f1": 0.743,
+      "per_class": {
+        "gift_given": {
+          "n_reference": 874,
+          "n_predicted": 867,
+          "precision": 0.913,
+          "recall": 0.906,
+          "f1": 0.91
+        },
+        "household": {
+          "n_reference": 473,
+          "n_predicted": 496,
+          "precision": 0.792,
+          "recall": 0.831,
+          "f1": 0.811
+        },
+        "received": {
+          "n_reference": 56,
+          "n_predicted": 58,
+          "precision": 0.672,
+          "recall": 0.696,
+          "f1": 0.684
+        },
+        "self": {
+          "n_reference": 2987,
+          "n_predicted": 3066,
+          "precision": 0.922,
+          "recall": 0.947,
+          "f1": 0.934
+        },
+        "unclear": {
+          "n_reference": 277,
+          "n_predicted": 180,
+          "precision": 0.478,
+          "recall": 0.31,
+          "f1": 0.376
+        }
+      }
+    }
+  },
+  "student_vs_human": {
+    "axes": {
+      "C1": {
+        "positive_labels": [
+          "gift_given"
+        ],
+        "n_rows": 500,
+        "n_reference_positive": 129,
+        "precision": {
+          "value": 0.6606,
+          "ci95": [
+            0.5879,
+            0.7333
+          ]
+        },
+        "recall": {
+          "value": 0.845,
+          "ci95": [
+            0.7877,
+            0.9008
+          ]
+        },
+        "f1": {
+          "value": 0.7415,
+          "ci95": [
+            0.6853,
+            0.7933
+          ]
+        }
+      },
+      "C1b": {
+        "positive_labels": [
+          "gift_given",
+          "household",
+          "received"
+        ],
+        "n_rows": 500,
+        "n_reference_positive": 310,
+        "precision": {
+          "value": 0.8754,
+          "ci95": [
+            0.8411,
+            0.9065
+          ]
+        },
+        "recall": {
+          "value": 0.9065,
+          "ci95": [
+            0.8792,
+            0.9344
+          ]
+        },
+        "f1": {
+          "value": 0.8906,
+          "ci95": [
+            0.8676,
+            0.9139
+          ]
+        }
+      }
+    },
+    "five_class": {
+      "n_compared": 500,
+      "accuracy": 0.676,
+      "macro_f1": 0.5636,
+      "per_class": {
+        "gift_given": {
+          "n_reference": 129,
+          "n_predicted": 165,
+          "precision": 0.661,
+          "recall": 0.845,
+          "f1": 0.741
+        },
+        "household": {
+          "n_reference": 170,
+          "n_predicted": 135,
+          "precision": 0.822,
+          "recall": 0.653,
+          "f1": 0.728
+        },
+        "received": {
+          "n_reference": 11,
+          "n_predicted": 21,
+          "precision": 0.286,
+          "recall": 0.545,
+          "f1": 0.375
+        },
+        "self": {
+          "n_reference": 144,
+          "n_predicted": 145,
+          "precision": 0.697,
+          "recall": 0.701,
+          "f1": 0.699
+        },
+        "unclear": {
+          "n_reference": 46,
+          "n_predicted": 34,
+          "precision": 0.324,
+          "recall": 0.239,
+          "f1": 0.275
+        }
+      }
+    }
+  },
+  "student_vs_teacher_holdout_in_kcore": {
+    "n": 546,
+    "axes": {
+      "C1": {
+        "positive_labels": [
+          "gift_given"
+        ],
+        "n_rows": 546,
+        "n_reference_positive": 92,
+        "precision": {
+          "value": 0.913,
+          "ci95": [
+            0.8478,
+            0.9674
+          ]
+        },
+        "recall": {
+          "value": 0.913,
+          "ci95": [
+            0.8627,
+            0.9643
+          ]
+        },
+        "f1": {
+          "value": 0.913,
+          "ci95": [
+            0.8715,
+            0.9508
+          ]
+        }
+      },
+      "C1b": {
+        "positive_labels": [
+          "gift_given",
+          "household",
+          "received"
+        ],
+        "n_rows": 546,
+        "n_reference_positive": 153,
+        "precision": {
+          "value": 0.9221,
+          "ci95": [
+            0.8766,
+            0.961
+          ]
+        },
+        "recall": {
+          "value": 0.9281,
+          "ci95": [
+            0.8869,
+            0.965
+          ]
+        },
+        "f1": {
+          "value": 0.9251,
+          "ci95": [
+            0.8939,
+            0.9537
+          ]
+        }
+      }
+    }
+  },
+  "criteria": {
+    "1_c1_axis_vs_teacher": {
+      "f1": 0.9098,
+      "threshold": 0.85,
+      "passed": true
+    },
+    "2_c1b_axis_vs_teacher": {
+      "f1": 0.9313,
+      "threshold": 0.85,
+      "passed": true
+    },
+    "3_c1_axis_vs_human_not_worse_than_teacher": {
+      "student_f1": 0.7415,
+      "teacher_f1": 0.7312,
+      "max_drop": 0.05,
+      "passed": true
+    }
+  },
+  "verdict": "PASS"
+}

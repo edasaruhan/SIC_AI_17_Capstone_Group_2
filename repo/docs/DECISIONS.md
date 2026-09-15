@@ -2010,3 +2010,112 @@ bu durumu kilitliyor.
 **Etkilediği bölüm:** `analysis/result_figures.py`, `tests/test_result_figures.py`, CLAUDE.md
 §2/§7/§10, README, GENEL_BAKIS §8
 **Kim:** Ekip
+
+---
+
+### 2026-09-15 — Hafta 5 sonucu: damıtma kapısı PASS, deney korpusunun tamamı etiketlendi
+
+#### Ne koşuldu
+
+Kaggle, "Save & Run All", kod `79e6b80` (raporların `code_version`'ı). transformers 5.0.0,
+torch 2.10.0+cu128, `sdpa` dikkat. **Eğitim** tek T4, 3 epoch, fp16, gradient checkpointing,
+etkin grup 32: 1.683 sn, son eğitim kaybı 0,276. Model seçimi yok (sabit epoch, ara kontrol
+noktası seçilmedi). **Çıkarım** iki T4'te paralel: Toys 2.164.018 satır 5.940 sn (364 satır/sn),
+Grocery 2.434.594 satır 7.385 sn (330 satır/sn). Yedek model (DeBERTa-v3) **denenmedi** —
+önceden kayıtlı kural yalnızca ana model FAIL olursa.
+
+#### Sadakat kapısı — PASS (3/3); eşikler 2026-09-14'te, eğitimden önce
+
+| ölçüt | ölçülen [%95 GA] | eşik | |
+|---|---|---|---|
+| 1 · C1 ekseni, öğrenci vs öğretmen (ayrılmış 4.667) | F1 0,910 [0,897–0,923] | ≥ 0,85 | ✓ |
+| 2 · C1b ekseni, öğrenci vs öğretmen | F1 0,931 [0,922–0,941] | ≥ 0,85 | ✓ |
+| 3 · C1 ekseni, öğrenci vs insan (500) | F1 0,742 [0,685–0,793]; öğretmen 0,731 | düşüş ≤ 0,05 | ✓ |
+
+Kapıya **girmeyen** ölçümler (raporda ayrı):
+- **clean → 5-core kayması:** ayrılmış kümenin 5-core'daki 546 satırında C1 F1 0,913
+  [0,872–0,951], C1b 0,925 [0,894–0,954]. Kayma saptanmadı; aralık geniş.
+- **Öğrenci insana karşı öğretmenin gürültüsünü taşıyor:** C1 kesinliği 0,661, duyarlılığı
+  0,845; C1b F1 0,891 [0,868–0,914]. Öğrenci öğretmeni kopyalıyor, düzeltmiyor — beklenen.
+  2026-09-14'ün yorum kuralı (C1 ≈ C4 → "saptanamadı", C1 > C4 → alt sınır) aynen geçerli.
+- Beş sınıf (ayrılmış): doğruluk 0,887, makro-F1 0,743; en zayıf `unclear` (F1 0,38),
+  `received` 0,68 (n = 56).
+- LLM etiketiyle örtüşen 5-core satırlarında uyum Toys 0,970 (n = 2.072), Grocery 0,973
+  (n = 2.532) — **iyimser**: bu satırların çoğu eğitimdeydi.
+
+#### 5-core etiket payları (öğrenci, ham — kalibre DEĞİL)
+
+| | gift_given = C1 | household | received | self | unclear | C1b |
+|---|---:|---:|---:|---:|---:|---:|
+| Toys | %24,8 | %27,3 | %0,3 | %42,3 | %5,4 | %52,4 |
+| Grocery | %3,1 | %4,0 | %0,5 | %89,0 | %3,4 | %7,6 |
+
+Mevsimsellik (Aralık–Ocak ÷ Haziran–Eylül): C1 Toys 1,36 · Grocery 1,75 (Kapı 1'in referansı
+≥ 1,25); C1b 1,17 / 1,30. RQ1'in insan kalibrasyonlu oranı (clean `main` çerçevesi) **bu
+tablonun yerine geçmez** ve bu tablo onun yerine geçmez: farklı korpus, farklı etiketleyici.
+Deney koşulları tanım gereği ham öğrenci etiketini kullanıyor.
+
+#### Deney girdileri (yerelde, gerçek etiketle) — ölçülenler
+
+- `atomic --labels distilled`: Toys 268.652 kullanıcı · 103.618 ürün · değerlendirilebilir
+  (test ürünü `self`) **%43,7** (117.386); Grocery 268.991 · 94.863 · %88,8.
+- Koşulların çıkardığı eğitim payı: Toys C1 **%24,7**, C1b **%52,8** (5.251 ürün, %5,1,
+  eğitimde gerçek kimliğiyle kalmıyor); Grocery C1 %3,1, C1b %7,6. C4/C4b aynı sayıda satır
+  çıkarıyor. **Sonuç için anlamı:** Toys'ta C1b−C0 farkı yarı yarıya veri kaybı da içerir;
+  önceden kayıtlı birincil karşıtlıkların C1−C4 / C1b−C4b olması tam bunun için.
+- C3 (Toys) 73.683 gölge ürün ekliyor; SASRec'in çıkış katmanı ~177 bin ürüne çıkıyor.
+- Tekrar eden (kullanıcı, ürün) çifti **yok** (iki kategoride de); C0 alınmış ürün maskesi
+  hiçbir koşulda valid/test pozitifiyle **çakışmıyor** — koşucu çakışmada durur, Kaggle'dan önce
+  sayıldı.
+
+#### Kaggle betikleri — sonucu etkilemeyen düzeltmeler
+
+- `d1b809e` — `DATASET_PATH` elle yazılmıyor; dosyalar `/kaggle/input` altında aranıyor.
+- `79e6b80` — damıtma hücresi kapı PASS değilse hata vermeden biter (hata veren versiyonun
+  çıktısı saklanmayabilir). Yedek model yeni oturumda ana modelin FAIL raporunu **depodan**
+  okur: FAIL raporu önce commit edilmeli.
+- Deney betiği (bu commit):
+  - Depo + RecBole paketleri `/tmp`'de: "Save & Run All" `/kaggle/working`'in tamamını çıktı
+    diye kaydediyor, paket klasörü on binlerce dosya.
+  - **Zaman bütçesi:** yeni koşu, aynı (kategori, model) için ölçülen en uzun süre × 1,15
+    `MAX_HOURS`'a sığmıyorsa başlatılmaz. Kaggle 12 saatte keser ve kesilen versiyonun
+    çıktısı kaybolabilir; eski kural yalnızca başlangıç saatine bakıyordu.
+  - İlk iki koşu çökerse yeni koşu başlatılmaz (sistematik hata, kota yakılmaz).
+  - Önceki oturumun çıktısı `/kaggle/input` altında kendiliğinden bulunur (yalnızca
+    `peruser/<slug>/`).
+  - `out/oturum_ozeti.json`: biten / bitmeyen koşular ve ölçülen süreler.
+  - **`PLAN = "matrix"` varsayılan.** Matrisin öncelik sırası zaman sondasının iki koşusuyla
+    (Toys × C0 × {SASRec, BPR} × ilk seed) başlıyor, sıra kesilmez çekirdekle devam ediyor;
+    ayrı sonda oturumu kotaya bir şey kazandırmıyor, bir tur kaybettiriyor. Plan Faz 4.1'in
+    **usulü** değişti, içeriği değil — süreler aynı koşulardan ölçülüyor.
+  - Pip `--only-binary=:all:`. Pinlerin hepsinin Linux cp311/cp312 wheel'i var (`pip install
+    --dry-run` ile denetlendi); **Python 3.13'te numpy 1.26.4 yok** → betik anlaşılır bir
+    mesajla durur. Kaggle imajının Python sürümü bilinmiyor.
+  - Hepsi betiğin kendi kodu okunarak sahte `/kaggle/input` ve sahte koşularla denendi.
+    **Kaggle'da henüz koşmadı.**
+
+#### Bulunan hata — paralel koşularda checkpoint çarpışması (Kaggle'dan ÖNCE, RecBole kaynağından)
+
+RecBole 1.2.0 en iyi modeli `checkpoint_dir/<model>-<Ay-Gün-Yıl_SS-DD-ss>.pth` diye kaydediyor
+(`trainer.py:132`, `get_local_time` saniye çözünürlüklü) ve koşucu hepsine aynı `saved/`
+klasörünü veriyordu. İki T4'te **aynı saniyede** kurulan aynı model aynı dosyaya yazar: biri
+ötekinin ağırlığını yükler — ürün sayısı aynıysa **sessizce yanlış sonuç** — sonra dosyayı
+siler ve öteki çöker. Matrisin sırası aynı (kategori, koşul, model) üçlüsünü aynı anda koşturmuyor,
+ama farklı seed'ler ve eşit ürün sayılı koşullar için olasılık sıfır değildi. Düzeltme:
+`checkpoint_dir = saved/<koşu kimliği>` (`run_experiment.checkpoint_dir`); koşu bitince klasör
+de silinir. Test: 12 farklı koşu 12 farklı klasör. Sentetik veriyle BPR + SASRec'te dosyanın
+koşuya özel klasöre yazıldığı ve temizlendiği RecBole'un kendi `_save_checkpoint`'i izlenerek
+görüldü; kullanıcı başı tutarlılık farkı 0,0.
+
+#### Yerel ön uçuş (gerçek veri, CPU, 1 epoch — sonuç DEĞİL, raporlara yazılmadı)
+
+- **BPR · Toys · C1b:** uçtan uca geçti. 547 sn (eğitim + valid 244 sn, test 231 sn), ~3,5 GB RAM.
+  117.386 kullanıcı; C0 maskesine 853.979 çift; kullanıcı başı ortalama RecBole toplamına
+  **birebir** eşit (fark 0,0); test çiftleri özeti `3bed366e…` (Kaggle'daki her koşulda aynı
+  çıkmalı).
+
+**Etkilediği bölüm:** `reports/results/distill_report_base.json`, `inference_*.json`,
+`condition_{Toys_and_Games,Grocery_and_Gourmet_Food}_*.json`, F20, `scripts/kaggle_experiment.py`,
+`recsys/run_experiment.py` (`checkpoint_dir`), `tests/test_run_experiment.py`, GENEL_BAKIS
+§5/§6/§8, CLAUDE.md §7/§10, README
+**Kim:** Ekip

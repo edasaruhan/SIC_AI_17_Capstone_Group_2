@@ -10,10 +10,15 @@ NE YAPAR:
   2. Kosullari (C0 C1 C4 C1b C4b C3) atomic dosyadan URETIR - yerelde uretilenle ayni
      kod, ayni seed; yuklenecek dosya 12 degil 4.
   3. Kosulari iki T4'e dagitir: her kart bir sonraki isi kuyruktan alir.
-     PLAN = "probe"  -> Toys x C0 x {SASRec, BPR} x ilk seed (ZAMAN SONDASI, Faz 4.1)
-     PLAN = "matrix" -> config'teki matris, oncelik sirasiyla (asagida)
-  Her kosu biter bitmez rapor + kullanici basi dosya out/'a kopyalanir; oturum
-  kesilse bile biten kosular kaybolmaz.
+     PLAN = "matrix" -> config'teki matris, oncelik sirasiyla (asagida). Ilk iki is
+                        zaman sondasinin KENDISI (Toys x C0 x {SASRec, BPR} x ilk seed);
+                        sureleri hucrede ">>> BITTI" satirlarinda. Ayri sonda oturumu
+                        gerekmiyor: sira kesilmez cekirdekle basliyor, kota bosa gitmez.
+     PLAN = "probe"  -> yalnizca o iki kosu
+  Her kosu biter bitmez rapor + kullanici basi dosya out/'a kopyalanir.
+  ZAMAN: yeni kosu, AYNI (kategori, model) icin olculen en uzun sure x 1,15 MAX_HOURS'a
+  sigmiyorsa BASLATILMAZ - Kaggle 12 saatte oturumu keser ve kesilen versiyonun ciktisi
+  kaybolabilir. Ilk iki kosu da cokerse (sistematik hata) yeni kosu baslatilmaz.
 
 ON KOSULLAR (Kaggle arayuzunde, elle):
   1. Settings > Accelerator = **GPU T4 x2**   ·   Settings > Internet = **On** (pip)
@@ -26,8 +31,9 @@ ON KOSULLAR (Kaggle arayuzunde, elle):
         data/processed/recbole/Grocery_and_Gourmet_Food/Grocery_and_Gourmet_Food.inter + split.json
      `.inter` review metni tasimaz ama kullanici kimligi tasir - yine OZEL.
      Dataset'in adi onemsiz: DATASET_PATH = None iken /kaggle/input altinda aranir.
-  3. (istege bagli) Onceki oturumun out/ klasorunu ikinci bir dataset olarak ekleyin:
-     icindeki experiment_*.json + peruser/*.parquet yerlestirilir ve o kosular ATLANIR.
+  3. IKINCI OTURUMDA: onceki versiyonun ciktisini da girdi olarak ekleyin (Add Input >
+     Your Work > bu notebook). PREVIOUS_OUT_PATH = None iken /kaggle/input altindaki
+     experiment_*.json + peruser/<slug>/*.parquet KENDILIGINDEN bulunur ve o kosular ATLANIR.
 
 KOSU BITINCE: /kaggle/working/out/ klasorunu indirin ve depoya yerlestirin:
      experiment_*.json, condition_*.json      -> reports/results/
@@ -41,14 +47,14 @@ ONCELIK (plan: kesme sirasi M3 -> BPR'nin ek seed'leri -> Grocery'de C3):
 
 # ---------------------------------------------------------------- ayarlar
 DATASET_PATH = None           # None: /kaggle/input altinda aranir · or. "/kaggle/input/recsys-experiment"
-PREVIOUS_OUT_PATH = None      # or. "/kaggle/input/recsys-experiment-out1" - biten kosular atlanir
+PREVIOUS_OUT_PATH = None      # None: /kaggle/input altinda aranir · biten kosular atlanir
 REPO = "https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_2.git"
-PLAN = "probe"                # "probe" (once bu!) · "matrix"
+PLAN = "matrix"               # "matrix" · "probe" (yalnizca Toys C0 x iki model)
 CATEGORIES = None             # None -> experiment.categories  · or. ["high"]
 MODELS = None                 # None -> experiment.models      · or. ["SASRec"]
 CONDITIONS = None             # None -> experiment.conditions
 SEEDS = None                  # None -> seeds
-MAX_HOURS = 11.0              # bu saatten sonra YENI kosu baslatilmaz (Kaggle 12 sa keser)
+MAX_HOURS = 11.0              # butun kosular bu saate kadar BITMELI (Kaggle 12 sa'te keser)
 FORCE = False                 # True: biten kosu da yeniden kosar
 
 # ------------------------------------------------------------------ kurulum
@@ -70,10 +76,16 @@ def sh(cmd: str) -> None:
 
 T_BASLA = time.time()
 WORK = Path("/kaggle/working")
-CLONE = WORK / "SIC_AI_17_Capstone_Group_2"
+# Depo, paketler ve RecBole ara dosyalari /kaggle/working DISINDA: "Save & Run All"
+# versiyonu oradaki HER dosyayi cikti diye kaydediyor ve paket klasoru on binlerce dosya
+# (out/ o yiginin icinde kaybolmasin). /tmp oturum boyunca kalici; hucre yeniden
+# calistirilirsa kurulum atlanir.
+SCRATCH = Path("/tmp/hediye")
+CLONE = SCRATCH / "SIC_AI_17_Capstone_Group_2"
 REPO_DIR = CLONE / "repo"
 OUT = WORK / "out"
-PKGS = WORK / "recbole_pkgs"
+PKGS = SCRATCH / "recbole_pkgs"
+SCRATCH.mkdir(parents=True, exist_ok=True)
 OUT.mkdir(exist_ok=True)
 
 # Depo HER KOSUDA guncellenir (kaggle_annotate.py'deki 2026-08-28 hatasi).
@@ -121,7 +133,13 @@ def _dogrula() -> bool:
 
 
 if not _dogrula():
-    sh(f"{sys.executable} -m pip install -q --no-deps --target {PKGS} {' '.join(PINLER)}")
+    # numpy 1.26.4'un Python 3.13 icin paketi YOK (RecBole 1.2.0 numpy 2'de cokuyor). Pinlerin
+    # hepsinin Linux cp311/cp312 wheel'i var (pip --dry-run ile denetlendi); --only-binary pip'in
+    # kaynaktan derlemeye kalkip dakikalar sonra anlasilmaz bir hatayla dusmesini engeller.
+    if sys.version_info >= (3, 13):
+        raise SystemExit(f"Python {sys.version.split()[0]}: numpy 1.26.4 bu surum icin yok - RecBole "
+                         "kurulamaz. Bu mesaji paylasin; kurulum tarifi degismeli (kod degil).")
+    sh(f"{sys.executable} -m pip install -q --no-deps --only-binary=:all: --target {PKGS} {' '.join(PINLER)}")
     if not _dogrula():
         raise SystemExit("RecBole ortami kurulamadi - yukaridaki hata ciktisina bakin.")
 
@@ -159,19 +177,24 @@ for rol in kategoriler:
     if etiket != "distilled":
         print(f"!! UYARI: {slug} etiket kaynagi '{etiket}' - bu kosular DUMAN TESTIDIR, raporlanamaz.")
 
-if PREVIOUS_OUT_PATH:
-    onceki = Path(PREVIOUS_OUT_PATH)
-    for f in onceki.rglob("experiment_*.json"):
+onceki = Path(PREVIOUS_OUT_PATH or "/kaggle/input")
+if onceki.exists():
+    raporlar = sorted(onceki.rglob("experiment_*.json"))
+    for f in raporlar:
         shutil.copy(f, REPO_DIR / "reports" / "results" / f.name)
         shutil.copy(f, OUT / f.name)
+    # Yalnizca peruser/<slug>/ altindakiler: ekli baska dataset'lerin parquet'leri karismasin.
     for f in onceki.rglob("*.parquet"):
         slug = f.parent.name
+        if f.parent.parent.name != "peruser" or slug not in SLUG.values():
+            continue
         d = REPO_DIR / "data" / "processed" / "recbole" / slug / "peruser"
         d.mkdir(parents=True, exist_ok=True)
         shutil.copy(f, d / f.name)
         (OUT / "peruser" / slug).mkdir(parents=True, exist_ok=True)
         shutil.copy(f, OUT / "peruser" / slug / f.name)
-    print("onceki oturumdan yerlestirildi:", len(list(onceki.rglob("experiment_*.json"))), "rapor")
+    if raporlar:
+        print(f"onceki oturumdan yerlestirildi: {len(raporlar)} rapor ({onceki}) - o kosular atlanacak")
 
 
 # ----------------------------------------------------------- alt surec kosucu
@@ -235,18 +258,29 @@ for is_ in isler:
     kuyruk.put(is_)
 ozet: list[dict] = []
 hatalar: list[str] = []
+n_coken = 0
+# (kategori, model) -> olculen en uzun kosu suresi (sn). Onceki oturumdan gelen (atlanan)
+# kosuda duvar suresi ~0; raporun kendi fit+test suresi kullanilir.
+SURE: dict[tuple[str, str], float] = {}
 kilit = threading.Lock()
 
 
 def isci(gpu: int) -> None:
+    global n_coken
     while True:
+        with kilit:
+            if n_coken >= 2 and not ozet:
+                return  # ilk kosularin hepsi coktu: sistematik hata, kota yakilmasin
         try:
             rol, kosul, model, seed = kuyruk.get_nowait()
         except queue.Empty:
             return
-        if (time.time() - T_BASLA) / 3600 > MAX_HOURS:
+        with kilit:
+            tahmin = 1.15 * SURE.get((rol, model), 0.0)
+        if (time.time() - T_BASLA + tahmin) / 3600 > MAX_HOURS:
             with kilit:
-                hatalar.append(f"{SLUG[rol]}/{kosul}/{model}/seed{seed}: MAX_HOURS doldu, baslatilmadi")
+                hatalar.append(f"{SLUG[rol]}/{kosul}/{model}/seed{seed}: MAX_HOURS'a sigmiyor "
+                               f"(~{tahmin / 60:.0f} dk), baslatilmadi")
             continue
         slug = SLUG[rol]
         etiket = f"{slug}_{kosul}_{model}_seed{seed}"
@@ -259,11 +293,14 @@ def isci(gpu: int) -> None:
         with kilit:
             if kod != 0 or not rapor.exists() or not pu.exists():
                 hatalar.append(f"{etiket}: kod {kod} - out/logs/{etiket}.log")
+                n_coken += 1
                 continue
             shutil.copy(rapor, OUT / rapor.name)
             (OUT / "peruser" / slug).mkdir(parents=True, exist_ok=True)
             shutil.copy(pu, OUT / "peruser" / slug / pu.name)
             r = json.loads(rapor.read_text(encoding="utf-8"))
+            olcum = sum((r["meta"].get("runtime_seconds") or {}).values())
+            SURE[(rol, model)] = max(SURE.get((rol, model), 0.0), time.time() - t0, olcum)
             ozet.append({"kosu": etiket, "gpu": gpu, "duvar_sn": round(time.time() - t0),
                          "fit_sn": r["meta"].get("runtime_seconds", {}).get("fit"),
                          "recall@10": r["test"].get("recall@10"), "etiket": r["meta"].get("label_source")})
@@ -275,9 +312,17 @@ for t in iplikler:
     t.start()
 for t in iplikler:
     t.join()
+while not kuyruk.empty():  # sistematik hata yuzunden hic alinmayan isler
+    rol, kosul, model, seed = kuyruk.get_nowait()
+    hatalar.append(f"{SLUG[rol]}/{kosul}/{model}/seed{seed}: ilk kosular coktugu icin baslatilmadi")
 
 # ------------------------------------------------------------------ ozet
+(OUT / "oturum_ozeti.json").write_text(json.dumps({
+    "plan": PLAN, "toplam_sn": round(time.time() - T_BASLA), "biten": ozet, "bitmeyen": hatalar,
+    "en_uzun_kosu_sn": {f"{SLUG[r]}/{m}": round(s) for (r, m), s in sorted(SURE.items())},
+}, ensure_ascii=False, indent=2), encoding="utf-8")
 print(f"\nTOPLAM {time.time() - T_BASLA:.0f} sn · biten {len(ozet)} / {len(isler)}")
+print("en uzun kosu (kategori/model, sn):", {f"{SLUG[r]}/{m}": round(s) for (r, m), s in SURE.items()})
 for o in sorted(ozet, key=lambda o: o["kosu"]):
     print("  ", o)
 if hatalar:

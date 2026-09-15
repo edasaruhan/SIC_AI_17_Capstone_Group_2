@@ -1,0 +1,53 @@
+{
+  "category": "Toys_and_Games",
+  "n_rows": 2164018,
+  "model": "answerdotai/ModernBERT-base",
+  "model_key": "base",
+  "label_source": "distilled",
+  "distill_gate_verdict": "PASS",
+  "code_version": "79e6b80",
+  "throughput": {
+    "rows_computed_this_run": 2164018,
+    "elapsed_s": 5939.7,
+    "rows_per_s": 364.3
+  },
+  "label_share_pct": {
+    "gift_given": 24.767,
+    "household": 27.275,
+    "received": 0.331,
+    "self": 42.263,
+    "unclear": 5.364
+  },
+  "contamination_share_pct": {
+    "C1": 24.767,
+    "C1b": 52.373
+  },
+  "seasonality": {
+    "peak_months": [
+      12,
+      1
+    ],
+    "trough_months": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "gate1_reference_min": 1.25,
+    "C1": {
+      "rate_peak": 0.29592,
+      "rate_trough": 0.21839,
+      "ratio": 1.355
+    },
+    "C1b": {
+      "rate_peak": 0.5772,
+      "rate_trough": 0.49192,
+      "ratio": 1.173
+    }
+  },
+  "overlap_with_llm": {
+    "n": 2072,
+    "agreement": 0.9701,
+    "note": "iyimser: bu satirlarin cogu egitimdeydi"
+  }
+}

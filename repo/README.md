@@ -101,7 +101,7 @@ python -m gift_contamination.recsys.conditions --category high --condition all -
 # data/processed/recbole/<kategori>/peruser/ altına yazılır (git'e girmez).
 PYTHONPATH=src .venv-recbole/Scripts/python.exe \
   -m gift_contamination.recsys.run_experiment --category high --condition C1 --model SASRec --seed 42
-# Bütün matris Kaggle'da: scripts/kaggle_experiment.py (önce PLAN = "probe").
+# Bütün matris Kaggle'da: scripts/kaggle_experiment.py (PLAN = "matrix"; ilk iki koşu zaman sondası).
 # Hafta 7 — Kapı 2 + eşli bootstrap (ana ortam; koşu çıktıları yerine konduktan sonra)
 python -m gift_contamination.analysis.experiment_stats   # -> gate2.json, experiment_stats.json
 # Hafta 8 — pazarlama metrikleri (yeniden eğitim yok; top-K listelerinden)

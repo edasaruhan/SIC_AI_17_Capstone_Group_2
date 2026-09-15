@@ -378,7 +378,7 @@ python -m gift_contamination.recsys.atomic     --config configs/base.yaml --cate
 python -m gift_contamination.recsys.conditions --config configs/base.yaml --category high --condition all --force
 python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
        --category high --condition C0 --model SASRec --seed 42   # .venv-recbole; biten koşuyu atlar
-# Matris Kaggle'da: scripts/kaggle_experiment.py (önce PLAN="probe" = zaman sondası).
+# Matris Kaggle'da: scripts/kaggle_experiment.py (PLAN="matrix"; ilk iki koşusu zaman sondası).
 # Kapı 2 + karşıtlıklar — koşu raporları reports/results/, kullanıcı başı dosyalar
 # data/processed/recbole/<kategori>/peruser/ altına konduktan sonra, ANA ortamda:
 python -m gift_contamination.analysis.experiment_stats --config configs/base.yaml
@@ -391,9 +391,9 @@ python -m gift_contamination.analysis.result_figures --config configs/base.yaml
 > Bütün modüller yazıldı (2026-09-14). Henüz yazılmamış olan yalnızca sonuç raporu
 > (`docs/SONUCLAR.md`) — gerçek koşuların sayılarıyla yazılacak.
 
-> **`recsys.atomic --labels distilled` kod olarak hazır, girdisi henüz yok
-> (2026-09-14).** `data/annotations/<kategori>_inferred.parquet` Kaggle'daki
-> `inference run`'dan gelecek. Üç kontrol: etiket gerçek modelden (stub değil),
+> **`recsys.atomic --labels distilled` gerçek etiketle koşuldu (2026-09-15).**
+> Sadakat kapısı PASS; `data/annotations/<kategori>_inferred.parquet` Kaggle'daki
+> `inference run`'dan geldi (Toys + Grocery). Üç kontrol: etiket gerçek modelden (stub değil),
 > çıkarım raporu kapıyı PASS kaydetmiş, o modelin damıtma raporu diskte PASS.
 > `build_atomic` kcore'un **her** satırı için etiket bekliyor (satır sayısı
 > tutmazsa hata). Vekille üretilmiş dosya varken `--labels distilled` istenirse
@@ -464,7 +464,8 @@ Kurallar:
 - `test_run_experiment.py` — kullanıcı başı metrik elle hesaba eşit mi; SASRec bölme
   dosyaları RecBole'un genişletme kuralına uyuyor mu (son N ürün, boş valid geçmişi);
   C0 alınmış ürün maskesi koşulun kaybettiği çiftler mi; koşucu pydantic çekmeden
-  import ediliyor mu; test çifti özeti sıradan bağımsız mı
+  import ediliyor mu; test çifti özeti sıradan bağımsız mı; paralel koşular aynı checkpoint
+  klasörünü paylaşmıyor mu (RecBole'un dosya adı saniye çözünürlüklü)
 - `test_experiment_stats.py` — **kritik**: eşli bootstrap bilinen farkı buluyor mu;
   plasebo C0'ı geçince, test çiftleri farklıyken Kapı 2 FAIL mi; eksik seed/koşulda
   INCOMPLETE mi (asla PASS değil); önceden kayıtlı yorum kuralı doğru etiketliyor mu;

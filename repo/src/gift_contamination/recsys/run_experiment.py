@@ -235,6 +235,17 @@ def experiment_path(cfg: Config, role: str, code: str, model: str, seed: int) ->
     return cfg.path("results", f"experiment_{slug}_{code}_{model}_seed{seed}.json")
 
 
+def checkpoint_dir(cfg: Config, role: str, code: str, model: str, seed: int) -> Path:
+    """Kosu basina checkpoint klasoru (RecBole'un varsayilani gibi calisma dizinine gore).
+
+    RecBole dosyayi `<model>-<Ay-Gun-Yil_SS-DD-ss>.pth` diye adlandiriyor - SANIYE
+    cozunurluklu. Kaggle'da iki kartta ayni saniyede kurulan ayni model AYNI dosyaya
+    yazar: biri otekinin agirligini yukler (ayni urun sayisinda sessizce), sonra
+    dosyayi siler ve oteki coker. Klasor kosunun kimligini tasiyinca carpisma olmaz.
+    """
+    return Path("saved") / experiment_path(cfg, role, code, model, seed).stem
+
+
 def bench_dir(cfg: Config, role: str, code: str, *, sequential: bool = False) -> Path:
     # Sirali modellerin dosya bicimi farkli (satir basina gecmis) - ayri klasor.
     ad = f"{code}_seq" if sequential else code
@@ -484,6 +495,8 @@ def run(
         # RecBole `gpu_id`i CUDA_VISIBLE_DEVICES'a YAZIYOR (varsayilan '0'). Kaggle'da
         # ikinci karta verilen kosu boylece sessizce birinci karta dusuyordu.
         "gpu_id": os.environ.get("CUDA_VISIBLE_DEVICES", "0"),
+        # Paralel kosular ayni checkpoint dosyasini paylasmasin (bkz. `checkpoint_dir`).
+        "checkpoint_dir": str(checkpoint_dir(cfg, role, code, model, seed)),
     }
     if epochs is not None:
         params["epochs"] = int(epochs)
@@ -580,6 +593,10 @@ def run(
     # Checkpoint yeniden kullanilmiyor: M1/M2 kullanici basi top-K listelerinden
     # hesaplaniyor. Matris ~70 kosu x ~100-300 MB; Kaggle'in 20 GB diskini doldururdu.
     Path(trainer.saved_model_file).unlink(missing_ok=True)
+    try:
+        Path(trainer.saved_model_file).parent.rmdir()
+    except OSError:
+        pass  # bos degilse (ayni kosu yeniden basladiysa) dokunulmaz
     for k, v in report["test"].items():
         log.info("  %-16s %.6f", k, v)
     return report

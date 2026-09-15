@@ -13,6 +13,7 @@ import pytest
 from gift_contamination.recsys.conditions import SHADOW_SUFFIX
 from gift_contamination.recsys.run_experiment import (
     UserItemMask,
+    checkpoint_dir,
     eval_mask_pairs,
     hash_test_pairs,
     per_user_topk_metrics,
@@ -206,3 +207,12 @@ def test_user_item_mask_lookup_returns_batch_rows():
     assert urun.tolist() == [1, 5, 3]
     bos_satir, bos_urun = maske.lookup(np.array([3]))
     assert bos_satir.tolist() == [] and bos_urun.tolist() == []
+
+
+def test_parallel_runs_never_share_a_checkpoint_dir(cfg):
+    # RecBole'un dosya adi yalnizca model + saniye: ayrim klasorden gelmek ZORUNDA.
+    klasorler = [checkpoint_dir(cfg, "pilot", k, m, s)
+                 for k in ("C0", "C1", "C3") for m in ("SASRec", "BPR") for s in (42, 1337)]
+
+    assert len(set(klasorler)) == len(klasorler)
+    assert all(not p.is_absolute() and p.parts[0] == "saved" and len(p.parts) == 2 for p in klasorler)

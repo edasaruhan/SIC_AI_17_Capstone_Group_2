@@ -1,0 +1,53 @@
+{
+  "category": "Grocery_and_Gourmet_Food",
+  "n_rows": 2434594,
+  "model": "answerdotai/ModernBERT-base",
+  "model_key": "base",
+  "label_source": "distilled",
+  "distill_gate_verdict": "PASS",
+  "code_version": "79e6b80",
+  "throughput": {
+    "rows_computed_this_run": 2434594,
+    "elapsed_s": 7384.7,
+    "rows_per_s": 329.7
+  },
+  "label_share_pct": {
+    "gift_given": 3.071,
+    "household": 4.007,
+    "received": 0.475,
+    "self": 89.036,
+    "unclear": 3.41
+  },
+  "contamination_share_pct": {
+    "C1": 3.071,
+    "C1b": 7.553
+  },
+  "seasonality": {
+    "peak_months": [
+      12,
+      1
+    ],
+    "trough_months": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "gate1_reference_min": 1.25,
+    "C1": {
+      "rate_peak": 0.04406,
+      "rate_trough": 0.02523,
+      "ratio": 1.746
+    },
+    "C1b": {
+      "rate_peak": 0.09057,
+      "rate_trough": 0.06976,
+      "ratio": 1.298
+    }
+  },
+  "overlap_with_llm": {
+    "n": 2532,
+    "agreement": 0.9727,
+    "note": "iyimser: bu satirlarin cogu egitimdeydi"
+  }
+}

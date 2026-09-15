@@ -1,0 +1,40 @@
+{
+  "condition": "C1",
+  "removed_labels": [
+    "gift_given"
+  ],
+  "n_before": 2164018,
+  "n_after": 1762732,
+  "n_removed": 401286,
+  "n_train_before": 1626714,
+  "removal_share_of_train": 0.2467,
+  "n_items_lost_from_training": 959,
+  "share_items_lost": 0.0093,
+  "items_lost_sample": [
+    "1579824625",
+    "1579824692",
+    "1690221356",
+    "B0007SND2M",
+    "B000BXJTIK",
+    "B000FCGCGE",
+    "B000FMJYCS",
+    "B000HDH07G",
+    "B000NIJ6CC",
+    "B00134RY3I",
+    "B0019AISIQ",
+    "B001YK3N9U",
+    "B002R8SKOQ",
+    "B002V8ANLU",
+    "B0033URH5K",
+    "B00381A61Q",
+    "B003ESKIJI",
+    "B003SKKS7Y",
+    "B00415EMYA",
+    "B0043WI6V6"
+  ],
+  "universe_is_subset_of_c0": true,
+  "n_users_without_rows": 0,
+  "n_items_without_rows": 19,
+  "label_source": "distilled",
+  "reportable": true
+}
