@@ -1899,3 +1899,87 @@ kurulum kontrolü → koşul üretimi → sonda → küçük matris → önceki 
 `configs/base.yaml` (`seeds`, `experiment.categories/ci/eval_score_cells`, `gate2` okunuyor),
 `tests/test_experiment_stats.py`, CLAUDE.md §2/§7/§10, README, GENEL_BAKIS §8
 **Kim:** Ekip
+
+---
+
+### 2026-09-14 — Faz 5 kodu: pazarlama metrikleri M1 / M2 / M3 — tanımlar ÖNCEDEN kayıt (HİÇBİR DENEY KOŞULMADAN)
+
+> CLAUDE.md §13'te M2'nin operasyonel tanımı TBD'ydi ve "kafaya göre doldurulmasın, sorulsun
+> ya da **varsayıldı** notuyla yazılsın" deniyordu. Aşağıdaki tanımlar **varsayıldı**:
+> gerçek etiketle tek bir deney koşulmadan, sentetik veriyle sınanarak yazıldı. Ekip
+> değiştirmek isterse sonuçlar görülmeden, bu kayda tarihli bir ekle yapılmalı.
+
+#### Ortak tanımlar
+
+- **Geçmiş H_u** = C0 dosyasındaki `train` + `valid` satırları (test ürünü geçmiş değil).
+  Geçmiş **her koşulda C0'ın**: koşul modelin ne gördüğünü değiştirir, kullanıcının ne
+  aldığını değil.
+- **Alt kategori** = metadata `categories[1]` (`marketing.subcategory_level`). Ölçüldü:
+  Toys'ta 223 farklı değer ("Preschool", "Games & Accessories", "Puzzles"…), Grocery'de 336
+  ("Pantry Staples", "Snacks & Sweets", "Beverages"…); 0. seviye kategori adının kendisi.
+  Listesi kısa olan ürünün alt kategorisi yok → hiçbir kümeye girmez.
+- **Hediye-yalnız alt kategori S_u** = H_u'da o alt kategoride en az bir hediye satırı olan
+  ve **hediye olmayan hiçbir satırı olmayan** alt kategori. `unclear` satırı da "hediye
+  değil" sayılır (muhafazakâr: kullanıcının kendi ilgisi olabilecek alt kategori dışarıda).
+  Hediye = eksenin etiket kümesi (`narrow`: `gift_given`; `broad`: + `household` + `received`).
+- K = `experiment.topk[0]` = 10. Kullanıcı başı pay önce seed'ler üzerinden ortalanır; GA
+  kullanıcılar yeniden örneklenerek (`experiment.bootstrap_iters`, `experiment.ci`).
+
+#### M1 — retargeting israf payı
+
+Top-10'un S_u'dan gelen payı, **S_u boş olmayan test kullanıcılarında** (hepsi üzerinden
+değil — hediye geçmişi olmayan kullanıcının israfı tanım gereği sıfır ve oranı sulandırır;
+maruz kullanıcı sayısı ve toplam test kullanıcısı ayrıca yazılır). Karşıtlıklar, pozitif =
+soldaki liste daha çok slot harcıyor: dar eksen **C0−C1**, **C4−C1** (plaseboya karşı),
+**C0−C3**; geniş eksen **C0−C1b**, **C4b−C1b**.
+
+#### M2 — kontaminasyon yarı ömrü (varsayıldı)
+
+- Kapsam: en az bir `gift_given` satırı olan test kullanıcısı; **son** hediye g'nin alt
+  kategorisi S_g hediye-yalnız olmalı (değilse öneriler kullanıcının kendi ilgisini de
+  yansıtabilir ve ayrıştırılamaz).
+- n_u = H_u'da g'den **sonraki** `self` satır sayısı (diğer etiketler sayılmaz).
+- Fazla pay e_u = pay_C0(S_g) − pay_C1(S_g): kirli modelin, hediyeyi hiç görmemiş modele
+  göre o alt kategoriye fazladan verdiği slotlar. Aynı kullanıcılar, eşli.
+- Kova: n = 0 … 9 ayrı, ≥ 10 birleşik (`marketing.m2_max_self_after_gift`). Birleşik kova
+  ve 30'dan az kullanıcılı kova (`marketing.m2_min_users_per_bucket`) uyuma girmez, raporda
+  görünür.
+- Uyum: e(n) = A·exp(−λn), kova büyüklüğüyle ağırlıklı en küçük kareler (A ∈ [0, 1]).
+  **Yarı ömür = ln 2 / λ etkileşim.** GA: kullanıcılar yeniden örneklenip yeniden uyum;
+  tekrarların yarısından azı uyum verirse GA yazılmaz.
+- **Tanımsız** yazılır (uydurulmaz): uyuma giren kova 3'ten azsa, ilk kovadaki fazla ≤ 0
+  ise ya da uyum yakınsamazsa. "Yarı ömür yok" bir bulgudur.
+- Haftaya çeviri: test kullanıcılarının ardışık etkileşim aralığının kullanıcı başı
+  medyanının medyanı (gün) × yarı ömür ÷ 7. **Yaklaşık** — review tarihi alım tarihi değil.
+  (Planın "T15 medyan alımlar arası süre" dediği tablo projede yok; bu sayı aynı işi görüyor
+  ve modülün içinde hesaplanıyor.)
+- Birincil model SASRec (sıra bilgisini kullanan tek model). BPR için de hesaplanır ama
+  BPR geçmişin sırasını görmediği için n'ye bağlı bir azalma beklenmez; öyle etiketlenir.
+
+#### M3 — segment
+
+C1−C4 ve C1b−C4b kullanıcı başı metrik farkı, |H_u|'nun üçte birlik dilimlerinde. Kesim
+noktaları test kullanıcılarının geçmiş uzunluğunun 1/3 ve 2/3 yüzdelikleri; kesim
+noktasına **eşit** uzunluk alttaki dilime gider (dilimler bu yüzden eşit büyüklükte
+olmayabilir; boyutlar ve kesim noktaları yazılır). Önceden kayıtlı yorum etiketi her dilime.
+
+#### Bulunan hata (testte, commit'ten önce)
+
+Alt kategori haritası ilk yazımda yalnızca **geçmişte geçen** ürünlerle sınırlıydı; top-K'daki
+geçmişte olmayan bir ürünün alt kategorisi boş kalıyor ve M1/M2 payı sessizce **düşük**
+çıkıyordu (elle kurulmuş testte 0,50 yerine 0,15). Gerçek veride öneri evreni C0'ın ürünleri
+olduğu için çoğu zaman görünmezdi. Harita artık kategorinin bütün ürünlerini kapsıyor; test
+bu durumu kilitliyor.
+
+#### Doğrulanan / doğrulanmayan
+
+- **Doğrulandı:** 6 test (M1 elle hesaba eşit; M2 kurgulanmış fazla payda A = 0,8 ve yarı
+  ömür = 1 etkileşimi, 1 gün aralıkta 1/7 haftayı buluyor; fazla yoksa tanımsız; M3 dilimleri
+  ve etiketler) · 24 RecBole duman koşusunun gerçek biçimli top-K dosyalarıyla uçtan uca
+  (sentetik metadata): M1 beş karşıtlık, M2 kovaları (30'u geçen kova olmadığı için beklendiği
+  gibi tanımsız), M3 dilimleri.
+- **Doğrulanmadı:** gerçek veriyle hiçbir şey; M2'nin gerçek kova doluluğu bilinmiyor.
+
+**Etkilediği bölüm:** `recsys/marketing_metrics.py`, `configs/base.yaml` (`marketing`),
+`tests/test_marketing_metrics.py`, CLAUDE.md §2/§7/§10/§13, README, GENEL_BAKIS §8
+**Kim:** Ekip (M2 tanımı "varsayıldı" — ekip onayı bekliyor)

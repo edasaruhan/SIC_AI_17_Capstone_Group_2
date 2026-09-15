@@ -96,7 +96,8 @@ src/gift_contamination/
     run_experiment.py    # deney koşucusu — .venv-recbole altında koşar. Gölge ürün
                          #   maskesi + C0 alınmış ürün maskesi (BPR), SASRec için hazır
                          #   geçmişli bölme dosyaları, kullanıcı başı metrik/top-K parquet
-    marketing_metrics.py # ⛔ YAZILMADI - M1, M2, M3              (Hafta 8)
+    marketing_metrics.py # M1 israf payı · M2 yarı ömür · M3 geçmiş uzunluğu dilimleri.
+                         #   Tanımlar koşulardan ÖNCE sabit (DECISIONS "Faz 5 kodu")
   utils/
     io.py, logging.py
 ```
@@ -379,16 +380,12 @@ python -m gift_contamination.recsys.run_experiment --config configs/base.yaml \
 # Kapı 2 + karşıtlıklar — koşu raporları reports/results/, kullanıcı başı dosyalar
 # data/processed/recbole/<kategori>/peruser/ altına konduktan sonra, ANA ortamda:
 python -m gift_contamination.analysis.experiment_stats --config configs/base.yaml
-```
-
-**Henüz YAZILMADI — hedef sözleşme.** Aşağıdakiler çalışmaz; modülleri yok.
-Bir komutu buradan yukarıdaki bloğa taşımak, o modülün testleriyle birlikte
-geldiği anlamına gelir.
-
-```bash
-# Hafta 8 — pazarlama metrikleri (M1/M2/M3)
+# Hafta 8 — pazarlama metrikleri M1/M2/M3 (ana ortam; yeniden eğitim yok, top-K listelerinden)
 python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
 ```
+
+> Bütün modüller yazıldı (2026-09-14). Henüz yazılmamış olan yalnızca sonuç raporu
+> (`docs/SONUCLAR.md`) ve sonuç figürleri F20–F23 — gerçek koşulardan sonra.
 
 > **`recsys.atomic --labels distilled` kod olarak hazır, girdisi henüz yok
 > (2026-09-14).** `data/annotations/<kategori>_inferred.parquet` Kaggle'daki
@@ -468,6 +465,10 @@ Kurallar:
   plasebo C0'ı geçince, test çiftleri farklıyken Kapı 2 FAIL mi; eksik seed/koşulda
   INCOMPLETE mi (asla PASS değil); önceden kayıtlı yorum kuralı doğru etiketliyor mu;
   vekil etiketli koşu `reportable: false` mu
+- `test_marketing_metrics.py` — M1 yalnızca hediye yoluyla girmiş alt kategorileri mi
+  sayıyor (self satırı olan alt kategori dışarıda); geçmişte olmayan önerilen ürünün alt
+  kategorisi kayboluyor mu; M2 bilinen yarı ömrü (1 etkileşim) buluyor mu, fazla yoksa
+  tanımsız mı; M3 dilimleri ve yorum etiketi doğru mu
 - `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
   genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık
@@ -570,7 +571,12 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
   GTX 1650 Ti (4 GB, Turing). LLM annotation **Kaggle**'da (2× T4, ~30 sa/hafta);
   preprocess, distillation, RecBole deneyleri **yerelde**. Altı aşamadan yalnızca
   biri kotaya bağlı. Ayrıntı: implementation-plan §1.6
-- [ ] **TBD** M2 "kontaminasyon yarı ömrü" için kesin operasyonel tanım
+- [x] ~~**TBD** M2 "kontaminasyon yarı ömrü" için kesin operasyonel tanım~~ →
+  **VARSAYILDI 2026-09-14 (deney koşulmadan, ekip onayı bekliyor).** Son hediyenin alt
+  kategorisi (hediye-yalnız) için, o hediyeden sonraki `self` etkileşim sayısı n'ye göre
+  C0 listesinin C1'e göre FAZLA payı; `A·exp(−λn)` uyumu, yarı ömür = ln2/λ etkileşim,
+  medyan ardışık etkileşim aralığıyla haftaya. Fazla yoksa ya da uyum olmazsa TANIMSIZ
+  yazılır. Gerekçe: DECISIONS "Faz 5 kodu"
 - [ ] **TBD** Hangi ekip üyesi hangi kulvarda (bkz. `docs/PROJECT_SPEC.md` §11)
 
 ---

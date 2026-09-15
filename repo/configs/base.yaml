@@ -197,6 +197,18 @@ gate2:
   ci: 0.95
   seed_cv_max: 0.10
 
+# Pazarlama metrikleri (Faz 5, `recsys.marketing_metrics`). Tanımlar 2026-09-14'te,
+# HİÇBİR DENEY KOŞULMADAN yazıldı (DECISIONS "Faz 5 kodu"). Yeniden eğitim yok.
+marketing:
+  # Ürünün alt kategorisi = metadata `categories` listesinin bu indeksi. 0 kategori adının
+  # kendisi ("Toys & Games"), 1 alt kategori (Toys: "Puzzles", Grocery: "Beverages").
+  subcategory_level: 1
+  # M2: son hediyeden sonraki `self` etkileşim sayısı bu değerde kovalanır (üst kova
+  # birleşik, eğriye girmez).
+  m2_max_self_after_gift: 10
+  # M2: bundan az kullanıcılı kova eğri uyumuna girmez (raporda yine görünür).
+  m2_min_users_per_bucket: 30
+
 analysis:
   # ÖLÇÜLDÜ (data-research §4.5, T14): tepe dört kategoride de Aralık-Ocak.
   # Review timestamp'i satın alma timestamp'inin gerisinde kaldığı için Kasım

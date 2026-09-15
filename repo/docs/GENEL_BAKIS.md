@@ -147,7 +147,7 @@ sıradaki adımlar için **§8**.
 | LLM–insan uyumu, C1 ekseni (popülasyon) | F1 **0,72** · kesinlik 0,65 |
 | Kapı 1 | 4 kategoride **PASS (4/4)** |
 | Hafta 4 | **INCOMPLETE** — tek etiketleyici (A), 500 satır |
-| Geçen test | **374** |
+| Geçen test | **380** |
 
 ### Hangi veri, ne kadar
 
@@ -282,7 +282,7 @@ C1 = yalnızca `gift_given` (birincil). C1b = `gift_given` + `household` + `rece
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | 🔄 annotation ✅ (4/4, Kapı 1 PASS) · damıtma + çıkarım kodu ✅ (CPU duman testi) · **Kaggle koşusu bekliyor** |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 kod ✅ (gerçek etiket yolu, BPR + SASRec, sentetik duman testi) · **damıtılmış etiket bekliyor** |
 | 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi ✅ · Kaggle deney betiği ✅ · **koşular bekliyor** |
-| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ⏳ |
+| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | 🔄 M1/M2/M3 kodu ✅ (tanımlar koşulardan önce) · figürler + sonuç raporu ⏳ |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
 
@@ -398,7 +398,8 @@ yayınlanamaz.
 | Damıtma + çıkarım **GPU yolu** (`train`, `run`) | yalnızca CPU duman testi | küçük rastgele ModernBERT ve DeBERTa, transformers 5.17: eğitim → kapı → rapor → parça parça çıkarım uçtan uca; **T4 üzerinde henüz koşmadı** |
 | **Kapı 2 + eşli bootstrap** (`experiment_stats`) | kod tamam, **gerçek koşu yok** | `test_experiment_stats`; 24 sentetik koşunun çıktısından `gate2.json` üretildi |
 | Kaggle deney betiği (`scripts/kaggle_experiment.py`) | yerelde CPU simülasyonu | kurulum tarifi torch 2.14 + numpy 2.5 ortamında `.venv-recbole` ile birebir aynı sayıları verdi; **Kaggle'da henüz koşmadı** |
-| Test paketi | **374 test geçiyor** | `pytest tests -q` |
+| Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | kod tamam, **gerçek koşu yok** | `test_marketing_metrics` (M2 bilinen yarı ömrü buluyor); duman koşularının top-K dosyalarıyla uçtan uca |
+| Test paketi | **380 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
@@ -410,7 +411,7 @@ yayınlanamaz.
 
 ### Yazılmadı
 
-`recsys/marketing_metrics.py` (M1/M2/M3) · sonuç figürleri F20–F23 · `docs/SONUCLAR.md`. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
+Sonuç figürleri F20–F23 · `docs/SONUCLAR.md` — ikisi de gerçek koşuların çıktısını bekliyor. Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
 işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
 
 ### Bilinen sınırlar
@@ -469,7 +470,9 @@ C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulard
 **4 · İSTATİSTİK** — ✅ kod hazır: `analysis.experiment_stats` → `gate2.json` +
 `experiment_stats.json` (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b, doz–yanıt; eşli bootstrap).
 
-**5 · PAZARLAMA METRİKLERİ** (Hafta 8) — M1 israf oranı · M2 yarı ömür · M3 segment.
+**5 · PAZARLAMA METRİKLERİ** (Hafta 8) — ✅ kod hazır: `recsys.marketing_metrics` → M1 israf
+payı · M2 yarı ömür · M3 segment. Tanımlar koşulardan önce DECISIONS'ta ("Faz 5 kodu");
+**M2'nin tanımı "varsayıldı" — ekip değiştirmek isterse sonuçlardan ÖNCE.**
 
 **6 · SONUÇ RAPORU** — RQ1–RQ4, her biri güven aralığıyla ve sınırlılıklarıyla birlikte.
 
