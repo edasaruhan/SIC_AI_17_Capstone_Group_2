@@ -35,12 +35,20 @@ KOSU BITINCE: /kaggle/working/out/ klasorunu indirin ve depoya yerlestirin:
      *_inferred.parquet                       -> data/annotations/
      *.log                                    -> saklamak isterseniz; depoya girmez
 
-KESINTI OLURSA: hucreyi AYNEN yeniden calistirin (FORCE=False). Egitim raporu
-varsa egitim atlanir; cikarimda bitmis parcalar (200.000 satir) yeniden hesaplanmaz.
+KESINTI OLURSA: interaktif oturum hala aciksa hucreyi AYNEN yeniden calistirin
+(FORCE=False). Egitim raporu varsa egitim atlanir; cikarimda bitmis parcalar
+(200.000 satir) yeniden hesaplanmaz. "Save & Run All" versiyonu ise her seferinde
+SIFIRDAN baslar (/kaggle/working bos gelir).
 
-KAPI FAIL VERIRSE: MODEL = "fallback" yapip hucreyi BIR KEZ daha calistirin
-(onceden kayitli kural; kod da ana model FAIL degilse yedegi reddeder). Yedek de
-gecemezse deney DURUR - sonucu ekiple paylasin.
+KAPI PASS DEGILSE hucre HATA VERMEDEN biter ve cikarim kosmaz: hata veren bir
+"Save & Run All" versiyonunda cikti dosyalarinin saklanacagi garanti degil; rapor
+kaybolmasin.
+
+KAPI FAIL VERIRSE: out/ klasorunu indirin; distill_report_base.json depoya commit
+edilip push'lanir (FAIL once kayda girer). SONRA MODEL = "fallback" yapip BIR KEZ
+daha calistirin. Yeni oturum depoyu klonlar ve ana modelin FAIL raporunu oradan
+okur - kod, ana model FAIL degilse (rapor yoksa da) yedegi reddeder (onceden kayitli
+kural). Yedek de gecemezse deney DURUR - sonucu ekiple paylasin.
 """
 
 # ---------------------------------------------------------------- ayarlar
@@ -208,14 +216,18 @@ print(f"\nSADAKAT KAPISI ({MODEL}) -> {rapor['verdict']}")
 for ad, c in rapor["criteria"].items():
     print(f"  {ad:44s} {c}")
 
-if rapor["verdict"] != "PASS":
+kapi_gecti = rapor["verdict"] == "PASS"
+if not kapi_gecti:
+    # Hata VERMEDEN biter: "Save & Run All" versiyonunda out/ (rapor dahil) saklansin.
     if rapor["verdict"] == "FAIL" and MODEL == "base":
-        raise SystemExit("Kapi kacti. MODEL = 'fallback' yapip hucreyi BIR KEZ daha calistirin.")
-    raise SystemExit(f"Kapi {rapor['verdict']} - cikarim KOSMAYACAK. out/ klasorunu indirip "
-                     "sonucu ekiple paylasin. Esik degistirilmez.")
+        print("\n!! KAPI KACTI - cikarim KOSMAYACAK. out/ klasorunu indirin; distill_report_base.json "
+              "depoya commit edildikten SONRA MODEL = 'fallback' ile BIR KEZ daha calistirin.")
+    else:
+        print(f"\n!! KAPI {rapor['verdict']} - cikarim KOSMAYACAK. out/ klasorunu indirip sonucu "
+              "ekiple paylasin. Esik degistirilmez.")
 
 # ---------------------------------------------------------------- 2. cikarim
-if RUN_INFERENCE:
+if RUN_INFERENCE and kapi_gecti:
     t1 = time.time()
     kosu = ["gift_contamination.detection.inference", "run", "--model", MODEL]
     kosu += [] if FP16 else ["--no-fp16"]
