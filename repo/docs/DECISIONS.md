@@ -2113,6 +2113,16 @@ görüldü; kullanıcı başı tutarlılık farkı 0,0.
   117.386 kullanıcı; C0 maskesine 853.979 çift; kullanıcı başı ortalama RecBole toplamına
   **birebir** eşit (fark 0,0); test çiftleri özeti `3bed366e…` (Kaggle'daki her koşulda aynı
   çıkmalı).
+- **SASRec · Toys · C3:** uçtan uca geçti. Eğitim **30 grupla sınırlandı** (grup 512; tam epoch
+  CPU'da grup başına ~3 sn, ~2 saat sürecekti — ilk deneme 1.261. grupta durduruldu), valid ve
+  test **tam boyut**: 1.134 sn (valid dahil 721, test 292), veri yüklemede en fazla ~3,8 GB RAM.
+  177.231 ürün (73.683 gölge ürün maskelendi), değerlendirme grubu 378 kullanıcı; kullanıcı başı
+  ortalama RecBole toplamına birebir eşit; test çiftleri özeti BPR C1b ile **aynı** (`3bed366e…`)
+  — Kapı 2'nin 1. ölçütü farklı koşul ve modelde gerçek veride tutuyor. Checkpoint koşuya özel
+  klasöre yazıldı ve temizlendi.
+- **GPU süresi hakkında bilgi vermez.** Zaman sondası matrisin ilk iki koşusu. RecBole'un
+  varsayılanı erken durdurmalı (300 epoch tavanı, 10 epoch sabır) — SASRec'in Toys'ta koşu başına
+  saatler sürmesi olası; matris büyük ihtimalle birden fazla oturum ister.
 
 **Etkilediği bölüm:** `reports/results/distill_report_base.json`, `inference_*.json`,
 `condition_{Toys_and_Games,Grocery_and_Gourmet_Food}_*.json`, F20, `scripts/kaggle_experiment.py`,
