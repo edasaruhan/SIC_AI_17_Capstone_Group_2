@@ -2184,3 +2184,113 @@ deney sonuçlarının kendisi.
 **Etkilediği bölüm:** `recsys/run_experiment.py` (`stub_tensorboard_if_broken`,
 `meta.tensorboard`), `tests/test_run_experiment.py`, GENEL_BAKIS §8
 **Kim:** Ekip
+
+---
+
+### 2026-09-18 — Deney matrisi Kaggle'da koştu: 72 koşunun 67'si bitti ve denetlendi, 5 koşu eksik
+
+> Bu kayıt **kurulumun ve çıktıların** denetimidir. Kapı 2'nin kararı ve karşıtlıklar 72 koşu
+> tamamlanınca hesaplanıp ayrı bir kayıtta yazılacak; aşağıdaki ara hesaplar commit edilmedi.
+
+#### Ne koşuldu
+
+Kod `e1c7f89` (67 raporun hepsinde aynı `code_version`), Kaggle, 2× T4, `PLAN = "matrix"`.
+Matris birden fazla hesapta paralel yedi oturuma bölündü; her oturum hücrenin başındaki
+`CATEGORIES` / `MODELS` / `SEEDS` satırlarıyla ayrık bir dilim aldı, kod değişmedi.
+
+| oturum | dilim | süre | biten |
+|---|---|---:|---:|
+| D0 | tam matris, öncelik sırasıyla (fiilen seed 42 + BPR seed 1337'nin dört hücresi) | 10,9 sa | 23 |
+| D1 | SASRec · Toys · seed 1337 | 5,4 sa | 6 |
+| D2 | SASRec · Grocery · 1337 | 7,5 sa | 6 |
+| D3 | SASRec · Toys · 2024 | 5,0 sa | 6 |
+| D4 | SASRec · Grocery · 2024 | 8,2 sa | 6 |
+| D5 | BPR · iki kategori · 1337 | 2,5 sa | 12 |
+| D6 | BPR · iki kategori · 2024 | 2,2 sa | 12 |
+
+Toplam 41,6 oturum saati. Koşu başına duvar süresi: SASRec Toys 24–162 dk (medyan 91),
+Grocery 117–195 dk (medyan 150); BPR Toys 19–49 dk, Grocery 13–23 dk. Hiçbir oturum 12 saat
+sınırına değmedi.
+
+#### Eksik 5 koşu — hata değil, zaman bütçesi
+
+Hepsi seed 42: **Toys C4b SASRec · Toys C3 SASRec · Grocery C4b SASRec · Grocery C3 SASRec ·
+Grocery C3 BPR.** D0 bunları başlatmadı: kalan süreye sığmıyorlardı (`MAX_HOURS` kuralı,
+oturum özetinde "başlatılmadı" diye yazıyor). Bölme planı bu tamamlama turunu öngörüyordu.
+
+Etkisi: SASRec'in C4b ve C3 hücreleri ile Grocery BPR C3 şu an **iki** seed'li. C4b ve
+Toys × SASRec × C3 kesilmez çekirdekte → **tamamlanmadan Kapı 2 ve karşıtlıklar kesin değil.**
+
+Tamamlama: tek oturum, `CONDITIONS = ["C4b", "C3"]` · `SEEDS = [42]` → 8 koşu, tahmini ~6
+saat. Üçü (BPR Toys C4b, Grocery C4b, Toys C3) D0'da zaten var ve yeniden koşacak — ~1 saat
+fazla kota karşılığında tek hücre, tek düzenleme; tekrar determinizmi bir kez daha sınar.
+Depo o sırada bu commit'te olacak: `code_version` farklı çıkar ama `src/`, `scripts/` ve
+`configs/` `e1c7f89`'dan beri **değişmedi** (bu commit yalnızca rapor ve belge).
+
+#### Denetim — indirilen yedi `out/` klasörünün tamamı, bu makinede koşturuldu
+
+- Dosya adı ↔ `meta` birebir; 67 raporun hepsi `label_source: distilled`,
+  `reportable: true`, `device: cuda`, `epochs: 300`. Matris dışı koşu yok.
+- **Test çiftlerinin özeti kategori içinde tek** (Kapı 2, ölçüt 1'in önkoşulu): iki model,
+  altı koşul, üç seed. Test kullanıcısı Toys 117.386, Grocery 238.756 — yereldeki sayıların
+  aynısı. Kullanıcı başı dosyaların kullanıcı kümesi de kategori içinde tek.
+- Kullanıcı başı dosyalar koşucudan bağımsız yeniden hesaplandı: satır sayısı = test
+  kullanıcısı; altı metriğin ortalaması raporla ≤ 5·10⁻⁷ içinde; her top-K 20 **farklı**
+  ürün; top-K'da gölge (`::gift`) ürün **0**.
+- Maske meta'sı tasarlandığı gibi: gölge maskesi yalnızca C3'te; BPR'de C0 geçmiş maskesi
+  (`c0_train`), SASRec'te `none_sequential`.
+- Koşul raporları (12 dosya × 5 oturum): birbirine ve depodaki raporlara **içerikçe eşit**
+  (yalnızca satır sonu farkı); C4 = C1 ve C4b = C1b kadar satır çıkarıyor; evren ⊆ C0.
+- **Oturumlar arası determinizm Linux'ta ölçüldü.** D0 ve D5, BPR × seed 1337'nin dört
+  hücresini (Toys C0, Grocery C0/C1/C4) ayrı oturumlarda koştu: kullanıcı başı dosyalar ve
+  top-K listeleri **birebir aynı**. 2026-09-16'da yalnızca Windows'ta sınanıp Linux için
+  çıkarım olarak kalan "koşul dosyaları süreçler arası aynı" varsayımı böylece doğrudan
+  doğrulandı — matrisi hesaplara bölmek güvenliydi. İkiz koşuların süresi %7'ye kadar
+  oynuyor (donanım).
+- 81 log tarandı: beklenen tensorboard uyarısı (2026-09-16) ve RecBole/pandas
+  `FutureWarning`'leri dışında hata, NaN, bellek hatası yok.
+
+#### Hata değil — ama sonuç okunurken bilinmeli
+
+- **SASRec'in validasyon kümesi koşula göre küçülüyor.** Eğitim geçmişi boşalan
+  kullanıcının valid satırı erken durdurma setinden düşüyor (2026-09-14 tasarımı; SASRec
+  boş geçmişi işleyemez). Toys: C1b 45.981 kullanıcı (%17), C4b 19.233, C1 15.666, C4 1.532;
+  Grocery en fazla 802. Test kümesi değişmiyor; erken durdurma farklı kümelerde karar
+  veriyor. BPR'de valid bütün koşullarda aynı.
+- **Kaç epoch eğitildiği bilinmiyor.** RecBole epoch satırlarını kök logger'a yazıyor ve
+  alt süreçte INFO düzeyinde handler yok — loglara düşmedi, rapora da yazılmıyordu. 300
+  tavanına değen koşu olup olmadığı söylenemez. SASRec'te süre koşullar arasında satır
+  oranından çok daha fazla oynuyor (Toys C1b 24 dk, C0 ~2,5 sa; eğitim satırı oranı 2,5×)
+  → erken durdurma en azından bazı koşularda devrede. Protokol bütün koşullarda aynı olduğu
+  için karşıtlıkları bozmaz; mutlak metriklerin tam yakınsadığı **iddia edilemez**. Matris
+  bitene kadar koşucu değiştirilmiyor (5 koşu aynı kodla koşmalı).
+
+#### Belgelerdeki eski Kapı 2 ifadesi — düzeltildi
+
+ROADMAP, PROJECT_SPEC ve GENEL_BAKIS §6 Kapı 2'yi "C0 ile C4 arasında anlamlı fark
+**olmamalı**" diye anlatıyordu. Bağlayıcı olan 2026-09-14 önceden kaydı (commit `8c697a8`,
+ilk koşudan iki gün önce) ölçütü "plasebo C0'ı **geçmemeli**" diye yazdı: rastgele silme
+veriyi azaltır ve doğruluğu düşürmesi beklenir; **iyileştirmesi** kurulum hatasıdır. Eski
+ifade bu yüzden 2026-09-14'ten beri geçersizdi ama belgeden silinmemişti.
+
+Açıkça yazılsın: **ara hesapta (67 koşu) Toys'ta C4, C0'dan anlamlı düşük** — eski ifadeyle
+Kapı 2 FAIL olurdu. Önceden kayıtlı ölçütle geçiyor. Bu, sonuç görüldükten sonra ölçüt
+değiştirmek değil (ölçüt koşulardan önce commit'liydi), ama sonuç raporu bu farkı ayrıca
+yazacak. GENEL_BAKIS §6 önceden kayda göre düzeltildi; ROADMAP ve PROJECT_SPEC tarihî
+belge olarak bırakıldı, bu kayıt çelişkiyi işaretliyor.
+
+#### Analiz hattı gerçek veride denendi (ara — commit EDİLMEDİ)
+
+67 koşuyla `experiment_stats` (9 dk), `marketing_metrics` (3 dk) ve `result_figures`
+hatasız koştu; F21/F23 gerçek sayılarla çizilip göz ile kontrol edildi (yerleşim sorunu yok).
+M2'nin kovaları iki kategoride de dolu (her kova ≥ 30 kullanıcı; Toys 29.577, Grocery
+11.614 kullanıcı). Eksik seed'li hücreler yüzünden `gate2.json`, `experiment_stats.json`,
+`marketing_metrics.json` ve F21–F23 **commit edilmedi**; 72 koşu tamamlanınca yeniden
+üretilecek. **M2'nin değerlerine bakılmadı** — tanım hâlâ "varsayıldı", ekip onayı bekliyor.
+
+**Commit edilen:** 67 koşu raporu (`reports/results/experiment_*.json`). Kullanıcı başı
+dosyalar `data/processed/recbole/<slug>/peruser/` altında (git'e girmez). Tekrarlanan dört
+hücrenin D5 kopyası kullanıldı (D0'ınkiyle birebir aynı).
+
+**Etkilediği bölüm:** `reports/results/experiment_*.json` (67), GENEL_BAKIS §6/§8
+**Kim:** Ekip

@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "category": "Grocery_and_Gourmet_Food",
+    "condition": "C4b",
+    "model": "SASRec",
+    "seed": 1337,
+    "epochs": 300,
+    "device": "cuda",
+    "eval_batch_size": 707,
+    "tensorboard": "VersionError: Detected mismatched Protobuf Gencode/Runtime major versions when loading tensorboard/compat/proto/event.proto: gencode 6.31.1 runtime 5.29.5. Same major version is required. See Protobuf version guarantees at https://protobuf.dev/support/cross-version-runtime-guarantee.",
+    "runtime_seconds": {
+      "fit": 7266.7,
+      "test": 19.3
+    },
+    "code_version": "e1c7f89",
+    "label_source": "distilled",
+    "reportable": true
+  },
+  "split": {
+    "train": 1483872,
+    "valid": 268951,
+    "test": 238756,
+    "n_test_before_self_rule": 268991,
+    "n_test_dropped_not_self": 30235,
+    "test_pairs_sha256": "2b3443240856e9da46cbcd959a427e8b67ccf0bbbcf9372317a49122ff0cf164",
+    "n_valid_dropped_empty_history": 40,
+    "max_item_list_length": 50
+  },
+  "n_users": 268987,
+  "n_items": 94864,
+  "best_valid_score": 0.015041,
+  "best_valid": {
+    "recall@10": 0.032857,
+    "recall@20": 0.049689,
+    "ndcg@10": 0.015041,
+    "ndcg@20": 0.019281,
+    "hit@10": 0.032857,
+    "hit@20": 0.049689
+  },
+  "test": {
+    "recall@10": 0.028611,
+    "recall@20": 0.044024,
+    "ndcg@10": 0.013185,
+    "ndcg@20": 0.017068,
+    "hit@10": 0.028611,
+    "hit@20": 0.044024
+  },
+  "n_shadow_items_masked": 0,
+  "eval_history_mask": "none_sequential",
+  "n_extra_mask_pairs": 0,
+  "peruser_file": "C4b_SASRec_seed1337.parquet",
+  "peruser_consistency": {
+    "n_users": 238756,
+    "metrics_checked": [
+      "hit@10",
+      "hit@20",
+      "ndcg@10",
+      "ndcg@20",
+      "recall@10",
+      "recall@20"
+    ],
+    "max_abs_diff": 0.0,
+    "tolerance": 5.00001e-07
+  }
+}

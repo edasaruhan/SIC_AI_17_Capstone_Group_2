@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "category": "Grocery_and_Gourmet_Food",
+    "condition": "C1b",
+    "model": "BPR",
+    "seed": 2024,
+    "epochs": 300,
+    "device": "cuda",
+    "eval_batch_size": 67108864,
+    "tensorboard": "VersionError: Detected mismatched Protobuf Gencode/Runtime major versions when loading tensorboard/compat/proto/event.proto: gencode 6.31.1 runtime 5.29.5. Same major version is required. See Protobuf version guarantees at https://protobuf.dev/support/cross-version-runtime-guarantee.",
+    "runtime_seconds": {
+      "fit": 726.2,
+      "test": 17.8
+    },
+    "code_version": "e1c7f89",
+    "label_source": "distilled",
+    "reportable": true
+  },
+  "split": {
+    "train": 1752823,
+    "valid": 268991,
+    "test": 238756,
+    "n_test_before_self_rule": 268991,
+    "n_test_dropped_not_self": 30235,
+    "test_pairs_sha256": "2b3443240856e9da46cbcd959a427e8b67ccf0bbbcf9372317a49122ff0cf164"
+  },
+  "n_users": 268992,
+  "n_items": 94856,
+  "best_valid_score": 0.0085,
+  "best_valid": {
+    "recall@10": 0.016462,
+    "recall@20": 0.026045,
+    "ndcg@10": 0.0085,
+    "ndcg@20": 0.010903,
+    "hit@10": 0.016462,
+    "hit@20": 0.026045
+  },
+  "test": {
+    "recall@10": 0.014383,
+    "recall@20": 0.023354,
+    "ndcg@10": 0.00748,
+    "ndcg@20": 0.009735,
+    "hit@10": 0.014383,
+    "hit@20": 0.023354
+  },
+  "n_shadow_items_masked": 0,
+  "eval_history_mask": "c0_train",
+  "n_extra_mask_pairs": 143742,
+  "peruser_file": "C1b_BPR_seed2024.parquet",
+  "peruser_consistency": {
+    "n_users": 238756,
+    "metrics_checked": [
+      "hit@10",
+      "hit@20",
+      "ndcg@10",
+      "ndcg@20",
+      "recall@10",
+      "recall@20"
+    ],
+    "max_abs_diff": 0.0,
+    "tolerance": 5.00001e-07
+  }
+}

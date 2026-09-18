@@ -133,7 +133,8 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 
 **Hafta 1–5 bitti.** Hafta 4 **tek etiketleyiciyle** kapandı (kapı INCOMPLETE — güvenilirlik
 ölçülmedi). Hafta 5'te damıtılmış öğrenci sadakat kapısını **geçti** ve deney korpusunun
-tamamını (4,6 milyon satır) etiketledi. Sırada Kaggle'da deney matrisi. Ayrıntılı durum ve
+tamamını (4,6 milyon satır) etiketledi. Deney matrisinin 72 koşusundan 67'si Kaggle'da bitti
+ve denetlendi; kalan 5 koşu gelince Kapı 2 ve sonuçlar. Ayrıntılı durum ve
 sıradaki adımlar için **§8**.
 
 | | |
@@ -151,7 +152,8 @@ sıradaki adımlar için **§8**.
 | Damıtma sadakat kapısı (ModernBERT-base) | **PASS (3/3)** — öğretmene C1 F1 0,91 · C1b F1 0,93 |
 | Öğrenciyle etiketlenmiş 5-core satır | **4.598.612** (Toys 2.164.018 + Grocery 2.434.594) |
 | Hediye payı 5-core — Toys / Grocery (öğrenci, ham) | %24,8 / %3,1 |
-| Geçen test | **385** |
+| Deney koşusu (Kaggle, 2× T4) | **67 / 72** bitti ve denetlendi · 5 koşu bekliyor |
+| Geçen test | **388** |
 
 ### Hangi veri, ne kadar
 
@@ -306,9 +308,9 @@ C1−C4 ve C1b−C4b olmasının sebebi bu. Figür: F20.
 | 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
 | 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ✅ bitti (2026-09-15) · **sadakat kapısı PASS 3/3** · 4.598.612 satır etiketlendi |
-| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 atomic + altı koşul **gerçek etiketle** üretildi ✅ · **Kaggle koşusu bekliyor** |
-| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi ✅ · Kaggle deney betiği ✅ · **koşular bekliyor** |
-| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | 🔄 M1/M2/M3 kodu ✅ (tanımlar koşulardan önce) · figürler + sonuç raporu ⏳ |
+| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 atomic + altı koşul **gerçek etiketle** ✅ · Kaggle'da **67/72 koşu bitti ve denetlendi** (2026-09-18) · 5 koşu (seed 42) tamamlama oturumu bekliyor |
+| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi gerçek veride koştu ✅ · **Kapı 2 kararı 72 koşu tamamlanınca** |
+| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | 🔄 M1/M2/M3 kodu gerçek veride koştu ✅ (tanımlar koşulardan önce) · figürler + sonuç raporu 72 koşuyu bekliyor |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
 
@@ -371,12 +373,26 @@ Kaggle kotasını hem iki haftayı yakar.
 
 ### 🚦 Kapı 2 — Hafta 6 sonu · deney geçerli mi?
 
-C0 (baseline) ile C4 (plasebo) arasında anlamlı fark **olmamalı**. C4, hediye sayısı
-kadar *rastgele* etkileşim çıkarır — yani "veri silmenin kendisi" ne kadar etki yapıyor
-onu ölçer.
+Kapı 2 kurulumun geçerliliğini ölçer, **etkiyi ölçmez.** Dört ölçüt, kategori × model
+başına; hepsi **ilk koşudan önce** yazıldı (`configs/base.yaml` → `gate2:`, DECISIONS
+2026-09-14, commit `8c697a8`):
 
-Fark çıkarsa kurulum bozuktur (büyük ihtimalle kullanıcı/ürün evreni koşullar arasında
-sabitlenmemiştir) ve **hiçbir sonuç yorumlanamaz.**
+| # | Ölçüt | Yakaladığı arıza |
+|---|---|---|
+| 1 | Test (kullanıcı, ürün) çiftleri bütün koşullarda ve seed'lerde **birebir aynı** (hash) | koşullar farklı şeyi ölçüyor |
+| 2 | Her koşulun gerçek ürün evreni C0'ın **alt kümesi** | evren sabitlenmemiş |
+| 3 | Plasebo C0'ı **geçmiyor**: (C4 − C0) ve (C4b − C0) Recall@10 farkının eşli bootstrap %95 GA'sının alt ucu ≤ 0 | rastgele veri silmek "iyileştiriyor" → kurulum hatası |
+| 4 | C0 Recall@10'un seed'ler arası değişim katsayısı < 0,10 | sonuç seed gürültüsünden ayrılamıyor |
+
+C4, hediye sayısı kadar *rastgele* etkileşim çıkarır — "veri silmenin kendisi" ne kadar
+etki yapıyor onu ölçer. Veri azaldığı için C4'ün C0'dan **kötü** çıkması beklenir;
+**iyi** çıkması kurulum hatasıdır. Kapı 2 PASS olmayan kategori × modelin sonucu
+**yorumlanamaz** damgası taşır.
+
+> **Eski ifade:** ROADMAP ve PROJECT_SPEC bu kapıyı "C0 ile C4 arasında anlamlı fark
+> olmamalı" diye anlatıyor. 2026-09-14 önceden kaydı bunu yukarıdaki 3. ölçütle değiştirdi
+> (koşulardan önce). Ara hesapta Toys'ta C4 C0'dan anlamlı düşük — eski ifadeyle FAIL
+> olurdu. Ayrıntı: DECISIONS 2026-09-18.
 
 ---
 
@@ -403,8 +419,8 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Son güncelleme **2026-09-16** (Kaggle deney matrisinin 1. denemesi import hatasıyla düştü —
-> **sonuç yok**; hata bulunup düzeltildi). "Çalışıyor" yazan her satır ya bir
+> Son güncelleme **2026-09-18** (deney matrisinin 72 koşusundan 67'si Kaggle'da bitti ve
+> denetlendi; 5 koşu tamamlama oturumu bekliyor). "Çalışıyor" yazan her satır ya bir
 > testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
 > aşağıda ayrıca yazıyor.
 
@@ -420,26 +436,24 @@ yayınlanamaz.
 | **Hafta 4 — insan doğrulaması** | **INCOMPLETE** · tek etiketleyici (A), 500 satır | yöntemler `8c697a8`, kod `eed7f35` — ikisi de sonuçtan önce push'landı; `validation_500.json`, F18 |
 | **RQ1 yaygınlık** — ham + insan kalibrasyonlu, F19 | tamam | `prevalence.json`; kalibrasyon elle hesaplanmış örnekle test ediliyor |
 | Koşullar (C0 · C1 · C4 · C1b · C4b · C3 gölge token; C2 açık hata) + `atomic --labels distilled` | **gerçek etiketle üretildi** (Toys + Grocery) | `test_conditions`, `test_no_leakage`, `test_experiment_labels`; `condition_*.json`; maske–pozitif çakışması 0 (yerelde sayıldı) |
-| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | sentetik duman testi geçti | `.venv-recbole`, CPU, 3 epoch, C0/C3/C4b: kullanıcı başı ortalama RecBole toplamına birebir eşit, gölge ürün top-K'da 0 |
+| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | **Kaggle'da 67 gerçek koşu** (2× T4) | 67 raporun çıktısı yerelde bağımsız denetlendi: test çiftleri özeti kategori içinde tek, kullanıcı başı ortalama rapora ≤ 5·10⁻⁷, top-K'da gölge ürün 0; iki oturumda koşan dört hücre **birebir aynı** çıktı — DECISIONS 2026-09-18 |
 | **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
 | **Damıtma + tam korpus çıkarımı** (Kaggle, T4) | **sadakat kapısı PASS (3/3)** · 4.598.612 satır | `distill_report_base.json`, `inference_*.json`, F20; indirilen etiketler 5-core'la satır satır aynı küme, boş değer yok, olasılıklar toplamı 1 |
-| **Kapı 2 + eşli bootstrap** (`experiment_stats`) | kod tamam, **gerçek koşu yok** | `test_experiment_stats`; 24 sentetik koşunun çıktısından `gate2.json` üretildi |
-| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | **Kaggle'da 1 kez koştu, koşular düştü** | 2026-09-16: kurulum, klon, altı koşulun üretimi (Toys C1b %52,82 — yereldekinin aynısı) ve fail-fast çalıştı; RecBole import'u imajın protobuf'uyla çakışan tensorboard yüzünden çöktü, **hiçbir koşu tamamlanmadı**. Düzeltme depo kodunda (`stub_tensorboard_if_broken`), hata yerelde birebir taklit edilip iki gerçek koşuyla sınandı — DECISIONS 2026-09-16 |
-| Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | kod tamam, **gerçek koşu yok** | `test_marketing_metrics` (M2 bilinen yarı ömrü buluyor); duman koşularının top-K dosyalarıyla uçtan uca |
-| Sonuç figürleri F20–F23 (`result_figures`) | kod tamam | `test_result_figures`; duman çıktısından çizilip göz ile kontrol edildi |
+| **Kapı 2 + eşli bootstrap** (`experiment_stats`) | 67 gerçek koşuyla uçtan uca koştu (9 dk) · **karar 72 koşuyu bekliyor** | `test_experiment_stats`; ara çıktı commit edilmedi (eksik seed'li hücreler var) |
+| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | **7 oturum, 67 koşu** (2026-09-16/17) | ilk deneme tensorboard/protobuf çakışmasıyla düştü, düzeltmeden sonra yedi oturum ayrık dilimlerle paralel koştu; zaman bütçesi kuralı D0'da 5 koşuyu başlatmadı (tasarlandığı gibi) — DECISIONS 2026-09-16, 2026-09-18 |
+| Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | 67 gerçek koşuyla uçtan uca koştu (3 dk) | `test_marketing_metrics`; M2 kovaları iki kategoride de dolu; ara çıktı commit edilmedi, **M2 değerlerine bakılmadı** (tanım ekip onayı bekliyor) |
+| Sonuç figürleri F20–F23 (`result_figures`) | gerçek sayılarla çizildi | `test_result_figures`; F21/F23 göz ile kontrol edildi; ara figürler commit edilmedi |
 | Test paketi | **388 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
-- **Öneri deneyi Kaggle koşusunu bekliyor.** Girdiler gerçek etiketle hazır
-  (`label_source: distilled`, `reportable: true`).
-- **Deney GPU'da hiç koşmadı.** Gerçek veriyle yalnızca yerel CPU ön uçuşu (1 epoch, sonuç
-  değil) yapıldı — ayrıntı DECISIONS 2026-09-15. Süreler matrisin ilk iki koşusundan
-  ölçülecek.
-- **Kaggle'daki 1. deneme (2026-09-16) hiçbir koşu tamamlamadan düştü:** RecBole'un import'u
-  imajın protobuf 5.29.5'iyle çakışan tensorboard 2.21.0'da patladı. Fail-fast kalan 69 koşuyu
-  başlatmadı (~2 dakika kota). Düzeltme yerelde sınandı, Kaggle'da **denenmedi** —
-  DECISIONS 2026-09-16.
+- **Matrisin 5 koşusu eksik** (hepsi seed 42): Toys C4b SASRec · Toys C3 SASRec · Grocery
+  C4b SASRec · Grocery C3 SASRec · Grocery C3 BPR. İlk oturumun süresine sığmadılar. Kesilmez
+  çekirdekteler → Kapı 2 kararı, karşıtlıklar, pazarlama metrikleri, F21–F23 ve
+  `docs/SONUCLAR.md` bu 5 koşu gelince. Tamamlama: tek Kaggle oturumu,
+  `CONDITIONS = ["C4b", "C3"]` · `SEEDS = [42]` (DECISIONS 2026-09-18).
+- Bitmiş 67 koşunun raporları commit'li (`reports/results/experiment_*.json`); kullanıcı
+  başı dosyalar yerelde `data/processed/recbole/<kategori>/peruser/` (git'e girmez).
 
 ### Yazılmadı
 
@@ -461,6 +475,11 @@ işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını enge
   koşulamaz; sonraki aşamalar `data/interim/` üzerinden çalışıyor.
 - `confidence` alanı analizden düşürüldü (`low` ≡ `unclear`, %100 örtüşme).
 - Deneme setiyle uyum **F1 olarak raporlanamaz**: prompt tam o satırlar okunarak yazıldı.
+- **Deney koşularının kaç epoch eğitildiği bilinmiyor** — RecBole'un epoch satırları loglara
+  düşmedi. 300 tavanına değen koşu olup olmadığı söylenemez; protokol her koşulda aynı
+  olduğu için karşıtlıkları bozmaz.
+- SASRec'in erken durdurma (valid) kümesi koşula göre küçülüyor: eğitim geçmişi boşalan
+  kullanıcı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
 
 ---
 
@@ -480,7 +499,8 @@ DECISIONS 2026-09-14 "Hafta 6 kodu".
 
 **3 · DENEY — Kapı 2** (Hafta 6–7) — {Toys, Grocery} × {SASRec, BPR} × 3 seed;
 C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulardan önce yazıldı.
-**Girdiler gerçek etiketle hazır; Kaggle koşusu bekliyor.** Adımlar:
+**72 koşunun 67'si bitti ve denetlendi (2026-09-18); 5 koşu tamamlama oturumu bekliyor**
+(`CONDITIONS = ["C4b", "C3"]` · `SEEDS = [42]`, ~6 saat). Adımlar:
 1. ✅ Yerelde: `recsys.atomic --category high --labels distilled --force` (ve `low`) ·
    `recsys.conditions --condition all` (koşul raporları `reports/results/condition_*.json`).
 2. `data/processed/recbole/<kategori>/` altındaki `<kategori>.inter` + `split.json`

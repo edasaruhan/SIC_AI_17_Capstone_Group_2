@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "category": "Toys_and_Games",
+    "condition": "C4b",
+    "model": "SASRec",
+    "seed": 1337,
+    "epochs": 300,
+    "device": "cuda",
+    "eval_batch_size": 650,
+    "tensorboard": "VersionError: Detected mismatched Protobuf Gencode/Runtime major versions when loading tensorboard/compat/proto/event.proto: gencode 6.31.1 runtime 5.29.5. Same major version is required. See Protobuf version guarantees at https://protobuf.dev/support/cross-version-runtime-guarantee.",
+    "runtime_seconds": {
+      "fit": 1929.8,
+      "test": 9.0
+    },
+    "code_version": "e1c7f89",
+    "label_source": "distilled",
+    "reportable": true
+  },
+  "split": {
+    "train": 518101,
+    "valid": 249419,
+    "test": 117386,
+    "n_test_before_self_rule": 268652,
+    "n_test_dropped_not_self": 151266,
+    "test_pairs_sha256": "3bed366ea0ca4bab7aab37789c0526aeece59ee823bf12db88611baae46f070c",
+    "n_valid_dropped_empty_history": 19233,
+    "max_item_list_length": 50
+  },
+  "n_users": 257696,
+  "n_items": 103102,
+  "best_valid_score": 0.008056,
+  "best_valid": {
+    "recall@10": 0.018018,
+    "recall@20": 0.02592,
+    "ndcg@10": 0.008056,
+    "ndcg@20": 0.010043,
+    "hit@10": 0.018018,
+    "hit@20": 0.02592
+  },
+  "test": {
+    "recall@10": 0.02082,
+    "recall@20": 0.028896,
+    "ndcg@10": 0.009611,
+    "ndcg@20": 0.011644,
+    "hit@10": 0.02082,
+    "hit@20": 0.028896
+  },
+  "n_shadow_items_masked": 0,
+  "eval_history_mask": "none_sequential",
+  "n_extra_mask_pairs": 0,
+  "peruser_file": "C4b_SASRec_seed1337.parquet",
+  "peruser_consistency": {
+    "n_users": 117386,
+    "metrics_checked": [
+      "hit@10",
+      "hit@20",
+      "ndcg@10",
+      "ndcg@20",
+      "recall@10",
+      "recall@20"
+    ],
+    "max_abs_diff": 0.0,
+    "tolerance": 5.00001e-07
+  }
+}
