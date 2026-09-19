@@ -1,0 +1,408 @@
+{
+  "meta": {
+    "code_version": "f3183df",
+    "label_sources": [
+      "distilled"
+    ],
+    "reportable": true,
+    "thresholds_fixed": "2026-09-14, configs/base.yaml -> gate2 (deney kosulmadan)"
+  },
+  "results": {
+    "Toys_and_Games/SASRec": {
+      "conditions_found": [
+        "C0",
+        "C1",
+        "C4",
+        "C1b",
+        "C4b",
+        "C3"
+      ],
+      "criteria": {
+        "1_same_test_pairs": {
+          "passed": true,
+          "n_distinct_hashes": 1,
+          "runs_checked": [
+            "C0/seed1337",
+            "C0/seed2024",
+            "C0/seed42",
+            "C1/seed1337",
+            "C1/seed2024",
+            "C1/seed42",
+            "C1b/seed1337",
+            "C1b/seed2024",
+            "C1b/seed42",
+            "C3/seed1337",
+            "C3/seed2024",
+            "C3/seed42",
+            "C4/seed1337",
+            "C4/seed2024",
+            "C4/seed42",
+            "C4b/seed1337",
+            "C4b/seed2024",
+            "C4b/seed42"
+          ]
+        },
+        "2_universe_subset_of_c0": {
+          "passed": true,
+          "per_condition": {
+            "C0": true,
+            "C1": true,
+            "C4": true,
+            "C1b": true,
+            "C4b": true,
+            "C3": true
+          }
+        },
+        "3_placebo_not_better_than_c0": {
+          "passed": true,
+          "metric": "recall@10",
+          "contrasts": {
+            "C4-C0": {
+              "mean_a": 0.03461798397310298,
+              "mean_b": 0.043128368516404565,
+              "diff": -0.008510384543301587,
+              "ci": [
+                -0.009160873812322879,
+                -0.007885593966344653
+              ],
+              "relative_diff": -0.19732683697656048,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 117386,
+              "passed": true
+            },
+            "C4b-C0": {
+              "mean_a": 0.02066685976181146,
+              "mean_b": 0.043128368516404565,
+              "diff": -0.02246150875459311,
+              "ci": [
+                -0.023356206589087852,
+                -0.021626514235087664
+              ],
+              "relative_diff": -0.5208058993942587,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 117386,
+              "passed": true
+            }
+          }
+        },
+        "4_seed_stability": {
+          "passed": true,
+          "metric": "recall@10",
+          "values": {
+            "42": 0.042816,
+            "1337": 0.043719,
+            "2024": 0.04285
+          },
+          "cv": 0.011867250727615125,
+          "threshold": 0.1
+        }
+      },
+      "verdict": "PASS"
+    },
+    "Toys_and_Games/BPR": {
+      "conditions_found": [
+        "C0",
+        "C1",
+        "C4",
+        "C1b",
+        "C4b",
+        "C3"
+      ],
+      "criteria": {
+        "1_same_test_pairs": {
+          "passed": true,
+          "n_distinct_hashes": 1,
+          "runs_checked": [
+            "C0/seed1337",
+            "C0/seed2024",
+            "C0/seed42",
+            "C1/seed1337",
+            "C1/seed2024",
+            "C1/seed42",
+            "C1b/seed1337",
+            "C1b/seed2024",
+            "C1b/seed42",
+            "C3/seed1337",
+            "C3/seed2024",
+            "C3/seed42",
+            "C4/seed1337",
+            "C4/seed2024",
+            "C4/seed42",
+            "C4b/seed1337",
+            "C4b/seed2024",
+            "C4b/seed42"
+          ]
+        },
+        "2_universe_subset_of_c0": {
+          "passed": true,
+          "per_condition": {
+            "C0": true,
+            "C1": true,
+            "C4": true,
+            "C1b": true,
+            "C4b": true,
+            "C3": true
+          }
+        },
+        "3_placebo_not_better_than_c0": {
+          "passed": true,
+          "metric": "recall@10",
+          "contrasts": {
+            "C4-C0": {
+              "mean_a": 0.012048569108184394,
+              "mean_b": 0.01615752020399934,
+              "diff": -0.004108951095814947,
+              "ci": [
+                -0.004571882507283662,
+                -0.003646090675208287
+              ],
+              "relative_diff": -0.2543057996485062,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 117386,
+              "passed": true
+            },
+            "C4b-C0": {
+              "mean_a": 0.005304437212841962,
+              "mean_b": 0.01615752020399934,
+              "diff": -0.010853082991157378,
+              "ci": [
+                -0.011372878083133139,
+                -0.010324839986596926
+              ],
+              "relative_diff": -0.6717047451669597,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 117386,
+              "passed": true
+            }
+          }
+        },
+        "4_seed_stability": {
+          "passed": true,
+          "metric": "recall@10",
+          "values": {
+            "42": 0.015734,
+            "1337": 0.016527,
+            "2024": 0.016211
+          },
+          "cv": 0.024707953809823744,
+          "threshold": 0.1
+        }
+      },
+      "verdict": "PASS"
+    },
+    "Grocery_and_Gourmet_Food/SASRec": {
+      "conditions_found": [
+        "C0",
+        "C1",
+        "C4",
+        "C1b",
+        "C4b",
+        "C3"
+      ],
+      "criteria": {
+        "1_same_test_pairs": {
+          "passed": true,
+          "n_distinct_hashes": 1,
+          "runs_checked": [
+            "C0/seed1337",
+            "C0/seed2024",
+            "C0/seed42",
+            "C1/seed1337",
+            "C1/seed2024",
+            "C1/seed42",
+            "C1b/seed1337",
+            "C1b/seed2024",
+            "C1b/seed42",
+            "C3/seed1337",
+            "C3/seed2024",
+            "C3/seed42",
+            "C4/seed1337",
+            "C4/seed2024",
+            "C4/seed42",
+            "C4b/seed1337",
+            "C4b/seed2024",
+            "C4b/seed42"
+          ]
+        },
+        "2_universe_subset_of_c0": {
+          "passed": true,
+          "per_condition": {
+            "C0": true,
+            "C1": true,
+            "C4": true,
+            "C1b": true,
+            "C4b": true,
+            "C3": true
+          }
+        },
+        "3_placebo_not_better_than_c0": {
+          "passed": true,
+          "metric": "recall@10",
+          "contrasts": {
+            "C4-C0": {
+              "mean_a": 0.029905007622845075,
+              "mean_b": 0.03010604969089782,
+              "diff": -0.00020104206805274003,
+              "ci": [
+                -0.0005138090770493726,
+                0.00010052103402637
+              ],
+              "relative_diff": -0.006677796327212019,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 238756,
+              "passed": true
+            },
+            "C4b-C0": {
+              "mean_a": 0.028468394511551542,
+              "mean_b": 0.03010604969089782,
+              "diff": -0.0016376551793462783,
+              "ci": [
+                -0.0019601950666510303,
+                -0.001309495887014358
+              ],
+              "relative_diff": -0.05439621591541458,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 238756,
+              "passed": true
+            }
+          }
+        },
+        "4_seed_stability": {
+          "passed": true,
+          "metric": "recall@10",
+          "values": {
+            "42": 0.03029,
+            "1337": 0.029989,
+            "2024": 0.030039
+          },
+          "cv": 0.005357664954299887,
+          "threshold": 0.1
+        }
+      },
+      "verdict": "PASS"
+    },
+    "Grocery_and_Gourmet_Food/BPR": {
+      "conditions_found": [
+        "C0",
+        "C1",
+        "C4",
+        "C1b",
+        "C4b",
+        "C3"
+      ],
+      "criteria": {
+        "1_same_test_pairs": {
+          "passed": true,
+          "n_distinct_hashes": 1,
+          "runs_checked": [
+            "C0/seed1337",
+            "C0/seed2024",
+            "C0/seed42",
+            "C1/seed1337",
+            "C1/seed2024",
+            "C1/seed42",
+            "C1b/seed1337",
+            "C1b/seed2024",
+            "C1b/seed42",
+            "C3/seed1337",
+            "C3/seed2024",
+            "C3/seed42",
+            "C4/seed1337",
+            "C4/seed2024",
+            "C4/seed42",
+            "C4b/seed1337",
+            "C4b/seed2024",
+            "C4b/seed42"
+          ]
+        },
+        "2_universe_subset_of_c0": {
+          "passed": true,
+          "per_condition": {
+            "C0": true,
+            "C1": true,
+            "C4": true,
+            "C1b": true,
+            "C4b": true,
+            "C3": true
+          }
+        },
+        "3_placebo_not_better_than_c0": {
+          "passed": true,
+          "metric": "recall@10",
+          "contrasts": {
+            "C4-C0": {
+              "mean_a": 0.014222330189258768,
+              "mean_b": 0.014456879268653631,
+              "diff": -0.00023454907939486343,
+              "ci": [
+                -0.0005361121814739735,
+                4.6107043732234127e-05
+              ],
+              "relative_diff": -0.01622404635441816,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 238756,
+              "passed": true
+            },
+            "C4b-C0": {
+              "mean_a": 0.013099845309297637,
+              "mean_b": 0.014456879268653631,
+              "diff": -0.0013570339593559951,
+              "ci": [
+                -0.0016530125595447514,
+                -0.0010680359865301815
+              ],
+              "relative_diff": -0.09386769676484791,
+              "seeds": [
+                42,
+                1337,
+                2024
+              ],
+              "n_users": 238756,
+              "passed": true
+            }
+          }
+        },
+        "4_seed_stability": {
+          "passed": true,
+          "metric": "recall@10",
+          "values": {
+            "42": 0.014458,
+            "1337": 0.014479,
+            "2024": 0.014433
+          },
+          "cv": 0.0015929652247559344,
+          "threshold": 0.1
+        }
+      },
+      "verdict": "PASS"
+    }
+  }
+}

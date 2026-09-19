@@ -86,7 +86,7 @@ flowchart TD
     D["ModernBERT — hızlı model<br/>149M parametre · yerel GPU"]
     E["Etiketlenmiş tam korpus<br/>12.417.784 etkileşim, hediye bayraklı"]
     F["RecBole deneyi<br/>C0 · C1 · C4 · C1b · C4b · C3"]
-    G2{"KAPI 2<br/>C0 ile C4 arasında fark YOK mu?"}
+    G2{"KAPI 2<br/>plasebo C0'ı geçiyor mu?<br/>test çiftleri aynı mı?"}
     R["Sonuçlar yorumlanabilir"]
     INV["Kurulum bozuk<br/>hiçbir sonuç yorumlanamaz"]
 
@@ -99,8 +99,8 @@ flowchart TD
     D -->|"tam korpus inference"| E
     E --> F
     F --> G2
-    G2 -->|"fark yok"| R
-    G2 -->|"fark var"| INV
+    G2 -->|"geçmiyor · 4 ölçüt PASS"| R
+    G2 -->|"geçiyor ya da ölçüt FAIL"| INV
 
     classDef gift stroke:#8E6210,stroke-width:2px
     classDef gate stroke:#8E6210,stroke-width:2px,stroke-dasharray:5
@@ -131,11 +131,11 @@ satırın üzerine kuruludur. Etiketleme kuralları: [`ETIKETLEME_REHBERI.md`](E
 
 ## 5. Nerede duruyoruz
 
-**Hafta 1–5 bitti.** Hafta 4 **tek etiketleyiciyle** kapandı (kapı INCOMPLETE — güvenilirlik
-ölçülmedi). Hafta 5'te damıtılmış öğrenci sadakat kapısını **geçti** ve deney korpusunun
-tamamını (4,6 milyon satır) etiketledi. Deney matrisinin 72 koşusundan 67'si Kaggle'da bitti
-ve denetlendi; kalan 5 koşu gelince Kapı 2 ve sonuçlar. Ayrıntılı durum ve
-sıradaki adımlar için **§8**.
+**Ölçümler bitti; RQ1–RQ4 cevaplandı → [`SONUCLAR.md`](SONUCLAR.md).** Hafta 4 **tek
+etiketleyiciyle** kapandı (kapı INCOMPLETE — güvenilirlik ölçülmedi). Hafta 5'te damıtılmış
+öğrenci sadakat kapısını **geçti** ve deney korpusunun tamamını (4,6 milyon satır) etiketledi.
+Deney matrisinin **72 koşusunun hepsi** Kaggle'da bitti ve denetlendi; **Kapı 2 dört hücrede
+de PASS**. Ayrıntılı durum için **§8**.
 
 | | |
 |---|---|
@@ -152,8 +152,11 @@ sıradaki adımlar için **§8**.
 | Damıtma sadakat kapısı (ModernBERT-base) | **PASS (3/3)** — öğretmene C1 F1 0,91 · C1b F1 0,93 |
 | Öğrenciyle etiketlenmiş 5-core satır | **4.598.612** (Toys 2.164.018 + Grocery 2.434.594) |
 | Hediye payı 5-core — Toys / Grocery (öğrenci, ham) | %24,8 / %3,1 |
-| Deney koşusu (Kaggle, 2× T4) | **67 / 72** bitti ve denetlendi · 5 koşu bekliyor |
-| Geçen test | **388** |
+| Deney koşusu (Kaggle, 2× T4) | **72 / 72** bitti ve denetlendi |
+| Kapı 2 | **PASS (4/4)** — Toys/Grocery × SASRec/BPR |
+| **RQ2** — C1 − C4, Recall@10 (Toys) | SASRec **+%15,7** · BPR **+%40,0** (ikisi de GA'sı sıfırın üstünde → alt sınır); Grocery +%1,2 / saptanamadı |
+| **RQ4** — M2 yarı ömür (Toys, SASRec) | **0,66** kendi alımı [0,53–0,82] ≈ 2,4 hafta |
+| Geçen test | **389** |
 
 ### Hangi veri, ne kadar
 
@@ -308,9 +311,9 @@ C1−C4 ve C1b−C4b olmasının sebebi bu. Figür: F20.
 | 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
 | 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ✅ bitti (2026-09-15) · **sadakat kapısı PASS 3/3** · 4.598.612 satır etiketlendi |
-| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | 🔄 atomic + altı koşul **gerçek etiketle** ✅ · Kaggle'da **67/72 koşu bitti ve denetlendi** (2026-09-18) · 5 koşu (seed 42) tamamlama oturumu bekliyor |
-| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | 🔄 koşul kodu ✅ (C2 kapsam dışı) · eşli bootstrap + Kapı 2 değerlendiricisi gerçek veride koştu ✅ · **Kapı 2 kararı 72 koşu tamamlanınca** |
-| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | 🔄 M1/M2/M3 kodu gerçek veride koştu ✅ (tanımlar koşulardan önce) · figürler + sonuç raporu 72 koşuyu bekliyor |
+| 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | ✅ atomic + altı koşul **gerçek etiketle** · Kaggle'da **72/72 koşu** (2026-09-16/19), denetlendi · **Kapı 2 PASS 4/4** |
+| 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | ✅ 3 seed, eşli bootstrap; RQ2/RQ3 karşıtlıkları ve doz–yanıt `experiment_stats.json` (C2 kapsam dışı) |
+| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ✅ M1/M2/M3 (tanımlar koşulardan önce, M2 onaylı) · F21–F23 · **[`SONUCLAR.md`](SONUCLAR.md)** · kalan: capstone raporu/sunum |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
 
@@ -389,10 +392,13 @@ etki yapıyor onu ölçer. Veri azaldığı için C4'ün C0'dan **kötü** çık
 **iyi** çıkması kurulum hatasıdır. Kapı 2 PASS olmayan kategori × modelin sonucu
 **yorumlanamaz** damgası taşır.
 
+**Sonuç (2026-09-19, 72 koşu): dört hücrede de PASS** — `reports/results/gate2.json`,
+tablo `SONUCLAR.md` §3.
+
 > **Eski ifade:** ROADMAP ve PROJECT_SPEC bu kapıyı "C0 ile C4 arasında anlamlı fark
 > olmamalı" diye anlatıyor. 2026-09-14 önceden kaydı bunu yukarıdaki 3. ölçütle değiştirdi
-> (koşulardan önce). Ara hesapta Toys'ta C4 C0'dan anlamlı düşük — eski ifadeyle FAIL
-> olurdu. Ayrıntı: DECISIONS 2026-09-18.
+> (koşulardan önce). Toys'ta C4, C0'dan anlamlı düşük — eski ifadeyle FAIL olurdu.
+> Ayrıntı: DECISIONS 2026-09-18.
 
 ---
 
@@ -419,8 +425,8 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Son güncelleme **2026-09-18** (deney matrisinin 72 koşusundan 67'si Kaggle'da bitti ve
-> denetlendi; 5 koşu tamamlama oturumu bekliyor). "Çalışıyor" yazan her satır ya bir
+> Son güncelleme **2026-09-19** (deney matrisi 72/72 tamam, Kapı 2 PASS 4/4, sonuç raporu
+> `SONUCLAR.md` yazıldı). "Çalışıyor" yazan her satır ya bir
 > testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
 > aşağıda ayrıca yazıyor.
 
@@ -436,29 +442,28 @@ yayınlanamaz.
 | **Hafta 4 — insan doğrulaması** | **INCOMPLETE** · tek etiketleyici (A), 500 satır | yöntemler `8c697a8`, kod `eed7f35` — ikisi de sonuçtan önce push'landı; `validation_500.json`, F18 |
 | **RQ1 yaygınlık** — ham + insan kalibrasyonlu, F19 | tamam | `prevalence.json`; kalibrasyon elle hesaplanmış örnekle test ediliyor |
 | Koşullar (C0 · C1 · C4 · C1b · C4b · C3 gölge token; C2 açık hata) + `atomic --labels distilled` | **gerçek etiketle üretildi** (Toys + Grocery) | `test_conditions`, `test_no_leakage`, `test_experiment_labels`; `condition_*.json`; maske–pozitif çakışması 0 (yerelde sayıldı) |
-| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | **Kaggle'da 67 gerçek koşu** (2× T4) | 67 raporun çıktısı yerelde bağımsız denetlendi: test çiftleri özeti kategori içinde tek, kullanıcı başı ortalama rapora ≤ 5·10⁻⁷, top-K'da gölge ürün 0; iki oturumda koşan dört hücre **birebir aynı** çıktı — DECISIONS 2026-09-18 |
+| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | **Kaggle'da 72 gerçek koşu** (2× T4) | 72 raporun çıktısı yerelde bağımsız denetlendi: test çiftleri özeti kategori içinde tek, kullanıcı başı ortalama rapora ≤ 5·10⁻⁷, top-K'da gölge ürün 0; iki oturumda koşan yedi hücre (iki kod sürümünde) **birebir aynı** çıktı — DECISIONS 2026-09-18, 2026-09-19 |
 | **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
 | **Damıtma + tam korpus çıkarımı** (Kaggle, T4) | **sadakat kapısı PASS (3/3)** · 4.598.612 satır | `distill_report_base.json`, `inference_*.json`, F20; indirilen etiketler 5-core'la satır satır aynı küme, boş değer yok, olasılıklar toplamı 1 |
-| **Kapı 2 + eşli bootstrap** (`experiment_stats`) | 67 gerçek koşuyla uçtan uca koştu (9 dk) · **karar 72 koşuyu bekliyor** | `test_experiment_stats`; ara çıktı commit edilmedi (eksik seed'li hücreler var) |
-| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | **7 oturum, 67 koşu** (2026-09-16/17) | ilk deneme tensorboard/protobuf çakışmasıyla düştü, düzeltmeden sonra yedi oturum ayrık dilimlerle paralel koştu; zaman bütçesi kuralı D0'da 5 koşuyu başlatmadı (tasarlandığı gibi) — DECISIONS 2026-09-16, 2026-09-18 |
-| Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | 67 gerçek koşuyla uçtan uca koştu (3 dk) | `test_marketing_metrics`; M2 kovaları iki kategoride de dolu; ara çıktı commit edilmedi, **M2 değerlerine bakılmadı** (tanım ekip onayı bekliyor) |
-| Sonuç figürleri F20–F23 (`result_figures`) | gerçek sayılarla çizildi | `test_result_figures`; F21/F23 göz ile kontrol edildi; ara figürler commit edilmedi |
-| Test paketi | **388 test geçiyor** | `pytest tests -q` |
+| **Kapı 2 + eşli bootstrap** (`experiment_stats`) | **PASS (4/4)** · 72 koşu (14 dk) | `test_experiment_stats`; `gate2.json`, `experiment_stats.json` |
+| Kaggle deney betiği (`scripts/kaggle_experiment.py`) | **8 oturum, 72 koşu** (2026-09-16/19) | ilk deneme tensorboard/protobuf çakışmasıyla düştü, düzeltmeden sonra yedi oturum ayrık dilimlerle paralel koştu; zaman bütçesi kuralı D0'da 5 koşuyu başlatmadı (tasarlandığı gibi), sekizinci oturum onları tamamladı — DECISIONS 2026-09-16, 2026-09-18, 2026-09-19 |
+| Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | 72 koşuyla (4 dk) · M2 tanımı **onaylandı** (2026-09-19, değerler görülmeden) | `test_marketing_metrics`; `marketing_metrics.json`; iki kez koşturuldu, çıktı birebir aynı |
+| Sonuç figürleri F20–F23 (`result_figures`) | gerçek sayılarla çizildi | `test_result_figures`; dördü de göz ile kontrol edildi; F22 lejantı GA'yı gösteriyor (DECISIONS 2026-09-19) |
+| **Sonuç raporu** (`docs/SONUCLAR.md`) | RQ1–RQ4, GA'lar ve sınırlılıklarla | her sayı `reports/results/` JSON'larından; sonuçtan sonra eklenen iki analiz işaretli |
+| Test paketi | **389 test geçiyor** | `pytest tests -q` |
 
 ### Kısmi
 
-- **Matrisin 5 koşusu eksik** (hepsi seed 42): Toys C4b SASRec · Toys C3 SASRec · Grocery
-  C4b SASRec · Grocery C3 SASRec · Grocery C3 BPR. İlk oturumun süresine sığmadılar. Kesilmez
-  çekirdekteler → Kapı 2 kararı, karşıtlıklar, pazarlama metrikleri, F21–F23 ve
-  `docs/SONUCLAR.md` bu 5 koşu gelince. Tamamlama: tek Kaggle oturumu,
-  `CONDITIONS = ["C4b", "C3"]` · `SEEDS = [42]` (DECISIONS 2026-09-18).
-- Bitmiş 67 koşunun raporları commit'li (`reports/results/experiment_*.json`); kullanıcı
-  başı dosyalar yerelde `data/processed/recbole/<kategori>/peruser/` (git'e girmez).
+- Koşu raporları commit'li (`reports/results/experiment_*.json`, 72); kullanıcı başı dosyalar
+  yalnızca yerelde `data/processed/recbole/<kategori>/peruser/` (git'e girmez) — analizi
+  yeniden üretmek için Kaggle çıktısından yerine konmalı.
 
 ### Yazılmadı
 
-`docs/SONUCLAR.md` — gerçek koşuların sayılarını bekliyor. (F20–F23 figür kodu hazır: `analysis.result_figures`.) Config'te bu aşamalara ait anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye
-işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını engelliyor.
+Capstone raporu ve sunum (kaynak: `SONUCLAR.md`). Kapsam dışı bırakılanlar: C2, `mid`
+kategoride deney, GRU4Rec/ItemKNN/Pop, ikincil LLM ile uyum. Config'te kullanılmayan
+anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye işaretli; `tests/test_config_keys.py` işaretsiz ölü
+anahtar kalmasını engelliyor.
 
 ### Bilinen sınırlar
 
@@ -480,6 +485,11 @@ işaretli; `tests/test_config_keys.py` işaretsiz ölü anahtar kalmasını enge
   olduğu için karşıtlıkları bozmaz.
 - SASRec'in erken durdurma (valid) kümesi koşula göre küçülüyor: eğitim geçmişi boşalan
   kullanıcı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
+- **Valid satırındaki hediye hiçbir koşulda silinmiyor** (sonuçtan sonra fark edildi):
+  koşullar yalnızca eğitim satırlarını değiştiriyor, SASRec valid satırını test girdisinde
+  görüyor. Toys'ta test kullanıcılarının %15,6'sında bu satır `gift_given`. SASRec'in C1
+  etkilerini küçültür; M2'nin n = 0 kovasını etkiler. Tanım değiştirilmedi; post-hoc
+  duyarlılık `SONUCLAR.md` §6.1, gerekçe DECISIONS 2026-09-19.
 
 ---
 
@@ -497,10 +507,9 @@ token** (RQ3) · C2 açık hatayla kilitli · `atomic --labels distilled` · kul
 metrikler · SASRec yolu · alınmış ürün maskesi bütün koşullarda C0'ın. Gerekçe:
 DECISIONS 2026-09-14 "Hafta 6 kodu".
 
-**3 · DENEY — Kapı 2** (Hafta 6–7) — {Toys, Grocery} × {SASRec, BPR} × 3 seed;
-C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulardan önce yazıldı.
-**72 koşunun 67'si bitti ve denetlendi (2026-09-18); 5 koşu tamamlama oturumu bekliyor**
-(`CONDITIONS = ["C4b", "C3"]` · `SEEDS = [42]`, ~6 saat). Adımlar:
+**3 · DENEY — Kapı 2** (Hafta 6–7) — ✅ **bitti (2026-09-19): 72/72 koşu, Kapı 2 PASS 4/4.**
+{Toys, Grocery} × {SASRec, BPR} × 3 seed; C0 / C1 / C4 / **C1b / C4b** / C3. Kapı 2'nin
+ölçütleri koşulardan önce yazıldı. Yeniden koşturmak için adımlar:
 1. ✅ Yerelde: `recsys.atomic --category high --labels distilled --force` (ve `low`) ·
    `recsys.conditions --condition all` (koşul raporları `reports/results/condition_*.json`).
 2. `data/processed/recbole/<kategori>/` altındaki `<kategori>.inter` + `split.json`
@@ -515,14 +524,15 @@ C0 / C1 / C4 / **C1b / C4b** (kesilmez) / C3. Kapı 2'nin ölçütleri koşulard
 4. `out/`'u indirin: `*.json` → `reports/results/`, `peruser/<kategori>/` →
    `data/processed/recbole/<kategori>/peruser/`.
 
-**4 · İSTATİSTİK** — ✅ kod hazır: `analysis.experiment_stats` → `gate2.json` +
+**4 · İSTATİSTİK** — ✅ koştu: `analysis.experiment_stats` → `gate2.json` +
 `experiment_stats.json` (C1−C4, C1−C0, C3−C1, C3−C0, C1b−C4b, doz–yanıt; eşli bootstrap).
 
-**5 · PAZARLAMA METRİKLERİ** (Hafta 8) — ✅ kod hazır: `recsys.marketing_metrics` → M1 israf
+**5 · PAZARLAMA METRİKLERİ** (Hafta 8) — ✅ koştu: `recsys.marketing_metrics` → M1 israf
 payı · M2 yarı ömür · M3 segment. Tanımlar koşulardan önce DECISIONS'ta ("Faz 5 kodu");
-**M2'nin tanımı "varsayıldı" — ekip değiştirmek isterse sonuçlardan ÖNCE.**
+M2'nin tanımı değerler görülmeden **onaylandı** (2026-09-19).
 
-**6 · SONUÇ RAPORU** — RQ1–RQ4, her biri güven aralığıyla ve sınırlılıklarıyla birlikte.
+**6 · SONUÇ RAPORU** — ✅ [`SONUCLAR.md`](SONUCLAR.md): RQ1–RQ4, her biri güven aralığıyla ve
+sınırlılıklarıyla. Sırada: capstone raporu ve sunum.
 
 **Kesme sırası** (teslim erken çıkarsa): M3 → BPR'nin ek seed'leri → Grocery'de C3.
 **Kesilmez:** C0/C1/C4, C1b/C4b, Toys × SASRec × C3.
@@ -537,6 +547,7 @@ payı · M2 yarı ömür · M3 segment. Tanımlar koşulardan önce DECISIONS'ta
 | Bağlayıcı kurallar, etiket şeması, yapılmayacaklar listesi | [`../CLAUDE.md`](../CLAUDE.md) |
 | Tam proje dokümanı — gap analizi, iş bölümü, riskler | [`PROJECT_SPEC.md`](PROJECT_SPEC.md) |
 | Aşama aşama teknik roadmap | [`ROADMAP.md`](ROADMAP.md) |
+| **Sonuçlar — RQ1–RQ4, güven aralıkları, sınırlılıklar** | [`SONUCLAR.md`](SONUCLAR.md) |
 | Neden şu yerine bu seçildi (tarihli) | [`DECISIONS.md`](DECISIONS.md) |
 | Elle etiketleme yapacaksanız | [`ETIKETLEME_REHBERI.md`](ETIKETLEME_REHBERI.md) |
 

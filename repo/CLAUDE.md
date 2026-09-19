@@ -388,8 +388,9 @@ python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
 python -m gift_contamination.analysis.result_figures --config configs/base.yaml
 ```
 
-> Bütün modüller yazıldı (2026-09-14). Henüz yazılmamış olan yalnızca sonuç raporu
-> (`docs/SONUCLAR.md`) — gerçek koşuların sayılarıyla yazılacak.
+> Bütün modüller yazıldı (2026-09-14) ve gerçek veride koştu. **Sonuç raporu:
+> `docs/SONUCLAR.md` (2026-09-19)** — 72 koşu, Kapı 2 PASS 4/4, RQ1–RQ4 GA'larıyla.
+> Oradaki her sayı `reports/results/` JSON'larından; yeni bir sayı eklenecekse önce JSON'a.
 
 > **`recsys.atomic --labels distilled` gerçek etiketle koşuldu (2026-09-15).**
 > Sadakat kapısı PASS; `data/annotations/<kategori>_inferred.parquet` Kaggle'daki
@@ -477,7 +478,8 @@ Kurallar:
   kategorisi kayboluyor mu; M2 bilinen yarı ömrü (1 etkileşim) buluyor mu, fazla yoksa
   tanımsız mı; M3 dilimleri ve yorum etiketi doğru mu
 - `test_result_figures.py` — dört figür rapor JSON'undan çiziliyor mu; verisi olmayan
-  figür boş çizilmek yerine atlanıyor mu; yerel model yolu figüre sızıyor mu
+  figür boş çizilmek yerine atlanıyor mu; yerel model yolu figüre sızıyor mu; M2 lejantı
+  GA'sı sınırsız bir yarı ömrü süre ölçümü gibi göstermiyor mu
 - `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
   genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık
@@ -575,17 +577,20 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
   ölçüt, `configs/base.yaml` → `gate1:` altında, koşudan önce sabitlendi.
   Gerekçe: `docs/DECISIONS.md`. **Sonuç 2026-08-29: PASS (4/4)** — dördü de kendi
   eşiğini geçti, hiçbiri sonradan değiştirilmedi
-- [ ] **TBD** Kaç seed (3 mü 5 mi) — koşu süresine göre
+- [x] ~~**TBD** Kaç seed (3 mü 5 mi)~~ → **3 seed (42, 1337, 2024)**, config `seeds`;
+  plan Faz 4.3'te (2026-09-14) koşu süresine göre seçildi. Kapı 2'nin seed kararlılığı
+  ölçütü dört hücrede de geçti (DK 0,002–0,025). 72 koşu, DECISIONS 2026-09-19
 - [x] ~~**TBD** GPU: yerel RTX mi Kaggle mı~~ → **KARARLAŞTI 2026-08-26.** Yerel kart
   GTX 1650 Ti (4 GB, Turing). LLM annotation **Kaggle**'da (2× T4, ~30 sa/hafta);
   preprocess, distillation, RecBole deneyleri **yerelde**. Altı aşamadan yalnızca
   biri kotaya bağlı. Ayrıntı: implementation-plan §1.6
 - [x] ~~**TBD** M2 "kontaminasyon yarı ömrü" için kesin operasyonel tanım~~ →
-  **VARSAYILDI 2026-09-14 (deney koşulmadan, ekip onayı bekliyor).** Son hediyenin alt
+  **VARSAYILDI 2026-09-14 (deney koşulmadan); ONAYLANDI 2026-09-19 (kullanıcı, ekip
+  adına, değerler görülmeden, tanım değişmeden).** Son hediyenin alt
   kategorisi (hediye-yalnız) için, o hediyeden sonraki `self` etkileşim sayısı n'ye göre
   C0 listesinin C1'e göre FAZLA payı; `A·exp(−λn)` uyumu, yarı ömür = ln2/λ etkileşim,
   medyan ardışık etkileşim aralığıyla haftaya. Fazla yoksa ya da uyum olmazsa TANIMSIZ
-  yazılır. Gerekçe: DECISIONS "Faz 5 kodu"
+  yazılır. Gerekçe: DECISIONS "Faz 5 kodu" ve 2026-09-19
 - [ ] **TBD** Hangi ekip üyesi hangi kulvarda (bkz. `docs/PROJECT_SPEC.md` §11)
 
 ---

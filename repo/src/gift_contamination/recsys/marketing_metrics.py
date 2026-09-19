@@ -120,6 +120,12 @@ def seed_mean_share(cfg, role, code, model, seeds, targets, sub, k) -> pl.DataFr
 
 
 # ------------------------------------------------------------------ M2 uyumu
+# Uyumun lambda alt siniri. Yari omur en fazla ln2 / LAMBDA_MIN olabilir; bu degere dayanan
+# bir bootstrap ucu GA'nin ust ucunun SINIRSIZ oldugunu gosterir, bir sure olcumu degil
+# (F22 lejanti "∞" yazar).
+LAMBDA_MIN = 1e-6
+
+
 def fit_half_life(n: np.ndarray, excess: np.ndarray, weights: np.ndarray) -> dict:
     """e(n) = A*exp(-lambda*n), agirlikli en kucuk kareler. A<=0 ya da uyum yoksa tanimsiz."""
     from scipy.optimize import curve_fit  # noqa: PLC0415
@@ -131,7 +137,7 @@ def fit_half_life(n: np.ndarray, excess: np.ndarray, weights: np.ndarray) -> dic
         return {"A": None, "lambda": None, "half_life": None, "reason": "en az 3 kova ve pozitif baslangic fazlasi gerekli"}
     try:
         (a, lam), _ = curve_fit(lambda x, a, lam: a * np.exp(-lam * x), n, e, p0=(e[0], 0.5),
-                                sigma=1 / np.sqrt(w), bounds=([0, 1e-6], [1, 50]), maxfev=10_000)
+                                sigma=1 / np.sqrt(w), bounds=([0, LAMBDA_MIN], [1, 50]), maxfev=10_000)
     except (RuntimeError, ValueError) as exc:
         return {"A": None, "lambda": None, "half_life": None, "reason": f"uyum olmadi: {exc}"}
     return {"A": float(a), "lambda": float(lam), "half_life": float(math.log(2) / lam)}

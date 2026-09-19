@@ -85,3 +85,16 @@ def test_local_model_paths_do_not_leak_into_figures():
     assert rf.display_model_name(r"C:\Users\someone\models\ModernBERT-base") == "ModernBERT-base"
     assert rf.display_model_name("/kaggle/working/models/base/") == "base"
     assert rf.display_model_name("answerdotai/ModernBERT-base") == "answerdotai/ModernBERT-base"
+
+
+def test_m2_legend_shows_the_ci_and_does_not_read_an_unbounded_one_as_a_duration():
+    sinirli = {"fit": {"half_life": 0.657}, "half_life_interactions_ci": [0.527, 0.816],
+               "half_life_weeks": 2.39}
+    assert rf.m2_label("Toys", sinirli) == "Toys · half-life 0.7 [0.5–0.8] interactions (≈2.4 wk)"
+
+    # GA'nin ust ucu uyumun lambda sinirinda (ln2 / 1e-6): ust uc sinirsiz, hafta yazilmaz.
+    sinirsiz = {"fit": {"half_life": 43.26}, "half_life_interactions_ci": [19.43, 693147.18],
+                "half_life_weeks": 157.6}
+    assert rf.m2_label("Toys", sinirsiz) == "Toys · half-life 43.3 [19.4–∞] interactions"
+
+    assert rf.m2_label("Toys", {"fit": {"half_life": None}}) == "Toys · half-life undefined"

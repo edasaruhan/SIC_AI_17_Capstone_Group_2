@@ -21,11 +21,13 @@ Kullanim:
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 import numpy as np
 
 from ..config import Config
+from ..recsys.marketing_metrics import LAMBDA_MIN
 from ..utils.io import read_json
 from ..utils.logging import get_logger
 from . import viz
@@ -184,6 +186,21 @@ def fig_m1(cfg: Config, mm: dict, out: Path) -> Path | None:
 
 
 # ------------------------------------------------------------------ F22
+def m2_label(ad: str, m2: dict) -> str:
+    """F22 lejanti: yari omur ve bootstrap GA'si. GA'nin ust ucu uyumun lambda sinirina
+    dayaniyorsa (ln2 / LAMBDA_MIN) ust uc SINIRSIZDIR: "∞" yazilir ve haftaya cevrilmez ki
+    nokta tahmini bir sure olcumu gibi okunmasin. Degerler JSON'dakiyle ayni, hesap yok."""
+    hl = m2.get("fit", {}).get("half_life")
+    if hl is None:
+        return f"{ad} · half-life undefined"
+    ci = m2.get("half_life_interactions_ci")
+    if ci is not None and ci[1] >= 0.999 * math.log(2) / LAMBDA_MIN:
+        return f"{ad} · half-life {hl:.1f} [{ci[0]:.1f}–∞] interactions"
+    hafta = m2.get("half_life_weeks")
+    ga = f" [{ci[0]:.1f}–{ci[1]:.1f}]" if ci is not None else ""
+    return f"{ad} · half-life {hl:.1f}{ga} interactions" + (f" (≈{hafta:.1f} wk)" if hafta else "")
+
+
 def fig_m2(cfg: Config, mm: dict, out: Path) -> Path | None:
     models = list(cfg.get("experiment.models"))
     roles = list(cfg.get("experiment.categories"))
@@ -204,10 +221,7 @@ def fig_m2(cfg: Config, mm: dict, out: Path) -> Path | None:
             xs = [n_max if isinstance(b["n_self_after_gift"], str) else b["n_self_after_gift"] for b in kovalar]
             ys = [None if b["excess"] is None else b["excess"] * 100 for b in kovalar]
             hl = m2.get("fit", {}).get("half_life")
-            hafta = m2.get("half_life_weeks")
-            ad = _short(cfg.category_slug(role))
-            etiket = (f"{ad} · half-life {hl:.1f} interactions" + (f" (≈{hafta:.1f} wk)" if hafta else "")
-                      if hl is not None else f"{ad} · half-life undefined")
+            etiket = m2_label(_short(cfg.category_slug(role)), m2)
             gecerli = [(x, y, b["used_in_fit"]) for x, y, b in zip(xs, ys, kovalar) if y is not None]
             if gecerli:
                 # Kullanicisi olmayan kova NaN: cizgi o noktada KIRILIR, bosluk koprulenmez.

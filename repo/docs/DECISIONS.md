@@ -2294,3 +2294,100 @@ hücrenin D5 kopyası kullanıldı (D0'ınkiyle birebir aynı).
 
 **Etkilediği bölüm:** `reports/results/experiment_*.json` (67), GENEL_BAKIS §6/§8
 **Kim:** Ekip
+
+---
+
+### 2026-09-19 — M2 tanımı onaylandı (DEĞERLERİ GÖRÜLMEDEN)
+
+Kullanıcı (ekip adına), 2026-09-14 "Faz 5 kodu" kaydındaki M2 tanımını **olduğu gibi**
+onayladı. Tanımda hiçbir değişiklik yok: son hediyenin hediye-yalnız alt kategorisi,
+sonraki `self` sayısı n'ye göre C0−C1 fazla payı, `A·exp(−λn)` uyumu, yarı ömür = ln 2/λ
+etkileşim, haftaya çeviri yaklaşık; uyum yoksa TANIMSIZ.
+
+Onay anında M2'nin **fazla pay, uyum ve yarı ömür değerleri görülmemişti**: 67 koşuluk ara
+hesapta `marketing_metrics` koştu; M2'den yalnızca kova doluluğu kontrol edildi, F22
+açılmadı (2026-09-18 kaydı). Etiket
+"varsayıldı" → **"onaylandı 2026-09-19"**. CLAUDE.md §13 buna göre güncellendi.
+
+**Etkilediği bölüm:** CLAUDE.md §13, GENEL_BAKIS §8
+**Kim:** Kullanıcı (ekip adına)
+
+---
+
+### 2026-09-19 — Deney matrisi tamam (72/72): Kapı 2 PASS 4/4, sonuçlar ve sonuçtan sonra bulunan bir tasarım etkisi
+
+> Sonuç raporu: `docs/SONUCLAR.md`. Bu kayıt tamamlama oturumunun denetimini, kararları ve
+> sonuç görüldükten sonra yapılan her şeyi yazar.
+
+#### Tamamlama oturumu (D7)
+
+`CONDITIONS = ["C4b", "C3"]` · `SEEDS = [42]`, kod `f3183df` (`src/`, `scripts/`, `configs/`
+`e1c7f89` ile aynı), 5,7 saat, 8 koşu, hepsi bitti. Eksik beş koşu geldi; üç BPR koşusu
+(Toys C4b, Grocery C4b, Toys C3) D0'da zaten vardı ve **bit bit aynı** çıktı. Böylece oturumlar
+arası birebir aynılık 7 hücrede ve **iki farklı kod sürümünde** ölçülmüş oldu. Aynı denetim
+betiği sekiz klasörün tamamına yeniden koşturuldu: 72/72 hücre, test çiftleri özeti kategori
+içinde tek, kullanıcı başı ortalamalar raporla ≤ 5·10⁻⁷, top-K'da gölge ürün 0, koşul
+raporları altı klasörde birbirine ve depodakine eşit, 91 log temiz. Betiğin "valid koşullar
+arasında farklı" uyarısı yalnızca SASRec'in düşen valid satırları: her koşuda
+`valid + n_valid_dropped_empty_history` kategorinin valid sayısına eşit (2026-09-18 tasarımı).
+Depoya yalnızca eksik beş koşu kopyalandı; tekrarların D0 kopyası kaldı.
+
+#### Sonuçlar (ayrıntı ve GA'lar SONUCLAR'da)
+
+- **Kapı 2: dört hücrede PASS** (`gate2.json`). Plasebo her yerde C0'ın altında ya da ondan
+  ayırt edilemiyor; seed değişim katsayısı 0,002–0,025.
+- **RQ2 birincil C1 − C4 (Recall@10):** Toys SASRec +0,545 puan [+0,482, +0,610], BPR +0,482
+  [+0,436, +0,529]; Grocery SASRec +0,036 [+0,005, +0,068] → hepsi "alt sınır"; Grocery BPR
+  +0,020 [−0,009, +0,049] → "saptanamadı" (NDCG@10'da alt sınır). Doz–yanıt dört
+  karşılaştırmada da Toys > Grocery.
+- **C1 − C0 modele bağlı:** Toys BPR +%4,4 (silmek iyileştiriyor), Toys SASRec −%7,1 (silmek
+  kötüleştiriyor); Grocery'de sıfırı içeriyor.
+- **RQ3:** gölge token (C3) hiçbir hücrede C1'den iyi değil; 3/4 hücrede C1'den ve C0'dan
+  anlamlı kötü.
+- **RQ4 / M2 (birincil SASRec):** Toys yarı ömür 0,66 [0,53–0,82] kendi alımı (≈2,4 hafta),
+  Grocery 9,5 [5,6–23,2] (≈86 hafta). BPR'de GA'nın üst ucu uyumun λ sınırına dayanıyor →
+  sınırlı yarı ömür yok. M1 Toys BPR'de C0 − C1 +4,9 puan, plaseboya karşı +4,2.
+
+#### Sonuçtan sonra bulunan: valid satırındaki hediye hiçbir koşulda silinmiyor
+
+M2'nin n = 0 kovasında C1'in de hediyenin alt kategorisine %29 slot verdiği görülünce
+incelendi. Sebep koddan doğrulandı (`run_experiment.sequential_parts`): koşullar yalnızca
+eğitim satırlarını değiştiriyor; SASRec'in test girdisi koşulun eğitim satırları + **valid**
+satırı. Valid satırı hediye ise C1/C1b/C3'te de test girdisinin son ürünü olarak kalıyor.
+BPR valid satırıyla hiçbir koşulda eğitilmiyor.
+
+Ölçüldü: test kullanıcılarının valid satırı `gift_given` olanı Toys'ta **18.335 (%15,6)**,
+C1b kümesiyle 43.407 (%37,0); Grocery'de 6.118 (%2,6) / 15.476 (%6,5). M2'nin n = 0 kovasında
+son hediye valid satırı olan kullanıcı Toys'ta 11.486 / 15.434 (%74), Grocery'de 2.422 / 2.688
+(%90); n ≥ 1 kovalarında tanım gereği sıfır.
+
+Değerlendirme: bir **kod hatası değil**, bölmenin C0'da donmasının (kural 3) sonucu. Etkisi
+önceden yazılmamıştı. SASRec için C1'i kısmi bir temizliğe çeviriyor ve C1 − C4 ile C1 − C0
+farklarını **küçültür**; birincil yorum ("alt sınır") yönünde. **Hiçbir tanım, koşul ya da
+sayı değiştirilmedi** — önceden kayıtlı tanımları sonuç gördükten sonra değiştirmek yasak.
+Yapılan iki şey:
+1. SONUCLAR'da sınırlılık olarak yazıldı (madde 3).
+2. M2 için **post-hoc duyarlılık**: aynı uyum n = 0 kovası hariç, JSON'daki kova
+   ortalamalarına (`fit_half_life`, GA'sız): Toys SASRec 1,08 (birincil 0,66), Grocery SASRec
+   4,2 (9,5), Toys BPR 4,4, Grocery BPR 5,6 kendi alımı. SONUCLAR §6.1'de "önceden kayıtlı
+   değil" diye işaretli; birincil değerin yerine geçmiyor.
+
+#### Sonuçtan sonra yapılan sunum değişikliği: F22 lejantı
+
+F22 lejantı yarı ömrü GA'sız yazıyordu; BPR için "≈1001,5 hafta" gibi, GA'sı sınırsız bir
+nokta tahmini süre ölçümü gibi okunuyordu. Lejant artık GA'yı da yazıyor. GA'nın üst ucu
+uyumun λ alt sınırına (`marketing_metrics.LAMBDA_MIN`, eskiden koda gömülü `1e-6`, değeri
+aynı) dayanıyorsa "∞" yazıyor ve haftaya çevirmiyor. Dört seriye de aynı kural uygulanıyor.
+Hiçbir sayı değişmedi; F20, F21, F23 bit bit aynı çıktı. `marketing_metrics` değişiklikten
+sonra yeniden koşturuldu, JSON `code_version` dışında birebir aynı. Test:
+`test_m2_legend_shows_the_ci_and_does_not_read_an_unbounded_one_as_a_duration`.
+
+#### M2 onayı
+
+M2 tanımı bu kaydın hemen öncesindeki kayıtla değerler görülmeden onaylandı.
+
+**Commit edilen:** 5 koşu raporu, `gate2.json`, `experiment_stats.json`,
+`marketing_metrics.json`, F21–F23, `docs/SONUCLAR.md`.
+**Etkilediği bölüm:** `analysis/result_figures.py`, `recsys/marketing_metrics.py` (sabit),
+`tests/test_result_figures.py`, SONUCLAR, GENEL_BAKIS §4/§5/§6/§8, CLAUDE.md §7/§13, README
+**Kim:** Ekip

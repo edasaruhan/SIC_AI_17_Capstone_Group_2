@@ -13,6 +13,7 @@ ediyor, yaygınlığını ölçüyor ve öneri modelini bu etkileşimlerle/onlar
 | `CLAUDE.md` | Claude Code için ana context ve bağlayıcı kurallar |
 | `docs/PROJECT_SPEC.md` | Tam proje dokümanı — problem, gap analizi, iş bölümü |
 | `docs/ROADMAP.md` | Teknik roadmap — aşama detayları, hafta planı |
+| **`docs/SONUCLAR.md`** | **Sonuçlar** — RQ1–RQ4, güven aralıkları, Kapı 2, pazarlama metrikleri, sınırlılıklar |
 | `docs/DECISIONS.md` | Spec'ten sapmalar ve gerekçeleri (tarihli) |
 | `docs/ETIKETLEME_REHBERI.md` | **Etiketleyene verilecek rehber.** Kendi başına yeterli: projeyi bilmeyen biri sıfırdan okuyup 500 satırı etiketleyebilir. Hafta 4'te üç kişi de bunu okur. |
 
@@ -152,7 +153,7 @@ Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış so
 | `models/distill/` | eğitilmiş öğrenci — git'e girmez |
 | `data/processed/recbole/<kategori>/` | RecBole `.inter` dosyaları, koşullar (C0 · C1 · C4 · C1b · C4b · C3) ve `peruser/` kullanıcı başı metrikler + top-K |
 | `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları, Kapı 2 (`gate2.json`), karşıtlıklar (`experiment_stats.json`), pazarlama metrikleri (`marketing_metrics.json`) |
-| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) · F20–F23 sonuç figürleri (damıtma sadakati, koşul karşıtlıkları, M2, M1) — gerçek koşulardan sonra |
+| `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) · F20–F23 sonuç figürleri (damıtma sadakati, koşul karşıtlıkları, M2, M1) — 72 gerçek koşudan |
 | `../data-research/data-research.md` | Data Research teslimi |
 
 ## Veri
