@@ -2,7 +2,7 @@
   "meta": {
     "category": "Grocery_and_Gourmet_Food",
     "n_main": 10000,
-    "code_version": "e5d8990-dirty",
+    "code_version": "cbd3abd",
     "prompt_version": "v3",
     "model": "Qwen/Qwen3-4B-Instruct-2507",
     "thresholds_fixed": "2026-08-28, configs/base.yaml -> gate1"

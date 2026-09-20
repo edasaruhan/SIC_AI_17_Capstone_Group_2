@@ -8,7 +8,7 @@
     "reliability": "none",
     "model": "Qwen/Qwen3-4B-Instruct-2507",
     "prompt_version": "v3",
-    "code_version": "e5d8990-dirty",
+    "code_version": "cbd3abd",
     "thresholds_fixed": "2026-08-29, configs/base.yaml -> validation",
     "methods_registered": "2026-09-14, DECISIONS (A modelle karsilastirilmadan once)"
   },
