@@ -156,7 +156,7 @@ de PASS**. Ayrıntılı durum için **§8**.
 | Kapı 2 | **PASS (4/4)** — Toys/Grocery × SASRec/BPR |
 | **RQ2** — C1 − C4, Recall@10 (Toys) | SASRec **+%15,7** · BPR **+%40,0** (ikisi de GA'sı sıfırın üstünde → alt sınır); Grocery +%1,2 / saptanamadı |
 | **RQ4** — M2 yarı ömür (Toys, SASRec) | **0,66** kendi alımı [0,53–0,82] ≈ 2,4 hafta |
-| Geçen test | **398** |
+| Geçen test | **441** |
 
 ### Hangi veri, ne kadar
 
@@ -426,8 +426,9 @@ yayınlanamaz.
 
 ## 8. Şu an ne çalışıyor, sırada ne var
 
-> Son güncelleme **2026-09-19** (deney matrisi 72/72 tamam, Kapı 2 PASS 4/4, sonuç raporu
-> `SONUCLAR.md` yazıldı). "Çalışıyor" yazan her satır ya bir
+> Son güncelleme **2026-09-21** (capstone raporu ve sunum yazıldı; bakım borcu kapatıldı).
+> Ondan önceki güncelleme 2026-09-19'du (deney matrisi 72/72 tamam, Kapı 2 PASS 4/4,
+> sonuç raporu `SONUCLAR.md` yazıldı). "Çalışıyor" yazan her satır ya bir
 > testle ya da o gün gerçekten koşturulmuş bir komutla kontrol edildi; koşturulamayanlar
 > aşağıda ayrıca yazıyor.
 
@@ -451,7 +452,10 @@ yayınlanamaz.
 | Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | 72 koşuyla (4 dk) · M2 tanımı **onaylandı** (2026-09-19, değerler görülmeden) | `test_marketing_metrics`; `marketing_metrics.json`; iki kez koşturuldu, çıktı birebir aynı |
 | Sonuç figürleri F20–F23 (`result_figures`) | gerçek sayılarla çizildi | `test_result_figures`; dördü de göz ile kontrol edildi; F22 lejantı GA'yı gösteriyor (DECISIONS 2026-09-19) |
 | **Sonuç raporu** (`docs/SONUCLAR.md`) | RQ1–RQ4, GA'lar ve sınırlılıklarla | her sayı `reports/results/` JSON'larından; sonuçtan sonra eklenen iki analiz işaretli |
-| Test paketi | **398 test geçiyor** | `pytest tests -q`; üç kritik değişmez 2026-09-20'de mutasyonla doğrulandı |
+| Test paketi | **441 test geçiyor** | `pytest tests -q`; üç kritik değişmez 2026-09-20'de mutasyonla doğrulandı |
+| **Demo** (`scripts/demo.py`) | veri dosyası ve bağımlılık gerektirmeden koşuyor | `test_demo`; çıktıdaki her sayı commit'li JSON'dan okunuyor, hiçbiri betikte yazılı değil |
+| **Capstone final raporu** (`../final-report/final-report.md`) | yazıldı (İngilizce, 13 bölüm) | her bölüm kaynak JSON'unu adıyla anıyor; tutturulamayan iki kapı ve tek etiketleyici metinde açıkça yazıyor |
+| **Sunum** (`../presentation/`) | 22 slayt `.pptx` + PDF, tek sayfalık `one_pager.pdf` | `build_deck.py` / `build_one_pager.py` sayıları `reports/results/*.json`'dan okuyor; 22 slaytın PNG'si tek tek gözle kontrol edildi |
 
 ### Kısmi
 
@@ -461,8 +465,9 @@ yayınlanamaz.
 
 ### Yazılmadı
 
-Capstone raporu ve sunum (kaynak: `SONUCLAR.md`). Model Refinement ve Deployment
-teslimleri **yazıldı** (2026-09-19, `../model-refinement/`, `../deployment/`). Kapsam dışı bırakılanlar: C2, `mid`
+Yazılacak teslim kalmadı. Capstone raporu (`../final-report/`) ve sunum
+(`../presentation/`) 2026-09-21'de, Model Refinement ve Deployment teslimleri
+2026-09-19'da yazıldı. Kapsam dışı bırakılanlar: C2, `mid`
 kategoride deney, GRU4Rec/ItemKNN/Pop, ikincil LLM ile uyum. Config'te kullanılmayan
 anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye işaretli; `tests/test_config_keys.py` işaretsiz ölü
 anahtar kalmasını engelliyor.

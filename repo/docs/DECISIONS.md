@@ -2510,3 +2510,93 @@ kökünde README yoktu.
 `detection/llm_annotate.py`, `recsys/atomic.py`, `utils/io.py`, altı test dosyası, CLAUDE.md,
 README, GENEL_BAKIS, SONUCLAR, kök README
 **Kim:** Ekip (denetim)
+---
+
+### 2026-09-20 — Bakım borcu kapatıldı: iki gerçek kırık, dört tekilleştirme (sonuç sayısı DEĞİŞMEDİ)
+**Karar:** Denetimin "bitmişlik için gerekli değil" diye ayırdığı listenin tamamı yapıldı.
+`prevalence`, `keyword_precision`, `gate2`, `experiment_stats` ve `marketing_metrics`
+yeniden üretildi; diff **yalnızca** `code_version` satırları.
+
+**Kırık/tehlikeli olan:**
+- `llm_annotate --gpus auto` her çağrıda `ValueError` veriyordu, üstelik yardım metni onu
+  geçerli gösteriyor ve **Kaggle'da kullanılan değer tam buydu**. Elle verilen sayı da
+  `_resolve_gpus`'u atlıyordu: iki kartlı makinede `--gpus 4` sessizce dört süreç açardı.
+  İkisi de artık aynı kapıdan geçiyor; düzeltmeyi geri alınca testin düştüğü görülerek
+  (mutasyon) doğrulandı.
+- `eda`/`deep_eda` üzerine test yazarken **üç gerçek arıza** çıktı: `available_roles`
+  config'te tanımsız bir rol görünce bütün EDA'yı düşürüyordu, `table_cross_category` tek
+  kategorili koşuda sıfıra bölüyordu, `table_seasonality_summary` eksik bir ayda `KeyError`
+  atıyordu. Üçü de artık "ölçülmedi" yazıyor ya da atlıyor.
+- `marketing_metrics`'te `explode()` polars 2.0 uyarısı alıyordu: varsayılan değişince
+  top-k'sı boş kullanıcı sonuçtan **düşerdi**, yani ortalamanın paydası sessizce değişirdi.
+  `empty_as_null=True` artık açık yazılı. `pyproject.toml`'daki toptan
+  `ignore::DeprecationWarning` kaldırıldı — uyarıyı susturan oydu.
+
+**Tekilleştirme (davranış değişmeden):** iki `wilson()` kopyası `utils/stats.wilson_interval`
+oldu; **iki çağrı noktasının `z` varsayılanı aynı değil** (1,959963985 ve 1,96) ve yayımlanmış
+aralıklar o değerlerle üretildi, o yüzden sessizce eşitlemek yerine test kilitledi.
+`_seed_for` → `utils/seeding.seed_for`; modül dışından çağrılan `_common_seeds`, `_aligned`,
+`_ci` açık adlar aldı. `seed_for(42, "C4") == 993655479` çakılı.
+
+**Kayıt:** Koşu raporu artık `epochs_trained` ve `hit_epoch_cap` yazıyor. Geçmiş 72 koşuyu
+kurtarmıyor — SONUCLAR §7 madde 6 duruyor, yanına "bundan sonrası kaydediliyor" eklendi.
+
+**Yeni:** `scripts/demo.py` (veri dosyası ve bağımlılık gerektirmeden commit'li JSON'lardan
+dört RQ'yu, iki kapıyı ve provenansı basar), kök `LICENSE` (MIT + veri/model/teslim
+carve-out'ları), `data-research/figures/README.md` (o klasör elle tutulmuyor,
+`eda.publish_figures_to` her koşuda üzerine yazıyor).
+
+**Testler:** 399 → 441 (`test_eda` 18, `test_demo` 9, `test_stats` 10, `--gpus` 2, epoch 3).
+
+**Etkilediği bölüm:** `detection/llm_annotate.py`, `detection/prompting.py`,
+`analysis/eda.py`, `analysis/deep_eda.py`, `analysis/prevalence.py`,
+`analysis/precision_check.py`, `analysis/experiment_stats.py`, `recsys/conditions.py`,
+`recsys/marketing_metrics.py`, `recsys/run_experiment.py`, `utils/stats.py` (yeni),
+`utils/seeding.py` (yeni), `config.py`, `scripts/kaggle_annotate.py`, `pyproject.toml`
+**Kim:** Ekip
+
+---
+
+### 2026-09-21 — Capstone raporu ve sunum: kapsam, dil ve "sayılar betikten okunur" kuralı
+**Karar:** Yazılmamış son iki teslim üretildi.
+
+- **Rapor** yalnızca **Markdown** ve **İngilizce**: `final-report/final-report.md`.
+  `.docx` üretilmedi — diğer iki `.docx` teslimi zaten var, üçüncüsü aynı sayıları üçüncü
+  bir yerde daha kopyalamak olurdu. Başlık bloğu Model Refinement / Deployment
+  teslimleriyle birebir aynı.
+- **Sunum** `.pptx` + PDF + tek sayfalık PDF özet: `presentation/`. Slaytlar **İngilizce**,
+  **konuşmacı notları Türkçe** (sunumu Türkçe yapılacak, dinleyiciye İngilizce belge
+  kalacak).
+- **Her ikisinde de hiçbir sayı elle yazılmadı.** `build_deck.py` ve `build_one_pager.py`
+  değerleri `reports/results/*.json`'dan okuyor, figürleri `reports/figures/` altındaki
+  commit'li PNG'lerden olduğu gibi gömüyor. Gerekçe: rapor/sunum artefaktlardan sapamasın.
+  Tek istisna one-pager'daki yarı ömür grafiği — A4'e sığması için tek panel olarak yeniden
+  çiziliyor, ama çizdiği değerler `marketing_metrics.json`'daki kova ortalamalarının ta
+  kendisi.
+- `python-pptx` **`requirements.txt`'e eklenmedi**: deck'i üretmek için gerekli, pipeline'ı
+  koşturmak için değil. `presentation/README.md` kurulumu söylüyor.
+- **22 slaytın hepsi PowerPoint COM ile PNG'ye aktarılıp tek tek gözle kontrol edildi**;
+  bulunan taşmalar ve çakışmalar betikte düzeltilip yeniden üretildi.
+
+**Bu sırada düzelen iki ifade hatası (sunumda ve ekte):** Kapı 2'nin 3. ölçütü "plasebolar
+C0'dan **kötü**" değil "**hiçbiri C0'dan iyi değil**" (kod `ci[0] <= 0` arıyor; Grocery'nin
+iki hücresinde GA sıfıra değiyor ama üstüne çıkmıyor). 4. ölçüt "seed yayılımı etkiden küçük"
+değil, **C0'ın seed'ler arası değişim katsayısı `gate2.seed_cv_max` eşiğinin altında**.
+
+**F18 İngilizceye çevrildi.** F17 ve F19–F23 İngilizceydi, F18 Türkçeydi; rapor ve sunum
+İngilizce olduğu için figür de İngilizce oldu. `validation` yeniden koşuldu,
+`validation_500.json`'da **yalnızca `code_version`** değişti. `F20`'nin alt başlığındaki tek
+Türkçe parantez düzeltilmedi: o dize `distill_report_base.json`'ın `meta` alanında duruyor ve
+düzeltmek ya damıtmayı yeniden koşmayı ya da makine tarafından yazılmış bir artefaktı elle
+düzenlemeyi gerektirirdi (`presentation/README.md` → "Bilinen kusur").
+
+**SONUCLAR §7 yeniden numaralandı (1..16).** Listede iki kez "8." vardı ve son madde "15."
+diye bitiyordu; madde sayısı hep 16'ydı, numaralar yanlıştı.
+
+**Ekip adları dokunulmadı:** `[Team Member 1/2/3]` ve `*(doldurulacak)*` yer tutucuları
+raporda, deck'te ve one-pager'da olduğu gibi duruyor.
+
+**Etkilediği bölüm:** `final-report/` (yeni), `presentation/` (yeni),
+`analysis/validation.py` (yalnızca figür metinleri), kök `README.md`, `docs/GENEL_BAKIS.md`,
+`docs/SONUCLAR.md`, `implementation-plan/implementation-plan.md`
+**Kim:** Ekip

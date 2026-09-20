@@ -201,6 +201,17 @@ Three lanes, balanced by effort. Each lane owns a capstone deliverable section, 
 | **M10** | **Marketing translation complete** | M1 wasted inventory figure; M2 contamination half-life curve; M3 sparse-profile stratification | 8 |
 | **M11** | **Submission ready** | All documents finalised; repository reproducible from README; presentation prepared | 8 |
 
+> **Erratum — 2026-09-21 (closing M11).** M11 is now met. The capstone final report is
+> [`final-report/final-report.md`](../final-report/final-report.md) (Markdown, English); the
+> presentation is [`presentation/`](../presentation/) — a 22-slide `.pptx` with a PDF copy and
+> a one-page PDF summary, slides in English with Turkish speaker notes. A `.docx` report was
+> deliberately **not** produced: the Model Refinement and Deployment submissions already exist
+> in that format and a third copy of the same numbers would be one more place to drift. The
+> repository reproduces from the README, 441 tests pass, and `python repo/scripts/demo.py`
+> prints every headline number from the committed JSON artefacts with no data files and no
+> dependencies beyond the standard library. Deck and summary read the same JSONs, so neither
+> can drift from the results. Team names are left as placeholders throughout.
+
 **Minimum viable outcome.** If time is lost, M1–M6 plus M7–M8 constitute a defensible submission: the first public measurement of gift-purchase prevalence, with a validated detector and an established baseline. C2 and C3 are the first conditions to drop.
 
 ---

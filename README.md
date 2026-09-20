@@ -17,14 +17,18 @@ karşılaştırıyor.
 | **RQ3** — silmek mi, işaretlemek mi? | Bu çalışmadaki işaretleme (gölge token) her iki seçenekten de kötü ya da onlardan ayırt edilemiyor. |
 | **RQ4** — liste ne kadar süre kirli kalıyor? | SASRec × Toys'ta fazla pay **2,0 puan**la başlıyor ve **~1 kendi alımında** yarıya iniyor (≈2–4 hafta). |
 
-72 koşu (2 kategori × 2 model × 6 koşul × 3 seed), Kapı 2 dört hücrede de PASS, 398 test.
-**Ayrıntı, güven aralıkları ve sınırlılıklar: [`repo/docs/SONUCLAR.md`](repo/docs/SONUCLAR.md).**
+72 koşu (2 kategori × 2 model × 6 koşul × 3 seed), Kapı 2 dört hücrede de PASS, 441 test.
+**Capstone raporunun tamamı: [`final-report/final-report.md`](final-report/final-report.md)** ·
+ayrıntı, güven aralıkları ve sınırlılıklar: [`repo/docs/SONUCLAR.md`](repo/docs/SONUCLAR.md) ·
+her başlığı tek komutla basmak için: `python repo/scripts/demo.py`
 
 ## Bu depoda ne var
 
 | Klasör | İçerik |
 |---|---|
 | **[`repo/`](repo/)** | **Kod, testler, config, sonuç JSON'ları ve figürler.** Buradan başlayın: [`repo/README.md`](repo/README.md) → kurulum, [`repo/docs/GENEL_BAKIS.md`](repo/docs/GENEL_BAKIS.md) → projenin tamamı |
+| **[`final-report/`](final-report/)** | **Capstone final raporu** (Markdown, İngilizce) — problemden sonuçlara, her sayının kaynak JSON'u adıyla |
+| **[`presentation/`](presentation/)** | **Sunum** (`.pptx` + PDF) ve tek sayfalık özet (`one_pager.pdf`); ikisini de üreten betikler |
 | `concept-note/` | Ders teslimi — problem, hipotez, başarı ölçütleri |
 | `literature-review/` | Ders teslimi — beş temada literatür |
 | `data-research/` | Ders teslimi — veri kaynağı, EDA, F1–F16 figürleri (+ `.docx`) |
@@ -33,6 +37,7 @@ karşılaştırıyor.
 | `model-refinement/` | Ders teslimi — model iyileştirme ve test (`.docx`) |
 | `deployment/` | Ders teslimi — dağıtım değerlendirmesi (`.docx`) |
 | `idea_proposal_grup_2.docx` | İlk fikir önerisi |
+| [`LICENSE`](LICENSE) | Kod için MIT. Veri, model ağırlıkları ve ders teslimleri kapsam dışıdır — dosyanın kendisi bunu ayrı ayrı sayıyor. |
 
 > Teslim belgelerindeki bazı erken ölçütler sonradan ölçümle değişti ya da tutturulamadı.
 > Hepsi tarihli **errata** notlarıyla belgelerin kendi içinde işaretli; tam gerekçeler
@@ -44,7 +49,7 @@ karşılaştırıyor.
 cd repo
 python -m venv .venv && .venv/Scripts/activate     # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt && pip install -e .
-python -m pytest tests -q                           # 398 test
+python -m pytest tests -q                           # 441 test
 ```
 
 Veri dosyaları (`data/`), model ağırlıkları (`models/`) ve kullanıcı başı deney çıktıları

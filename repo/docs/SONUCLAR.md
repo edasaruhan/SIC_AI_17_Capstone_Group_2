@@ -358,7 +358,8 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
 6. **Kaç epoch eğitildiği bilinmiyor.** RecBole'un epoch satırları loglara düşmedi; 300
    tavanına değen koşu olup olmadığı söylenemez. Protokol her koşulda aynı, ama mutlak
    metriklerin tam yakınsadığı iddia edilemez. Hiperparametre araması yapılmadı (RecBole
-   varsayılanları, bütün koşullarda aynı).
+   varsayılanları, bütün koşullarda aynı). **2026-09-20'den sonraki koşular** `epochs_trained` ve
+   `hit_epoch_cap` alanlarını rapora yazıyor; geçmiş 72 koşu kurtarılamıyor.
 7. **SASRec'in erken durdurma kümesi koşula göre küçülüyor:** eğitim geçmişi tamamen silinen
    kullanıcının valid satırı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
 8. **Deneyde iki kategori var.** Doz–yanıt iki noktalı; Video Games deneye girmedi, All
@@ -366,20 +367,20 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
 9. **Kalibrasyonun varsayımı Toys'ta tutmuyor** (insan–LLM uyumu kategoriden bağımsız
    değil): Toys'un kendi uyumuyla C1b oranı %54,4, havuzlanmış uyumla %44,2. Düşük hediyeli
    kategorilerde C1b'nin kalibre oranı muhtemelen yukarı yanlı.
-8. `received` sınıfı pratikte güvenilmez: etiketleyici 11 kez kullandı, LLM'in bu sınıftaki
+10. `received` sınıfı pratikte güvenilmez: etiketleyici 11 kez kullandı, LLM'in bu sınıftaki
    kesinliği popülasyonda 0,09. C1b'ye girer, C1'e girmez.
-10. **Öğrenci `clean` dağılımında eğitildi, 5-core'u etiketledi.** LLM etiketlerinin yalnızca
+11. **Öğrenci `clean` dağılımında eğitildi, 5-core'u etiketledi.** LLM etiketlerinin yalnızca
    küçük bir kısmı (Toys'ta %17,6) 5-core'da. Kayma ölçüldü ve raporlandı (DECISIONS
    2026-09-15), düzeltilmedi.
-11. **Review ≠ alım:** yalnızca review yazılmış alımlar görülüyor; review tarihi alımın
+12. **Review ≠ alım:** yalnızca review yazılmış alımlar görülüyor; review tarihi alımın
     gerisinde (mevsim tepesi Aralık–Ocak'a kayıyor; M2'nin haftaya çevirisi yaklaşık).
-12. **RQ3 tek bir işaretleme yöntemini sınıyor** (gölge token). C2 uygulanmadı.
-13. **M1 "israfı" dönüşüm ölçmüyor**, yalnızca slot payı. **M2 gözlemsel:** n'si büyük
+13. **RQ3 tek bir işaretleme yöntemini sınıyor** (gölge token). C2 uygulanmadı.
+14. **M1 "israfı" dönüşüm ölçmüyor**, yalnızca slot payı. **M2 gözlemsel:** n'si büyük
     kullanıcılar başka açılardan da farklı (daha uzun geçmiş); fark C0 − C1 eşli olduğu için
     kullanıcı sabit, ama n'nin kendisi rastgele atanmadı.
-14. **Çoklu karşılaştırma düzeltmesi yok.** Birincil karşıtlık (C1 − C4, Recall@10) önceden
+15. **Çoklu karşılaştırma düzeltmesi yok.** Birincil karşıtlık (C1 − C4, Recall@10) önceden
     belirlendi; öteki karşıtlıklar ve metrikler ikincil ve GA'larıyla birlikte okunmalı.
-15. **Kapı 2'nin eski ifadesi** belgelerde başka bir ölçütü anlatıyordu (§3).
+16. **Kapı 2'nin eski ifadesi** belgelerde başka bir ölçütü anlatıyordu (§3).
 
 ---
 

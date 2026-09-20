@@ -15,6 +15,8 @@ ediyor, yaygınlığını ölçüyor ve öneri modelini bu etkileşimlerle/onlar
 | `docs/ROADMAP.md` | Teknik roadmap — aşama detayları, hafta planı |
 | **`docs/SONUCLAR.md`** | **Sonuçlar** — RQ1–RQ4, güven aralıkları, Kapı 2, pazarlama metrikleri, sınırlılıklar |
 | `docs/DECISIONS.md` | Spec'ten sapmalar ve gerekçeleri (tarihli) |
+| **`../final-report/final-report.md`** | **Capstone final raporu** (İngilizce) — problemden sonuçlara, her bölüm kaynak JSON'unu adıyla anıyor |
+| **`../presentation/`** | **Sunum** (`.pptx` + PDF) ve tek sayfalık `one_pager.pdf`; ikisini de üreten betikler |
 | `docs/ETIKETLEME_REHBERI.md` | **Etiketleyene verilecek rehber.** Kendi başına yeterli: projeyi bilmeyen biri sıfırdan okuyup 500 satırı etiketleyebilir. Hafta 4'te üç kişi de bunu okur. |
 
 ## Kurulum
@@ -133,7 +135,14 @@ python -m gift_contamination.analysis.precision_check score
 Testler:
 
 ```bash
-pytest tests -q
+pytest tests -q          # 441 test
+```
+
+Sonuçların tamamını tek komutla görmek (veri dosyası gerekmez, yalnız standart
+kütüphane): 
+
+```bash
+python scripts/demo.py
 ```
 
 > `datasets.load_dataset(..., trust_remote_code=True)` **kullanılmıyor** — `datasets` 4.x
@@ -174,5 +183,6 @@ Veri dosyaları git'e **girmez**.
 | C — Recsys & Deney | RecBole, C0–C4, istatistik, pazarlama metrikleri | TBD |
 
 ## Lisans / Etik
+Kod **MIT** ile lisanslı (`../LICENSE`); veri, model ağırlıkları ve ders teslimleri kapsam dışıdır.
 Amazon Reviews 2023 akademik kullanım içindir. Review metinlerinde kişisel bilgi geçebilir;
 yayınlanan hiçbir çıktıda ham review metni birebir paylaşılmaz.

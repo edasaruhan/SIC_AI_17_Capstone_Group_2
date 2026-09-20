@@ -660,23 +660,25 @@ def fig_llm_vs_human(
     ax.set_yticklabels([f"{c}\n(n={m})" for c, m in zip(names, n)])
     ax.invert_yaxis()
     ax.set_xlim(0, 1)
-    ax.set_xlabel("F1 (insan referansina karsi)")
+    # Figur metinleri INGILIZCE: F17-F23'un geri kalani da oyle ve bu figur
+    # Ingilizce capstone raporuyla sunumunda kullaniliyor (2026-09-21).
+    ax.set_xlabel("F1 against the human reference")
     for bar, value in zip(bars, f1):
         ax.text(min(value + 0.02, 0.95), bar.get_y() + bar.get_height() / 2,
                 f"{value:.2f}", va="center", fontsize=9)
 
     referans = (
-        "Tek etiketleyicinin (A) etiketi referans alindi; etiket guvenilirligi "
-        "OLCULMEDI."
+        "The single annotator's (A) labels are the reference; label reliability "
+        "was NOT measured."
         if n_annotators == 1
-        else f"{n_annotators} bagimsiz etiketleyicinin cogunlugu referans alindi."
+        else f"The majority of {n_annotators} independent annotators is the reference."
     )
     viz.titles(
         ax,
-        f"F18 · LLM'in sinif bazli F1'i — {sum(n)} satir",
-        f"{referans} Bu bir KAPI degil olcumdur: F1 icin hicbir esik sabitlenmedi. "
-        "Agirliksiz; dogrulama seti yaygınlık ornegi degildir - `household` ve "
-        "`received` bilerek fazla temsil edildi.",
+        f"F18 · per-class F1 of the LLM labels — {sum(n)} rows",
+        f"{referans} This is a MEASUREMENT, not a gate: no threshold was ever fixed "
+        "for F1. Unweighted; the validation set is not a prevalence sample - "
+        "`household` and `received` were over-sampled on purpose.",
     )
     ax.grid(axis="y", visible=False)
     return viz.save(fig, out, log)
