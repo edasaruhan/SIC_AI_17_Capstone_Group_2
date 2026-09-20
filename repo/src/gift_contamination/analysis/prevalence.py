@@ -52,7 +52,7 @@ from ..config import Config, add_standard_args, resolve_roles
 from ..data.sampling import LABELS, _stratum_seed
 from ..detection.llm_annotate import annotation_path
 from ..detection.schema import CONTAMINATION
-from ..utils.io import read_json, write_json
+from ..utils.io import code_version, read_json, write_json
 from ..utils.logging import get_logger
 from . import viz
 from .validation import (
@@ -503,6 +503,7 @@ def evaluate(cfg: Config, roles: list[str]) -> dict:
 
     report = {
         "meta": {
+            "code_version": code_version(),
             "frame": FRAME_MAIN,
             "n_per_category": int(kategoriler[ornek]["n_main"]),
             "model": ilk["model"][0],

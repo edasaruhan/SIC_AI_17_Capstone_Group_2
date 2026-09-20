@@ -84,7 +84,7 @@ flowchart TD
     G1{"KAPI 1<br/>Aralık–Ocak tepesi var mı?"}
     P["prompt v3 / model değişikliği<br/>tam annotation'a geçilmez"]
     D["ModernBERT — hızlı model<br/>149M parametre · yerel GPU"]
-    E["Etiketlenmiş tam korpus<br/>12.417.784 etkileşim, hediye bayraklı"]
+    E["Etiketlenmiş deney korpusu<br/>4.598.612 etkileşim (Toys + Grocery 5-core)<br/>hediye bayraklı"]
     F["RecBole deneyi<br/>C0 · C1 · C4 · C1b · C4b · C3"]
     G2{"KAPI 2<br/>plasebo C0'ı geçiyor mu?<br/>test çiftleri aynı mı?"}
     R["Sonuçlar yorumlanabilir"]
@@ -156,7 +156,7 @@ de PASS**. Ayrıntılı durum için **§8**.
 | Kapı 2 | **PASS (4/4)** — Toys/Grocery × SASRec/BPR |
 | **RQ2** — C1 − C4, Recall@10 (Toys) | SASRec **+%15,7** · BPR **+%40,0** (ikisi de GA'sı sıfırın üstünde → alt sınır); Grocery +%1,2 / saptanamadı |
 | **RQ4** — M2 yarı ömür (Toys, SASRec) | **0,66** kendi alımı [0,53–0,82] ≈ 2,4 hafta |
-| Geçen test | **389** |
+| Geçen test | **398** |
 
 ### Hangi veri, ne kadar
 
@@ -313,7 +313,8 @@ C1−C4 ve C1b−C4b olmasının sebebi bu. Figür: F20.
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ✅ bitti (2026-09-15) · **sadakat kapısı PASS 3/3** · 4.598.612 satır etiketlendi |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | ✅ atomic + altı koşul **gerçek etiketle** · Kaggle'da **72/72 koşu** (2026-09-16/19), denetlendi · **Kapı 2 PASS 4/4** |
 | 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | ✅ 3 seed, eşli bootstrap; RQ2/RQ3 karşıtlıkları ve doz–yanıt `experiment_stats.json` (C2 kapsam dışı) |
-| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ✅ M1/M2/M3 (tanımlar koşulardan önce, M2 onaylı) · F21–F23 · **[`SONUCLAR.md`](SONUCLAR.md)** · kalan: capstone raporu/sunum |
+| 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ✅ M1/M2/M3 (tanımlar koşulardan önce, M2 onaylı) · F21–F23 · **[`SONUCLAR.md`](SONUCLAR.md)** · Model Refinement + Deployment teslimleri · kalan: capstone raporu/sunum |
+| — | **Denetim (2026-09-20)** | ✅ uçtan uca denetim: kırık `precision_check score` onarıldı, üç deney değişmezi test kilidine alındı, provenans (`-dirty`, eksik `code_version`) düzeltildi, tutturulamayan iki detektör kapısı kayda geçti. **Hiçbir sonuç sayısı değişmedi** (yeniden üretildi, bit düzeyinde aynı). DECISIONS 2026-09-20 |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
 
@@ -395,8 +396,8 @@ etki yapıyor onu ölçer. Veri azaldığı için C4'ün C0'dan **kötü** çık
 **Sonuç (2026-09-19, 72 koşu): dört hücrede de PASS** — `reports/results/gate2.json`,
 tablo `SONUCLAR.md` §3.
 
-> **Eski ifade:** ROADMAP ve PROJECT_SPEC bu kapıyı "C0 ile C4 arasında anlamlı fark
-> olmamalı" diye anlatıyor. 2026-09-14 önceden kaydı bunu yukarıdaki 3. ölçütle değiştirdi
+> **Eski ifade:** ROADMAP, PROJECT_SPEC, `concept-note` ve `implementation-plan`
+> bu kapıyı "C0 ile C4 arasında anlamlı fark olmamalı" diye anlatıyor (dördü de). 2026-09-14 önceden kaydı bunu yukarıdaki 3. ölçütle değiştirdi
 > (koşulardan önce). Toys'ta C4, C0'dan anlamlı düşük — eski ifadeyle FAIL olurdu.
 > Ayrıntı: DECISIONS 2026-09-18.
 
@@ -450,7 +451,7 @@ yayınlanamaz.
 | Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | 72 koşuyla (4 dk) · M2 tanımı **onaylandı** (2026-09-19, değerler görülmeden) | `test_marketing_metrics`; `marketing_metrics.json`; iki kez koşturuldu, çıktı birebir aynı |
 | Sonuç figürleri F20–F23 (`result_figures`) | gerçek sayılarla çizildi | `test_result_figures`; dördü de göz ile kontrol edildi; F22 lejantı GA'yı gösteriyor (DECISIONS 2026-09-19) |
 | **Sonuç raporu** (`docs/SONUCLAR.md`) | RQ1–RQ4, GA'lar ve sınırlılıklarla | her sayı `reports/results/` JSON'larından; sonuçtan sonra eklenen iki analiz işaretli |
-| Test paketi | **389 test geçiyor** | `pytest tests -q` |
+| Test paketi | **398 test geçiyor** | `pytest tests -q`; üç kritik değişmez 2026-09-20'de mutasyonla doğrulandı |
 
 ### Kısmi
 
@@ -460,7 +461,8 @@ yayınlanamaz.
 
 ### Yazılmadı
 
-Capstone raporu ve sunum (kaynak: `SONUCLAR.md`). Kapsam dışı bırakılanlar: C2, `mid`
+Capstone raporu ve sunum (kaynak: `SONUCLAR.md`). Model Refinement ve Deployment
+teslimleri **yazıldı** (2026-09-19, `../model-refinement/`, `../deployment/`). Kapsam dışı bırakılanlar: C2, `mid`
 kategoride deney, GRU4Rec/ItemKNN/Pop, ikincil LLM ile uyum. Config'te kullanılmayan
 anahtarlar **"⚠️ HENÜZ OKUNMUYOR"** diye işaretli; `tests/test_config_keys.py` işaretsiz ölü
 anahtar kalmasını engelliyor.

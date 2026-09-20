@@ -20,6 +20,7 @@ from gift_contamination.recsys.conditions import (
     REMOVED_LABELS,
     SHADOW_LABELS,
     SHADOW_SUFFIX,
+    _seed_for,
     apply_condition,
     universe,
 )
@@ -144,25 +145,51 @@ def test_c4b_removes_exactly_as_many_rows_as_c1b():
     assert c4b["placebo_of"] == "C1b"
 
 
+def _removed_rows(df: pl.DataFrame, out: pl.DataFrame) -> set[tuple]:
+    """Kosulun `df`den dusurdugu satirlar - (kullanici, urun) ciftleri."""
+    return set(
+        df.join(out, on=["user_id", "item_id", "timestamp", "label", "split"], how="anti")
+        .select("user_id", "item_id")
+        .iter_rows()
+    )
+
+
 def test_c4_removes_at_random_not_by_label():
-    """Plasebo etikete BAKMAMALI - baksa plasebo olmaz, ikinci bir C1 olur."""
+    """Plasebo etikete BAKMAMALI - baksa plasebo olmaz, ikinci bir C1 olur.
+
+    Eski hali "gift_given ya da household hayatta kaldi mi" diye soruyordu ve
+    C4'u C1'in kopyasi yapan bir mutasyonda BILE geciyordu: C1 `household`a
+    dokunmuyor, yani `or` dali her zaman dogruydu (denetim 2026-09-20). Iki
+    assert de o mutasyonda dusmeli.
+    """
     df = _frame()
 
-    out, _ = apply_condition(df, "C4", seed=SEED)
+    c4, _ = apply_condition(df, "C4", seed=SEED)
+    c1, _ = apply_condition(df, "C1", seed=SEED)
 
-    kalan = out.filter(pl.col("split") == SPLIT_TRAIN)["label"].to_list()
-    # C1 butun gift_given'lari silerdi; C4'te en az biri hayatta kalmali
-    # ya da bir gift-disi satir silinmis olmali.
-    silinen = df.filter(pl.col("split") == SPLIT_TRAIN).height - len(kalan)
-    assert silinen > 0
-    assert "gift_given" in kalan or "household" in kalan
+    kalan = c4.filter(pl.col("split") == SPLIT_TRAIN)["label"].to_list()
+    assert df.filter(pl.col("split") == SPLIT_TRAIN).height - len(kalan) > 0
+    # 1. C1'in sildigi etiket C4'te hayatta kalir: secim etikete bakmiyor.
+    assert "gift_given" in kalan
+    # 2. Secilen satirlar C1'inkinden farkli: sayi ayni, kume degil.
+    assert _removed_rows(df, c4) != _removed_rows(df, c1)
+
+
+def test_seed_for_is_pinned_so_it_cannot_become_hash():
+    """`hash()` PYTHONHASHSEED ile surecten surece degisir; crc32 degismez.
+
+    Deger CAKILI, cunku "ayni surecte iki kez cagir, esit mi" testi `hash()`
+    ile de gecer - `hash()` bir surec ICINDE kararlidir (denetim 2026-09-20).
+    Kardesi `test_sampling.test_stratum_seed_is_stable_across_processes` ayni
+    deseni kullaniyor. Bu sayi degisirse C4/C4b'nin sectigi satirlar ve
+    butun bootstrap seed'leri degisir.
+    """
+    assert _seed_for(42, "C4") == 993655479
+    assert _seed_for(42, "C4b") == 353048883
 
 
 def test_c4_is_reproducible_across_processes():
-    """`hash()` PYTHONHASHSEED ile degisir; crc32 degismez.
-
-    Ayni seed ayni satirlari secmezse "3-5 seed" iddiasi anlamsizlasir.
-    """
+    """Ayni seed ayni satirlari secmezse "3 seed" iddiasi anlamsizlasir."""
     df = _frame()
 
     ilk, _ = apply_condition(df, "C4", seed=SEED)

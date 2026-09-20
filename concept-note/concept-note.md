@@ -89,6 +89,20 @@ A final property makes the intervention unusually attractive commercially: becau
 | Category ordering | Toys > Video Games > Grocery | **Stop and revise** — detector is capturing something other than gift intent |
 | **Placebo validity** | C0 vs C4 difference **not** significant | Experimental setup is broken; results uninterpretable |
 
+> **Erratum — 2026-09-20 (audit).** Three of the criteria above were not met as written, and
+> the project proceeded anyway. Recording that here rather than leaving it to the reader:
+> (a) **detector macro-F1 measured 0.5404** [0.4897–0.5869] against the human labels, not
+> ≥ 0.75, and **`gift_given` precision measured 0.68** (0.6485 population-weighted), not
+> ≥ 0.80 — neither threshold was ever written into `configs/base.yaml`, so neither was
+> enforced as a gate; (b) inter-annotator agreement was **never measured** — only one of the
+> three annotators delivered, so Week 4 closed as INCOMPLETE and κ was not computed;
+> (c) the **placebo criterion was reformulated before the runs** (2026-09-14) to "the placebo
+> must not *beat* C0", because random deletion is expected to *hurt* accuracy — under the
+> wording above Toys would have failed. The decision rule below also names **NDCG@10**, while
+> the pre-registered primary metric in `configs/base.yaml` is **Recall@10**; both are reported
+> per cell. Full reasoning and the affected numbers: `repo/docs/DECISIONS.md` (2026-09-14,
+> 2026-09-18, 2026-09-20) and `repo/docs/SONUCLAR.md` §7.
+
 **Decision rule for the primary result.** The project succeeds when it produces a *conclusive* answer, in either direction:
 
 - If **C1 − C4** in NDCG@10 has a 95% bootstrap confidence interval excluding zero → contamination materially degrades recommendation quality; the marketing recommendation is to filter the signal.
@@ -130,7 +144,7 @@ This capability is recent. Until instruction-tuned language models became runnab
 
 A four-stage pipeline converting unstructured review text into a marketing decision:
 
-1. **Semantic detection** — an open-weight instruction-tuned LLM classifies each review into `self` / `gift_given` / `household` / `unclear`, returning a verbatim evidence span, recipient relation, and occasion.
+1. **Semantic detection** — an open-weight instruction-tuned LLM classifies each review into `self` / `gift_given` / `household` / `received` / `unclear`, returning a verbatim evidence span, recipient relation, and occasion. *(`received` — the reviewer was given the item — became a fifth class in schema v3, 2026-08-27; four-way wording elsewhere in this document predates it.)*
 2. **Human validation** — 500 reviews independently annotated by three team members; inter-annotator agreement and per-class detector performance reported.
 3. **Distillation and scaling** — an encoder classifier trained on the LLM labels is applied to the full corpus at feasible cost.
 4. **Controlled experiment** — sequential recommenders trained under five conditions; evaluation restricted to held-out items that are themselves self-purchases.
@@ -279,4 +293,4 @@ The design is built so that either outcome is trustworthy and useful. A positive
 
 ---
 
-*Companion documents: `LITERATURE_REVIEW.md`, `TECHNOLOGY_REVIEW.md`, `IMPLEMENTATION_PLAN.md`.*
+*Companion documents: [`literature-review/literature-review.md`](../literature-review/literature-review.md), [`technology-review/technology-review.md`](../technology-review/technology-review.md), [`implementation-plan/implementation-plan.md`](../implementation-plan/implementation-plan.md). Results: [`repo/docs/SONUCLAR.md`](../repo/docs/SONUCLAR.md).*

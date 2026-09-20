@@ -40,7 +40,7 @@ Amazon Reviews 2023 (HF, kategori bazlı)
    ├─ [C] LLM annotation (Qwen3-4B-Instruct, vLLM)      → data/annotations/
    ├─ [D] insan doğrulama (500, tek etiketleyici)      → data/annotations/human/
    ├─ [E] ModernBERT distillation                      → models/
-   ├─ [F] tam korpus inference                         → data/processed/
+   ├─ [F] tam korpus inference                         → data/annotations/
    │
    ├─ [G] betimsel analiz + doğrulama (V1–V5)          → reports/figures/
    └─ [H] RecBole deneyi (C0 C1 C4 C1b C4b C3) + M1–M3 → reports/results/
@@ -189,7 +189,7 @@ olduğunu bilmiyordu. Join anahtarı **`parent_asin`** — `asin` DEĞİL.
 
 Sequential recommendation, leave-one-out.
 
-### Beş koşul
+### Koşullar (planda beş, koşan altı)
 | Kod | Ne yapar |
 |---|---|
 | C0 | Baseline — tüm etkileşimler |
@@ -231,12 +231,12 @@ Sequential recommendation, leave-one-out.
 | Structured output | vLLM guided decoding (JSON schema) | serbest metin parse edilmeyecek |
 | Distillation | **ModernBERT-base** | `AutoModelForSequenceClassification` |
 | Recsys | **RecBole 1.2.0** — **ayrı venv** (`.venv-recbole`, `requirements-recbole.txt`) | kendi implementasyonumuzu yazmıyoruz. RecBole numpy 1.x dönemine ait: ana ortamın numpy 2.5 / pandas 3.0 yığınında ilk satırda çöküyor (`np.float_`). Ana ortama kurmak numpy/scipy/sklearn'i geri çekip polars/statsmodels tarafını kırardı. İki taraf `.inter` dosyasıyla konuşuyor, ayırmanın bedeli yok. Gerekçe: `docs/DECISIONS.md` 2026-08-29 |
-| Deney takibi | **Weights & Biases** | her run config + seed + metrik loglar |
+| Deney takibi | ~~Weights & Biases~~ → **JSON koşu raporu** | **W&B KULLANILMADI** (2026-09-20 denetimi): kodda tek bir `wandb` çağrısı yok, bağımlılık ve `.env` değişkenleri kaldırıldı. Her koşu `reports/results/*.json` içine config, seed, metrik ve `code_version` yazıyor; 72 koşunun tamamı böyle kayıtlı |
 | Config | **YAML** (`configs/`) | kodda hardcode path/parametre yok |
 | Test | **pytest** | |
 
-**Prefix caching neden zorunlu.** Ölçüldü (2026-08-27): SYSTEM prompt'u `v3`'te
-**~2.450 token**, review medyanı **~30 token**. Yani her satırın prefill'inin **%99'u
+**Prefix caching neden zorunlu.** Ölçüldü (2026-08-27 tahmin ~2.450; Kaggle'da
+ölçülen **2.277 token**): SYSTEM prompt'u `v3`'te **2.277 token**, review medyanı **~30 token**. Yani her satırın prefill'inin **%99'u
 aynı**. Caching kapalıysa 47.200 satırda ~**116M gereksiz prefill token** üretilir ve
 Kaggle kotası boşa gider.
 
@@ -276,7 +276,7 @@ Kaggle kotası boşa gider.
 > gerçeğin 4,6 katı yanlış.
 >
 > **Gerçekleşen:** Toys 11.800 satır = **57 dk** (tahmin 73'tü). Dört kategori
-> (47.200) ≈ **3,8 saat**, Kaggle'ın 30 sa/hafta kotasının %13'ü. Darboğaz T4'te
+> (47.200) = **4,07 saat**, Kaggle'ın 30 sa/hafta kotasının %13'ü. Darboğaz T4'te
 > decode: FlashAttention yok (compute capability 7.5 → `TRITON_ATTN`), KV cache
 > 4,45 GiB → aynı anda ~8 istek.
 
@@ -315,7 +315,7 @@ sığmazsa (14B+) gerekir ve o zaman `gpus` düşürülür — kod
 > 200.000'lik parçalarla. Akış `scripts/kaggle_distill.py`'de.
 
 **Inference kapsamı: önce `kcore`, sonra `clean`.** RQ2–RQ4 yalnızca k-core korpusuna
-etiket istiyor (**4,97M satır**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25 saat) RQ1'in
+etiket istiyor (üç kategoride 4,97M satır; **koşulan iki kategoride 4.598.612**, ~3–5 saat yerel GPU). `clean` (27M, ~15–25 saat) RQ1'in
 betimsel eğrilerini keskinleştiriyor ama zorunlu değil — RQ1 `main` çerçevesinden güven
 aralığıyla zaten cevaplanabiliyor. Ters sırada deney 20 saat boşuna bekler.
 
@@ -336,12 +336,14 @@ isterse duruyor.
 Her adım tek başına yeniden çalıştırılabilir; çıktı varsa `--force` olmadan
 yeniden hesaplanmaz.
 
-> **Aşağıdaki komutların hepsi BUGÜN çalışır.** Henüz yazılmamış olanlar en
-> altta, ayrı bir blokta ve öyle işaretli. Karışık liste tutmak, hangi adımın
-> gerçekten koşabildiğini belirsiz bırakıyordu (denetim, 2026-08-29).
+> **Aşağıdaki komutların hepsi BUGÜN çalışır** ve 2026-09-20 denetiminde
+> `--help` ile tek tek doğrulandı. Yazılmamış adım kalmadı (2026-09-14).
 
 ```bash
 python -m gift_contamination.data.download      --config configs/base.yaml --category pilot
+# ÜRÜN METADATA'SI ZORUNLU: `sampling` bu dosya olmadan hata verir (prompt'a
+# `product_title` giriyor). Adım 2026-09-20 denetiminde listeye eklendi.
+python -m gift_contamination.data.download      --config configs/base.yaml --category pilot --meta
 python -m gift_contamination.data.preprocess    --config configs/base.yaml --category pilot
 python -m gift_contamination.analysis.keyword_scan --config configs/base.yaml --category pilot
 # Örneklem boyutu `sampling.n_annotate` ile config'ten gelir - CLI bayrağı YOK.
@@ -402,9 +404,12 @@ python -m gift_contamination.analysis.result_figures --config configs/base.yaml
 > üretilmeli. Zincir: Hafta 5 damıtma + çıkarım (Kaggle) → atomic → koşullar → deney.
 
 Kurallar:
-- Her komut **idempotent** olmalı; çıktı varsa `--force` olmadan yeniden hesaplamamalı.
+- **Veri üreten** her komut idempotent: çıktı varsa `--force` olmadan yeniden
+  hesaplamaz. **Analiz/figür adımları değil** — `analysis.experiment_stats`, `recsys.marketing_metrics`, `analysis.result_figures`, `analysis.validation` ve `analysis.eda`/`deep_eda` her
+  çağrıldığında yeniden hesaplar ve çıktıyı ezer (girdileri zaten commit'li JSON'lar,
+  maliyet 4–14 dk). Kural 2026-09-20'de gerçeğe çekildi.
 - Her komut çıktı yolunu ve satır sayısını loglamalı.
-- Uzun süren her adım `tqdm` ile ilerleme göstermeli.
+- Uzun süren her adım **ilerleme loglamalı**. (`tqdm` kullanılmadı — parça/chunk bazlı `log.info` satırları kullanılıyor: satır sayısı, geçen süre, satır/sn. Kural 2026-09-20'de gerçeğe çekildi.)
 
 ---
 
@@ -489,7 +494,16 @@ Kurallar:
   dışlanamayan satır hata veriyor mu; stub öğretmen/öğrenci kapıyı geçemiyor mu;
   yedek model yalnızca ana model FAIL olunca koşuyor ve onun kanıtını ezmiyor mu
 - `test_inference.py` — 5-core'un her satırına TAM bir etiket mi; kesintiden sonra
-  bitmiş parça yeniden hesaplanmıyor mu; kapıyı geçmemiş öğrenci reddediliyor mu
+  bitmiş parça yeniden hesaplanmıyor mu; kapıyı geçmemiş öğrenci reddediliyor mu; **başka
+  bir modelin/backend'in parçaları sessizce `distilled` damgası almıyor mu** (manifest)
+- `test_io.py` — `code_version` commit'lenmemiş değişikliği `-dirty` diye işaretliyor mu;
+  depo dışında `None` mu; `relative_to_repo` işletim sistemi kullanıcı adını sızdırmıyor mu
+
+> **Mutasyonla doğrulanmış üç değişmez (2026-09-20 denetimi).** Bir test "geçiyor" diye
+> koruma sağlamaz; koruduğu şeyi bozunca DÜŞMELİ. Şunlar bozulunca düşecek biçimde
+> yazıldı ve bu bilfiil denendi: C4'ü C1'in kopyası yapmak · eşli bootstrap'ı eşsiz
+> yapmak · `conditions._seed_for`'u `zlib.crc32` yerine `hash()` ile yazmak. Üçü de
+> eski testlerden geçiyordu.
 
 Küçük sentetik fixture'lar `tests/fixtures/` altında. Gerçek veri testte kullanılmaz.
 
@@ -532,7 +546,10 @@ Cevabın yönü (pozitif/null) başarı kriteri **değildir**.
 Bunlar henüz kararlaştırılmadı. Claude Code bunları **kendi kafasına göre doldurmasın**,
 karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazsın.
 
-- [ ] **TBD** Örnekleme boyutu kesin sayı: 40K mı 60K mı (pilot sonucuna göre)
+- [x] ~~**TBD** Örnekleme boyutu kesin sayı: 40K mı 60K mı~~ → **40K KARARLAŞTI**
+  (`sampling.n_annotate: 40000`); dört kategoride **47.200 satır** etiketlendi
+  (kategori başına 11.800). 2026-09-20 denetiminde kapatıldı — karar çoktan
+  uygulanmıştı, kutu işaretsiz kalmıştı.
 - [x] ~~**TBD** C2'de kullanılacak nihai ağırlık(lar)~~ → **KAPSAM DIŞI 2026-09-14.**
   C2 uygulanmadı ve çağrılırsa açık hata veriyor. Önceki kod bir `weight` kolonu
   ekliyordu ama hiçbir şey onu okumuyordu — koşulsa C0'ın aynısı "C2" diye

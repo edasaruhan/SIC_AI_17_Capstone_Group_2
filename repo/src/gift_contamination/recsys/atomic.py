@@ -174,10 +174,20 @@ def build_atomic(
             "vekil etiketi 'proxy' disinda bir adla damgalanamaz (ya da tersi)."
         )
     dest = inter_path(cfg, role)
-    if dest.exists() and not force and split_path(cfg, role).exists():
+    if dest.exists() and not force:
         # BAYAT DOSYA KORUMASI: vekille uretilmis dosya varken `--labels distilled`
         # istemek "zaten var" diye atlanirsa deney sessizce vekille kosar.
-        eski = read_json(split_path(cfg, role)).get("label_source")
+        yol = split_path(cfg, role)
+        if not yol.exists():
+            # Korumanin kanit dosyasi yoksa ATLAMA. Kaggle akisi operatore bu
+            # dosyayi elle yeniden adlandirtiyor (scripts/kaggle_experiment.py),
+            # yani kaybolmasi gercek bir senaryo; eskiden bu durumda kontrol
+            # komple atlaniyordu (denetim 2026-09-20).
+            raise RuntimeError(
+                f"{dest.name} var ama {yol.name} yok - dosyanin hangi etiketle "
+                "uretildigi bilinemiyor. `--force` ile yeniden uretin."
+            )
+        eski = read_json(yol).get("label_source")
         if eski != label_source:
             raise RuntimeError(
                 f"{dest.name} '{eski}' etiketiyle uretilmis, '{label_source}' isteniyor. "

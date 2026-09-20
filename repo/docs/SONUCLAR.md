@@ -7,7 +7,7 @@
 > her bölümde yazıyor. Eşikler, karşıtlıklar, yorum kuralları ve pazarlama metriklerinin
 > tanımları **deney koşulmadan** yazıldı (DECISIONS 2026-09-14, commit `8c697a8` ve
 > sonrası). Sonuç görüldükten sonra eklenenler ikidir, ikisi de yerinde öyle işaretli:
-> valid satırındaki hediyelerin sayımı (§6.1, §7 madde 3) ve M2'nin n = 0 kovası hariç
+> valid satırındaki hediyelerin sayımı (§6.1, §7 madde 5) ve M2'nin n = 0 kovası hariç
 > duyarlılığı (§6.1). Hiçbiri birincil bir sayının yerine geçmiyor.
 
 ---
@@ -113,8 +113,10 @@ Kaynak: `gate2.json`. Dört ölçüt, eşikler koşulardan önce (`configs/base.
 doğruluğu düşürmeli, iyileştirirse kurulum hatalıdır. Dört hücrede de plasebo C0'ın altında
 ya da ondan ayırt edilemiyor. Seed değişim katsayısı eşiğin (0,10) çok altında.
 
-> **Belgelerdeki eski ifade.** ROADMAP ve PROJECT_SPEC bu kapıyı "C0 ile C4 arasında
-> anlamlı fark **olmamalı**" diye anlatıyor. Bağlayıcı olan, koşulardan iki gün önce commit'lenen
+> **Belgelerdeki eski ifade.** ROADMAP, PROJECT_SPEC, `concept-note` §5 ve
+> `implementation-plan` §"Gate 2" bu kapıyı "C0 ile C4 arasında anlamlı fark
+> **olmamalı**" diye anlatıyor (dördü de; ilk ikisi 2026-09-18'de, kalan ikisi
+> 2026-09-20 denetiminde bulundu). Bağlayıcı olan, koşulardan iki gün önce commit'lenen
 > ölçüt yukarıdaki. Toys'ta C4, C0'dan anlamlı düşük — **eski ifadeyle Kapı 2 FAIL olurdu.**
 > Ölçüt sonuç görüldükten sonra değiştirilmedi; çelişki DECISIONS 2026-09-18'de ayrıca yazılı.
 
@@ -326,44 +328,58 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
 
 ## 7. Sınırlılıklar
 
-1. **İnsan referansı tek kişi; etiket güvenilirliği ölçülmedi.** Hafta 4 kapısı bu yüzden
+1. **Önceden kayıtlı iki detektör eşiği tutturulamadı.** `concept-note` §5 iki eşik
+   yazmıştı: makro-F1 **≥ 0,75** ve `gift_given` kesinliği **≥ 0,80**. Ölçülen: **0,5404**
+   [0,4897–0,5869] (popülasyonda 0,494) ve **0,68** (popülasyonda 0,6485). Eşiklerin yazılı
+   karşılığı "prompt v4 yaz / modeli değiştir" ve "confidence eşiğini yükselt"ti; ikisi de
+   yapılmadı — v4, Kapı 1'in yeniden koşulmasını gerektiriyordu ve 500 doğrulama satırı
+   prompt ayarı için kullanılamazdı (tek bağımsız referans yok olurdu), `confidence` alanı
+   ise zaten 2026-08-29'da ölçümle düşürülmüştü (`low` ≡ `unclear`). Eşikler config'e hiç
+   girmedi, yani fiilen hiçbir zaman kapı olarak kurulmadılar. Proje bu ölçümle ilerledi;
+   sonuçlar bu yüzden alt sınır olarak okunuyor (madde 4). Gerekçe: DECISIONS 2026-09-20.
+2. **Birincil metrik, concept-note'un yazdığı NDCG@10 değil Recall@10.** Değişiklik deney
+   koşulmadan config'e yazıldı (2026-09-14) ama kaydedilmemişti. Tek bir hücrede sonucu
+   çeviriyor: Grocery × BPR C1 − C4, Recall'da "saptanamadı" [−0,000085, +0,000487],
+   NDCG'de "alt sınır" [+0,000055, +0,000352]. İki metrik de §4.2'de yan yana duruyor.
+   Gerekçe: DECISIONS 2026-09-20.
+3. **İnsan referansı tek kişi; etiket güvenilirliği ölçülmedi.** Hafta 4 kapısı bu yüzden
    INCOMPLETE (asla PASS yazılmadı). Bütün kalibrasyon ve etiket kalitesi sayıları tek
    etiketleyiciye göre.
-2. **C1 etiketi gürültülü:** popülasyonda kesinlik 0,65 (öğrenci 0,66) — "hediye" denen
+4. **C1 etiketi gürültülü:** popülasyonda kesinlik 0,65 (öğrenci 0,66) — "hediye" denen
    satırların yaklaşık üçte biri insana göre hediye değil, çoğu kendi çocuğuna alınan. RQ2
    etkileri bu yüzden alt sınır; gerçek etki muhtemelen daha büyük.
-3. **Valid satırındaki hediye silinmiyor** (sonuçtan sonra fark edildi, §6.1). Koşullar
+5. **Valid satırındaki hediye silinmiyor** (sonuçtan sonra fark edildi, §6.1). Koşullar
    yalnızca eğitim satırlarını değiştiriyor; testten önceki son etkileşim (valid) her koşulda
    yerinde. Toys'ta test kullanıcılarının **%15,6**'sında bu satır `gift_given` (C1b kümesiyle
    %37,0); Grocery'de %2,6 / %6,5. SASRec onu C1/C1b/C3'te de test girdisinde görüyor. Yani
    SASRec için C1 kısmi bir temizlik ve C1 − C4 ile C1 − C0 farklarını **küçültür**, büyütmez.
    BPR valid satırıyla hiçbir koşulda eğitilmediği için etkilenmiyor. Tasarım bilinçliydi
    (bölme C0'da donar), sonuca etkisi önceden yazılmamıştı.
-4. **Kaç epoch eğitildiği bilinmiyor.** RecBole'un epoch satırları loglara düşmedi; 300
+6. **Kaç epoch eğitildiği bilinmiyor.** RecBole'un epoch satırları loglara düşmedi; 300
    tavanına değen koşu olup olmadığı söylenemez. Protokol her koşulda aynı, ama mutlak
    metriklerin tam yakınsadığı iddia edilemez. Hiperparametre araması yapılmadı (RecBole
    varsayılanları, bütün koşullarda aynı).
-5. **SASRec'in erken durdurma kümesi koşula göre küçülüyor:** eğitim geçmişi tamamen silinen
+7. **SASRec'in erken durdurma kümesi koşula göre küçülüyor:** eğitim geçmişi tamamen silinen
    kullanıcının valid satırı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
-6. **Deneyde iki kategori var.** Doz–yanıt iki noktalı; Video Games deneye girmedi, All
+8. **Deneyde iki kategori var.** Doz–yanıt iki noktalı; Video Games deneye girmedi, All
    Beauty'nin 5-core'u boş.
-7. **Kalibrasyonun varsayımı Toys'ta tutmuyor** (insan–LLM uyumu kategoriden bağımsız
+9. **Kalibrasyonun varsayımı Toys'ta tutmuyor** (insan–LLM uyumu kategoriden bağımsız
    değil): Toys'un kendi uyumuyla C1b oranı %54,4, havuzlanmış uyumla %44,2. Düşük hediyeli
    kategorilerde C1b'nin kalibre oranı muhtemelen yukarı yanlı.
 8. `received` sınıfı pratikte güvenilmez: etiketleyici 11 kez kullandı, LLM'in bu sınıftaki
    kesinliği popülasyonda 0,09. C1b'ye girer, C1'e girmez.
-9. **Öğrenci `clean` dağılımında eğitildi, 5-core'u etiketledi.** LLM etiketlerinin yalnızca
+10. **Öğrenci `clean` dağılımında eğitildi, 5-core'u etiketledi.** LLM etiketlerinin yalnızca
    küçük bir kısmı (Toys'ta %17,6) 5-core'da. Kayma ölçüldü ve raporlandı (DECISIONS
    2026-09-15), düzeltilmedi.
-10. **Review ≠ alım:** yalnızca review yazılmış alımlar görülüyor; review tarihi alımın
+11. **Review ≠ alım:** yalnızca review yazılmış alımlar görülüyor; review tarihi alımın
     gerisinde (mevsim tepesi Aralık–Ocak'a kayıyor; M2'nin haftaya çevirisi yaklaşık).
-11. **RQ3 tek bir işaretleme yöntemini sınıyor** (gölge token). C2 uygulanmadı.
-12. **M1 "israfı" dönüşüm ölçmüyor**, yalnızca slot payı. **M2 gözlemsel:** n'si büyük
+12. **RQ3 tek bir işaretleme yöntemini sınıyor** (gölge token). C2 uygulanmadı.
+13. **M1 "israfı" dönüşüm ölçmüyor**, yalnızca slot payı. **M2 gözlemsel:** n'si büyük
     kullanıcılar başka açılardan da farklı (daha uzun geçmiş); fark C0 − C1 eşli olduğu için
     kullanıcı sabit, ama n'nin kendisi rastgele atanmadı.
-13. **Çoklu karşılaştırma düzeltmesi yok.** Birincil karşıtlık (C1 − C4, Recall@10) önceden
+14. **Çoklu karşılaştırma düzeltmesi yok.** Birincil karşıtlık (C1 − C4, Recall@10) önceden
     belirlendi; öteki karşıtlıklar ve metrikler ikincil ve GA'larıyla birlikte okunmalı.
-14. **Kapı 2'nin eski ifadesi** belgelerde başka bir ölçütü anlatıyordu (§3).
+15. **Kapı 2'nin eski ifadesi** belgelerde başka bir ölçütü anlatıyordu (§3).
 
 ---
 

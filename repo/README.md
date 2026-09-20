@@ -28,7 +28,7 @@ python -m venv .venv && .venv/Scripts/activate     # Linux/macOS: source .venv/b
 pip install -r requirements.txt
 pip install -e .                                    # python -m gift_contamination.* icin
 
-cp .env.example .env    # HF_TOKEN ve WANDB_API_KEY (ikisi de opsiyonel)
+cp .env.example .env    # HF_TOKEN (opsiyonel; dataset public)
 ```
 
 **LLM annotation (Hafta 3–5) yerelde koşmuyor.** Kaggle'da iki T4 üzerinde
@@ -52,19 +52,22 @@ python -m venv .venv-recbole
 İki ortam birbirine **dosyayla** bağlı: `data/processed/recbole/…/*.inter`. Ortak
 kod import edilmiyor, o yüzden çakışma da yok.
 
-> **Disk uyarısı.** Dört kategori ham hâlde ~16.3 GB. Proje bir bulut-senkron klasörü
+> **Disk uyarısı.** Dört kategori ham hâlde ~16 GB (review JSONL 15,2 GB + metadata ~1,1 GB). Proje bir bulut-senkron klasörü
 > (OneDrive/Dropbox) altındaysa `data/raw`'ı senkron dışına alın — Windows'ta bir junction
 > yeterlidir ve config'i değiştirmez:
 > `mklink /J data\raw D:\amazon-reviews-2023`
 
 ## Hızlı başlangıç
 
-Her komut idempotent: çıktı varsa `--force` olmadan yeniden hesaplamaz.
+Veri üreten komutlar idempotent: çıktı varsa `--force` olmadan yeniden hesaplamaz.
+Analiz/figür adımları (`experiment_stats`, `marketing_metrics`, `result_figures`,
+`validation`, `eda`, `deep_eda`) her çağrıldığında yeniden hesaplar.
 `--category` değerleri: `pilot` · `high` · `mid` · `low` · `all`.
 
 ```bash
 # Hafta 1-2 — veri, vekil, EDA, örneklem
 python -m gift_contamination.data.download          --category pilot
+python -m gift_contamination.data.download          --category pilot --meta   # ZORUNLU: sampling bunu istiyor
 python -m gift_contamination.data.preprocess        --category pilot
 python -m gift_contamination.analysis.keyword_scan  --category pilot
 python -m gift_contamination.analysis.eda
@@ -155,6 +158,9 @@ Veri dosyaları git'e **girmez**; `reports/` altındaki toplulaştırılmış so
 | `reports/results/` | huni sayaçları, keyword oranları, EDA tabloları, Kapı 1, doğrulama, yaygınlık, damıtma kapısı, deney raporları, Kapı 2 (`gate2.json`), karşıtlıklar (`experiment_stats.json`), pazarlama metrikleri (`marketing_metrics.json`) |
 | `reports/figures/` | F1–F19 (F18 = Hafta 4 doğrulaması, F19 = kalibre yaygınlık) · F20–F23 sonuç figürleri (damıtma sadakati, koşul karşıtlıkları, M2, M1) — 72 gerçek koşudan |
 | `../data-research/data-research.md` | Data Research teslimi |
+| `../concept-note/` · `../literature-review/` · `../technology-review/` · `../implementation-plan/` | Önceki ders teslimleri (tarihli errata notlarıyla) |
+| `../model-refinement/` · `../deployment/` | Model Refinement ve Deployment teslimleri (`.docx`) |
+| `reports/results/smoke/` | Duman testi çıktıları — `reportable: false`, sonuç tablosuna giremez |
 
 ## Veri
 `McAuley-Lab/Amazon-Reviews-2023` (HuggingFace, açık). Kategori bazlı indirilir.

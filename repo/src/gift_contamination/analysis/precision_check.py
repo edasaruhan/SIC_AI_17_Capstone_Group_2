@@ -28,9 +28,9 @@ from pathlib import Path
 
 import polars as pl
 
-from ..config import Config, DEFAULT_CONFIG, REPO_ROOT, resolve_roles
+from ..config import Config, DEFAULT_CONFIG, resolve_roles
 from ..data.preprocess import clean_parquet_path
-from ..utils.io import write_json
+from ..utils.io import code_version, relative_to_repo, should_skip, write_json
 from ..utils.logging import get_logger, log_output
 from .keyword_scan import PROXY_COL, keyword_path
 
@@ -43,8 +43,10 @@ SAMPLE_NAME = "keyword_precision_sample.csv"
 STRATA_SHARE = {"proxy": 0.6, "speculative": 0.2, "unflagged": 0.2}
 
 # Etiket sozlugu configs/annotation_schema.json ile ayni: ileride LLM etiketleriyle
-# dogrudan karsilastirilabilsin.
-LABELS = ("gift_given", "self", "household", "unclear")
+# dogrudan karsilastirilabilsin. `received` sema v3'te eklendi (2026-08-27) ve buraya
+# 2026-09-20 denetiminde geldi - o tarihe kadar dogru etiketlenmis bir `received`
+# satiri `score`u hataya dusururdu.
+LABELS = ("gift_given", "self", "household", "received", "unclear")
 
 
 def sample_path(cfg: Config) -> Path:
@@ -56,7 +58,7 @@ def result_path(cfg: Config) -> Path:
 
 
 # ------------------------------------------------------------------ ornekleme
-def _strata(lf: pl.LazyFrame) -> dict[str, pl.Expr]:
+def _strata() -> dict[str, pl.Expr]:
     return {
         "proxy": pl.col(PROXY_COL),
         "speculative": pl.col("kw_gift_speculative") & ~pl.col(PROXY_COL),
@@ -66,7 +68,14 @@ def _strata(lf: pl.LazyFrame) -> dict[str, pl.Expr]:
     }
 
 
-def build_sample(cfg: Config, roles: list[str]) -> Path:
+def build_sample(cfg: Config, roles: list[str], *, force: bool = False) -> Path:
+    # ELLE ETIKETLENMIS DOSYAYI EZMEYIN. Bu CSV 100 manuel etiket tasiyor ve
+    # gitignore'da - ezilirse geri gelmez. Depodaki her uretici bu korumayi
+    # yapiyor, burada yoktu (denetim 2026-09-20).
+    dest = sample_path(cfg)
+    if should_skip(dest, force, log):
+        return dest
+
     n_total = int(cfg.get("keywords.precision_sample_n"))
     seed = int(cfg.get("keywords.precision_seed"))
     per_role = max(1, n_total // len(roles))
@@ -82,7 +91,7 @@ def build_sample(cfg: Config, roles: list[str]) -> Path:
         )
         joined = flags.join(text, on="row_id", how="inner").collect()
 
-        for stratum, expr in _strata(flags).items():
+        for stratum, expr in _strata().items():
             pool = joined.filter(expr)
             take = max(1, round(per_role * STRATA_SHARE[stratum]))
             if pool.height == 0:
@@ -111,7 +120,6 @@ def build_sample(cfg: Config, roles: list[str]) -> Path:
         )
     )
 
-    dest = sample_path(cfg)
     dest.parent.mkdir(parents=True, exist_ok=True)
     out.write_csv(dest)
     log_output(log, dest, n_rows=out.height)
@@ -158,6 +166,7 @@ def score(cfg: Config) -> dict:
         raise ValueError(f"{src} icinde hic etiket yok; `label` sutununu doldurun.")
 
     out: dict = {
+        "code_version": code_version(),
         # Repo-koku goreli: mutlak yol kullanici adini iceriyor ve bu dosya
         # commit ediliyor. Projenin gizlilik taahhudu icin bkz. CLAUDE.md.
         "source": relative_to_repo(src),
@@ -206,6 +215,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("action", choices=["sample", "score"])
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--category", default="all")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="ELLE ETIKETLENMIS ornegi yeniden uretir ve EZER (yalnizca `sample`).",
+    )
     args = parser.parse_args(argv)
 
     cfg = Config.load(args.config)
@@ -215,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if not roles:
             raise FileNotFoundError("Once keyword_scan kosun.")
-        build_sample(cfg, roles)
+        build_sample(cfg, roles, force=args.force)
     else:
         res = score(cfg)
         log.info(

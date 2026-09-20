@@ -63,6 +63,38 @@ def parts_dir(cfg: Config, role: str) -> Path:
     return distill_dir(cfg) / f"infer_parts_{cfg.category_slug(role)}"
 
 
+PARTS_MANIFEST = "_manifest.json"
+
+
+def check_parts_manifest(parts: Path, *, model_key: str, backend: str, model_name: str,
+                         chunk_rows: int, force: bool = False) -> dict:
+    """Parca onbellegi HANGI ogrencinin urettigini tasimali.
+
+    Parcalar yalnizca `part.exists()` ile atlaniyor, ama nihai damga
+    (`label_source`, `model`) o an YUKLU ogrenciden geliyordu. Yani stub ile
+    uretilmis ya da baska bir modele ait parcalar, `_inferred.parquet`
+    kaybolup kosu tekrarlandiginda sessizce `distilled` damgasiyla yazilabilirdi;
+    `atomic` yalnizca damgaya baktigi icin de kabul ederdi (denetim 2026-09-20).
+    Desen `llm_annotate._stale_backend` ile ayni: bayat onbellek sessizce degil
+    ACIK HATAYLA reddedilir.
+    """
+    yol = parts / PARTS_MANIFEST
+    simdi = {"model_key": model_key, "backend": backend, "model": model_name,
+             "chunk_rows": int(chunk_rows)}
+    if yol.exists() and not force:
+        eski = read_json(yol)
+        if eski != simdi:
+            farkli = [k for k in simdi if eski.get(k) != simdi[k]]
+            raise RuntimeError(
+                f"{parts.name} baska bir kosudan kalmis ({', '.join(farkli)} farkli): "
+                f"kayitli {eski}, istenen {simdi}. Bitmis parcalar o kosuya ait; "
+                "karisik etiket yazmamak icin durdum. Parca klasorunu silin ya da "
+                "`--force` verin."
+            )
+    write_json(simdi, yol)
+    return simdi
+
+
 def inferred_path(cfg: Config, role: str) -> Path:
     return cfg.path("annotations", f"{cfg.category_slug(role)}_inferred.parquet")
 
@@ -168,6 +200,8 @@ def run(
     student = load_student(cfg, model_key, backend, fp16=fp16)
     parts = parts_dir(cfg, role)
     parts.mkdir(parents=True, exist_ok=True)
+    check_parts_manifest(parts, model_key=model_key, backend=backend,
+                         model_name=student.model_name, chunk_rows=chunk_rows, force=force)
     girdi = pl.scan_parquet(src)
     n = girdi.select(pl.len()).collect().item()
 

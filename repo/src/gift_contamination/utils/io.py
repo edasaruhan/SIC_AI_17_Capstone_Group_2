@@ -36,20 +36,39 @@ def code_version() -> str | None:
     Fark ancak cikti formatindan sezilebiliyordu. Artik ciktilar bir kod
     surumune baglanabiliyor - notebook ciktisi kaybolsa bile.
 
+    COMMIT'LENMEMIS DEGISIKLIK `-dirty` ile isaretlenir. Yalnizca HEAD yazmak,
+    calisma agacinda degisiklikle uretilmis bir ciktiyi temiz bir commit'ten
+    gelmis gibi gosteriyordu; `marketing_metrics.json` tam boyle damgalanmisti
+    (denetim 2026-09-20). Damga bir iddiadir; dogru olmayan bir iddiayi
+    sessizce yazmaktansa "dirty" demek gerekir.
+
     Sessizce None doner: git yoksa veya depo degilse kosu durmamali, bu bir
     kayit alani, bir kapi degil. Burada durmasinin sebebi RecBole ortami:
     `llm_annotate` pydantic cekiyor, deney kosucusu cekemez.
     """
     import subprocess  # noqa: PLC0415
 
-    try:
-        out = subprocess.run(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=5, check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
+    def git(*args: str) -> subprocess.CompletedProcess | None:
+        try:
+            return subprocess.run(
+                ["git", "-C", str(REPO_ROOT), *args],
+                capture_output=True, text=True, timeout=5, check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    out = git("rev-parse", "--short", "HEAD")
+    if out is None:
         return None
-    return out.stdout.strip() or None
+    surum = out.stdout.strip()
+    if not surum:
+        return None
+    kirli = git("status", "--porcelain", "--untracked-files=no")
+    # Belirlenemiyorsa iddia BUYUTULMEZ: temiz oldugunu varsaymak yerine
+    # bilinmedigini yaz.
+    if kirli is None or kirli.returncode != 0:
+        return f"{surum}-unknown"
+    return f"{surum}-dirty" if kirli.stdout.strip() else surum
 
 
 def ensure_parent(path: Path) -> Path:

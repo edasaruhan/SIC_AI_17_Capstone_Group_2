@@ -1,19 +1,16 @@
 # Çekirdek: veri işleme + analiz. Her ortamda kurulur.
 polars>=1.0
-pyarrow>=15.0
+pyarrow>=15.0               # dogrudan import edilmiyor: `datasets` ve parquet
+                            # gidis-donusu icin gerekli
 datasets>=2.19
 huggingface_hub>=0.23        # dosyalari dogrudan cekiyoruz; bkz docs/DECISIONS.md
 pydantic>=2.7
 pyyaml>=6.0
 python-dotenv>=1.0
-tqdm>=4.66
 numpy>=1.26
 scipy>=1.13
 statsmodels>=0.14
-scikit-learn>=1.4
 matplotlib>=3.8
-seaborn>=0.13
-wandb>=0.17
 pytest>=8.0
 
 # Elle etiketleme sayfasi (data/labelsheet.py). Excel gidis-donusunde

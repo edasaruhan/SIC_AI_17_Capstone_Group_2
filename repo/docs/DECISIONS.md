@@ -2391,3 +2391,122 @@ M2 tanımı bu kaydın hemen öncesindeki kayıtla değerler görülmeden onayla
 **Etkilediği bölüm:** `analysis/result_figures.py`, `recsys/marketing_metrics.py` (sabit),
 `tests/test_result_figures.py`, SONUCLAR, GENEL_BAKIS §4/§5/§6/§8, CLAUDE.md §7/§13, README
 **Kim:** Ekip
+
+---
+
+### 2026-09-20 — Denetim: önceden kayıtlı iki detektör kapısı tutturulamadı (KAYIT)
+**Karar:** İki eşik `concept-note` §"Success criteria"da yazılıydı ve **tutturulamadı**.
+Bugüne kadar hiçbir belgede uzlaştırılmamıştı; bu kayıt onu kapatıyor. Sonuç **değişmiyor**,
+proje bu ölçümle ilerlemiş sayılıyor — ama artık sınırlılık olarak yazılı.
+
+| Kapı (concept-note §5) | Eşik | Ölçülen (`validation_500.json`) |
+|---|---|---|
+| Detektör makro-F1 (insan etiketine karşı) | **≥ 0,75** | **0,5404** [0,4897–0,5869] · popülasyon ağırlıklı 0,494 |
+| `gift_given` kesinliği | **≥ 0,80** | **0,68** · popülasyon ağırlıklı **0,6485** |
+
+**Gerekçe (neden eşiklerin öngördüğü şey yapılmadı):** İkisinin de yazılı karşılığı "prompt'u
+revize et (v2) / birincil modeli değiştir" ve "confidence eşiğini yükselt"ti.
+
+1. **Prompt v4 yazılmadı.** Gerekçesi 2026-08-29'da (sonuç görülmeden, `confidence` kaydında)
+   yazılmıştı: v4 ~4 saat Kaggle ve **Kapı 1'in yeniden koşulması** demek. Daha önemlisi,
+   500 doğrulama satırı prompt ayarı için kullanılamaz — kullanılsaydı elimizdeki tek
+   bağımsız referans yok olurdu (deneme setinin F1 olarak raporlanamamasıyla aynı hata).
+2. **`confidence` eşiği zaten düşmüştü.** 2026-08-29: `low` ile `unclear` birebir örtüşüyor
+   (870/870), alan bağımsız bilgi taşımıyor. Yani kapının öngördüğü kaçış yolu ölçümle
+   kapanmıştı; iki karar birbirine bağlanmamıştı.
+3. **Eşikler koda hiç girmedi.** `analysis/validation.py` tek kapı ölçütü tanıyor
+   (`1_annotator_agreement`, tek etiketleyici olduğu için `passed: null`). Yani bu iki eşik
+   fiilen hiçbir zaman kapı olarak kurulmadı — bu kayıt onu düzeltmiyor, **yazıyor**.
+
+**Sonuca etkisi:** Zaten raporlanan etkinin ta kendisi. C1 etiketinin popülasyon kesinliği
+0,65 → "hediye" denen satırların ~üçte biri insana göre hediye değil. Önceden kayıtlı yorum
+kuralı bu yüzden var: **C1 > C4 gerçek etkinin ALT SINIRI**. Düşük makro-F1'i iki
+küçük/bulanık sınıf çekiyor (`received` F1 0,12, `unclear` 0,20); deneyin kullandığı ikili
+eksenlerde F1 0,72 (C1) ve 0,79 (C1b).
+
+**Etkilediği bölüm:** `docs/SONUCLAR.md` §7 (madde 1), `concept-note` §5 errata,
+`technology-review` §5 errata
+**Kim:** Ekip (denetim bulgusu)
+
+### 2026-09-20 — Denetim: birincil metrik NDCG@10 değil Recall@10 (KAYIT)
+**Karar:** `concept-note` §"Decision rule" karar kuralını **NDCG@10** üzerinden yazmış;
+`configs/base.yaml` → `gate2.metric` ve `SONUCLAR.md` **Recall@10** diyor. Değişimin kaydı
+yoktu. **Birincil metrik Recall@10 kalıyor** (deney koşulmadan, 2026-09-14'te config'e öyle
+yazıldı ve öyle koşuldu); değişim burada kayda geçiyor.
+
+**Fark nerede sonucu çeviriyor:** Tek hücrede. Grocery × BPR, C1 − C4:
+
+| Metrik | Fark | %95 GA | Önceden kayıtlı yoruma göre |
+|---|---|---|---|
+| Recall@10 (fiilî birincil) | +0,000201 | [−0,000085, +0,000487] | **saptanamadı** |
+| NDCG@10 (concept-note'un kuralı) | +0,000198 | [+0,000055, +0,000352] | **alt sınır** |
+
+Öteki üç hücrede iki metrik aynı yönü veriyor. `experiment_stats.json` altı metriği de
+taşıyor ve `SONUCLAR.md` §4.2 ikisini yan yana yazıyor — yani seçim sonucu gizlemiyor,
+yalnızca hangisinin "birincil" olduğu kayıtsız değişmişti.
+
+**Etkilediği bölüm:** `docs/SONUCLAR.md` §7, `concept-note` errata
+**Kim:** Ekip (denetim bulgusu)
+
+### 2026-09-20 — Denetim: kod ve kayıt düzeltmeleri (sonuç sayısı DEĞİŞMEDİ)
+**Karar:** Tam bir uçtan uca denetim yapıldı. Bulgular düzeltildi; **hiçbir sonuç sayısı
+değişmedi** — `gate1_*.json`, `prevalence.json`, `validation_500.json` ve
+`keyword_precision.json` yeniden üretildi, ölçülen değerlerin hepsi bit düzeyinde aynı çıktı
+(tek fark eklenen provenans alanları). Birincil karşıtlık (C1 − C4, Toys × SASRec,
+Recall@10 = +0,005449) ham `peruser` parquet'lerinden bağımsız olarak yeniden hesaplandı ve
+`experiment_stats.json` ile birebir tuttu.
+
+**Düzeltilen kırıklar:**
+- `analysis/precision_check.py`: `score()` **hiç çalışmıyordu** — `relative_to_repo` çağrılıyor
+  ama import edilmemiş (`6f5e9b9` ortak yardımcıya geçerken bu dosyayı atlamış, 2026-08-27'den
+  beri). T4 yeniden üretilemiyordu. Aynı modülde: etiket sözlüğü hâlâ şema v2'ydi (`received`
+  yoktu) ve `sample` elle etiketlenmiş CSV'yi koşulsuz eziyordu (artık `should_skip` +
+  `--force`). Yeniden koşuldu: **proxy precision 0,5833 değişmedi**.
+- `detection/inference.py`: parça önbelleği modele/backend'e göre anahtarlanmıyordu. Stub ya
+  da başka bir modelle üretilmiş parçalar, nihai damga o an yüklü öğrenciden geldiği için
+  `label_source: distilled` diye yazılabilirdi. Artık parça klasöründe `_manifest.json` var ve
+  uyuşmazlıkta koşu açık hatayla duruyor (desen `llm_annotate._stale_backend`).
+- `detection/llm_annotate.py`: kesintiden sonra `stats_w{worker}.json` **eziliyordu** ve kalite
+  oranları birleşmiş tam satır sayısına bölünüyordu — Kapı 1'in 3. ölçütü ölçülmemiş bir sayıyı
+  okuyabilirdi. Her koşu artık kendi sayaç dosyasını yazıyor, oranlar üretilen satır sayısına
+  bölünüyor, rapor `n_rows_generated` ve `counters_cover_all_rows` taşıyor; işçi sayısı dosya
+  sayısından değil işçi kimliğinden geliyor. **Dört üretim koşusu tek oturumda bitti**, yani
+  mevcut Kapı 1 sayıları bu hatadan etkilenmedi.
+- `analysis/gate1.py`: vekil bayrağı join'i denetimsizdi; örnekleme dosyası etiketlemeden sonra
+  yeniden üretilseydi 2. ölçüt ölçmediği bir şeyi PASS ederdi. Artık satır/null denetimi var
+  (dört kategoride de yeniden koşuldu, PASS 4/4 değişmedi).
+- `recsys/atomic.py`: `split.json` yoksa bayat-etiket koruması komple atlanıyordu — o dosyayı
+  Kaggle akışı operatöre elle yeniden adlandırtıyor, yani kaybolması gerçek senaryo.
+
+**Provenans:**
+- `utils/io.code_version()` artık commit'lenmemiş değişikliği `-dirty` ile işaretliyor.
+  `marketing_metrics.json` `f3183df` damgalıydı ama içeriği `589fad8`'deki `LAMBDA_MIN`
+  değişikliğiyle üretilmişti (GA üst ucu tam `ln2/1e-6`); damga temiz bir commit'i işaret
+  ediyordu. Geçmişe dönük düzelmiyor, bundan sonrası dürüst.
+- `gate1_*`, `prevalence`, `validation_500`, `keyword_precision` artık `code_version` taşıyor.
+  `validation_500.json` ayrıca `model` ve `prompt_version` yazıyor (ikisi de `null`du: rapor
+  hangi modeli doğruladığını söylemiyordu).
+- Video_Games duman testi artefaktları `reports/results/smoke/` altına taşındı; adlarından
+  gerçek koşulardan ayırt edilemiyorlardı.
+
+**Testler (389 → 398):** Üç değişmez **mutasyonla düşecek** biçimde kilitlendi ve bu
+doğrulandı: (1) `test_c4_removes_at_random_not_by_label` C4'ü C1'in kopyası yapan mutasyonda
+geçiyordu (`household` C1'de silinmediği için `or` dalı hep doğruydu) — plasebonun tek
+tanımlayıcı özelliği test edilmiyordu; (2) eşli bootstrap testleri eşsiz bir uygulamayla da
+geçiyordu (GA 0,059 genişliğinde ama hâlâ sıfırı dışlıyor) — artık kullanıcı başı fark sabit
+kurulup GA genişliğinin sıfır olması isteniyor; (3) "süreçler arası üretilebilir" testi tek
+süreçte koşuyordu ve `hash()` süreç içinde kararlı olduğu için `_seed_for` `hash()`e
+çevrilse bile geçiyordu — değer artık çakılı (`993655479`). Yeni: `tests/test_io.py`,
+çıkarım manifesti, kesintili koşunun sayaçları.
+
+**Belgeler gerçeğe çekildi:** W&B "verilmiş karar" diye yazılıydı ama kodda tek satır yok
+(ölü bağımlılık ve ölü `.env` değişkenleri kaldırıldı) · "her komut idempotent" iddiası beş
+modülde doğru değildi · hızlı başlangıçta zorunlu `download --meta` adımı eksikti ·
+GENEL_BAKIS diyagramı 12,4M satır etiketlendiğini söylüyordu (gerçek 4.598.612) · depo
+kökünde README yoktu.
+
+**Etkilediği bölüm:** `analysis/precision_check.py`, `analysis/gate1.py`,
+`analysis/prevalence.py`, `analysis/validation.py`, `detection/inference.py`,
+`detection/llm_annotate.py`, `recsys/atomic.py`, `utils/io.py`, altı test dosyası, CLAUDE.md,
+README, GENEL_BAKIS, SONUCLAR, kök README
+**Kim:** Ekip (denetim)

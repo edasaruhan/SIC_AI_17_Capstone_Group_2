@@ -654,7 +654,14 @@ def run_worker(
               # kucuk kosudan buyuk kosuya uzatma yapilamaz.
               "generation_s": time.perf_counter() - started,
               "n_rows_generated": todo.height}
-    write_json(stats, shards / f"stats_w{worker}.json")
+    # HER KOSU KENDI DOSYASINI yazar. Once `stats_w{worker}.json` EZILIYORDU:
+    # kesintiden sonra ikinci kosu yalnizca kendi satirlarinin sayaclarini
+    # birakiyor, ama `_write_stats` paydaya BIRLESMIS tam satir sayisini
+    # koyuyordu - yani `parse_fail_rate` ve `span_downgrade_rate` hic olculmemis
+    # bir sayiya bolunuyordu. Kapi 1'in 3. olcutu tam bu iki alani okuyor
+    # (denetim 2026-09-20).
+    n_gecmis = len(list(shards.glob(f"stats_w{worker}_*.json")))
+    write_json(stats, shards / f"stats_w{worker}_{n_gecmis:02d}.json")
 
 
 # --------------------------------------------------- deneme kosusu (Kapi 1 / 4)
@@ -803,34 +810,64 @@ def merge(cfg: Config, role: str, *, limit: int | None, elapsed: float) -> Path:
     log_output(log, dest, n_rows=final.height)
 
     stats = _sum_worker_stats(shards)
-    _write_stats(cfg, role, final, stats, elapsed, limit=limit, n_workers=len(
-        list(shards.glob("stats_w*.json"))
-    ))
+    _write_stats(cfg, role, final, stats, elapsed, limit=limit,
+                 n_workers=int(stats.get("n_workers") or 0))
     return dest
+
+
+def _worker_of(path: Path) -> str:
+    """`stats_w0.json` ve `stats_w0_01.json` ayni isciyi gosterir."""
+    return path.stem.split("_")[1]
 
 
 def _sum_worker_stats(shards: Path) -> dict:
     files = sorted(shards.glob("stats_w*.json"))
     total = {"n_parse_fail": 0, "n_downgraded": 0, "n_truncated": 0,
              "n_output_tokens": 0, "n_retried": 0, "n_rows_generated": 0}
-    # Bu ikisi TOPLANMAZ: onek her iscide ayni, sure ise paralel gectigi icin
-    # toplami degil EN YAVAS isciyi gosterir.
-    peak = {"shared_prefix_chars": 0, "generation_s": 0.0}
+    # Onek toplanmaz, her iscide ayni.
+    prefix = 0
+    # Sure ONCE isci icinde TOPLANIR (kesintiden sonra ayni isci birden fazla
+    # kez kosmus olabilir), SONRA isciler arasinda en buyugu alinir - paralel
+    # kosuda gecen sure iscilerin toplami degil en yavas iscinin suresidir.
+    gen_by_worker: dict[str, float] = {}
     meta = {}
     for f in files:
         s = read_json(f)
         for k in total:
             total[k] += s.get(k, 0)
-        for k in peak:
-            peak[k] = max(peak[k], s.get(k, 0))
+        prefix = max(prefix, s.get("shared_prefix_chars", 0) or 0)
+        w = _worker_of(f)
+        gen_by_worker[w] = gen_by_worker.get(w, 0.0) + float(s.get("generation_s", 0.0) or 0.0)
         meta = {"backend": s["backend"], "prompt_version": s["prompt_version"],
                 "system_prompt_tokens": s["system_prompt_tokens"]}
-    return total | peak | meta
+    return total | {
+        "shared_prefix_chars": prefix,
+        "generation_s": max(gen_by_worker.values(), default=0.0),
+        # Kac ISCI kostu - kac stats dosyasi var degil. Kesintiden sonra ayni
+        # isci ikinci bir dosya yaziyor; dosya sayisi `rows_per_s_per_gpu`'yu
+        # boler ve hizi yariya dusururdu.
+        "n_workers": len(gen_by_worker),
+    } | meta
 
 
 def _write_stats(cfg, role, final, stats, elapsed, *, limit, n_workers) -> None:
     """Kosu raporu. Kapi 1 bu dosyayi okur; tahmin degil olcum yazilir."""
     n = final.height
+    # Sayaclarin kapsadigi satir sayisi. Tam kosuda `n`e esittir.
+    n_uretilen = int(stats.get("n_rows_generated") or 0) or n
+    if n_uretilen < n:
+        # TEHLIKELI YON: sayaclar ciktinin tamamini kapsamiyor, yani oranlar
+        # olculmemis satirlari da iceren bir paydaya bolunurdu. Kapi 1 bu
+        # dosyayi okuyor - sessiz gecilemez.
+        log.warning(
+            "sayaclar yalnizca %s satiri kapsiyor ama cikti %s satir: bir kosunun "
+            "sayac dosyasi kayip. Kalite oranlari EKSIK olcumden geliyor.",
+            f"{n_uretilen:,}", f"{n:,}",
+        )
+    elif n_uretilen > n:
+        # Zararsiz yon: kesintiden sonra bazi satirlar yeniden uretildi.
+        log.info("sayaclar %s uretim iceriyor, cikti %s satir (yeniden uretilen "
+                 "satirlar var)", f"{n_uretilen:,}", f"{n:,}")
     # Uretim suresi en yavas isciden; sifirsa (devam ettirilen kosuda hicbir
     # isci uretim yapmadiysa) duvar saatine dus.
     gen_s = stats.get("generation_s") or elapsed
@@ -883,10 +920,22 @@ def _write_stats(cfg, role, final, stats, elapsed, *, limit, n_workers) -> None:
             "system_prompt_tokens": stats["system_prompt_tokens"],
         },
         "quality": {
-            "parse_fail_rate": round(stats["n_parse_fail"] / n, 6) if n else None,
+            # HANGI PAYDA. Oranlar `n_rows_generated` uzerinden hesaplanir: bu
+            # kosularin GERCEKTEN etiketledigi satir sayisi. Tam kosuda ikisi
+            # esittir; kesintiden sonra sayaclar yalnizca uretilen satirlari
+            # kapsadigi icin birlesmis satir sayisina bolmek oranlari
+            # OLCULMEMIS bir sayiya bolerdi (denetim 2026-09-20). Ikisi
+            # farkliysa asagida acikca yaziyor.
+            "n_rows_generated": n_uretilen,
+            # Sayaclar ciktinin HER satirini kapsiyor mu. `false` ise bir
+            # kosunun sayac dosyasi kayip ve oranlar eksik olcumden geliyor.
+            # `n_rows_generated > n_rows` zararsizdir: kesintiden sonra bazi
+            # satirlar yeniden uretilmistir.
+            "counters_cover_all_rows": n_uretilen >= n,
+            "parse_fail_rate": round(stats["n_parse_fail"] / n_uretilen, 6) if n_uretilen else None,
             "n_parse_fail": stats["n_parse_fail"],
             "n_retried": stats["n_retried"],
-            "span_downgrade_rate": round(stats["n_downgraded"] / n, 6) if n else None,
+            "span_downgrade_rate": round(stats["n_downgraded"] / n_uretilen, 6) if n_uretilen else None,
             "n_span_downgraded": stats["n_downgraded"],
             "n_truncated_reviews": stats["n_truncated"],
         },

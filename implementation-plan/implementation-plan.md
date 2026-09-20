@@ -147,6 +147,13 @@ gantt
 
 **🚦 Gate 2 — End of Week 6: Is the experiment valid?**
 *Criterion:* C0 versus C4 shows **no** statistically significant difference.
+> **Erratum — 2026-09-20 (audit).** This criterion was **reformulated before the runs**
+> (2026-09-14, `configs/base.yaml` → `gate2`) to "the placebo must not *beat* C0"
+> (lower CI bound ≤ 0). Deleting random interactions is expected to *hurt* accuracy, so
+> demanding no difference at all would fail a correct setup — and did: Toys × SASRec has
+> C4 − C0 = −0.851 pt [−0.916, −0.789]. The binding four criteria, all four PASS, are in
+> `repo/docs/SONUCLAR.md` §3. The same superseded wording also appears in `concept-note`
+> §5, `repo/docs/ROADMAP.md` and `repo/docs/PROJECT_SPEC.md`.
 *If failed:* the setup is broken — most likely the user/item universe is not frozen across conditions, or the temporal split leaks. **Do not interpret any downstream result** until resolved. Budget: three days to diagnose.
 
 ### 2.4 Task distribution matrix
@@ -330,9 +337,13 @@ Oversight is built into the pipeline as gates rather than added as review:
 > the 500-item validation set. Inter-annotator agreement therefore cannot be computed, and
 > the team decided not to substitute an intra-annotator re-test. The Week-4 agreement gate
 > is recorded as **INCOMPLETE — not passed and not failed** — and the pipeline proceeds by
-> that dated decision. No F1 threshold was ever fixed (by design: fixing one after seeing
-> results would be a post-hoc gate), so the phrase "agreement or F1 thresholds" above no
-> longer describes a live control. Class-level F1 against the single annotator is still
+> that dated decision. **Correction, 2026-09-20 (audit):** this note previously said "no F1
+> threshold was ever fixed". That was wrong — `concept-note` §5 fixes macro-F1 ≥ 0.75 and
+> `gift_given` precision ≥ 0.80. Neither was written into `configs/base.yaml`, so neither was
+> enforced in code, and both were **missed**: macro-F1 measured 0.5404 [0.4897–0.5869]
+> (0.494 population-weighted) and precision 0.68. The project proceeded on that measurement;
+> it is limitation 1 in `repo/docs/SONUCLAR.md` §7, reasoning in `repo/docs/DECISIONS.md`
+> 2026-09-20. No threshold was invented after seeing results. Class-level F1 against the single annotator is still
 > reported, with bootstrap confidence intervals, and single-annotator labelling is stated as
 > a limitation. All measurement methods were registered before the annotator's labels were
 > compared with the model's. Details: `repo/docs/DECISIONS.md`, entry 2026-09-14.

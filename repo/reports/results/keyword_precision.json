@@ -6,6 +6,7 @@
     "gift_given",
     "self",
     "household",
+    "received",
     "unclear"
   ],
   "strata": {
@@ -27,6 +28,7 @@
         "gift_given": 35,
         "self": 10,
         "household": 14,
+        "received": 0,
         "unclear": 1
       }
     },
@@ -48,6 +50,7 @@
         "gift_given": 5,
         "self": 12,
         "household": 1,
+        "received": 0,
         "unclear": 2
       }
     },
@@ -69,6 +72,7 @@
         "gift_given": 1,
         "self": 19,
         "household": 0,
+        "received": 0,
         "unclear": 0
       }
     }

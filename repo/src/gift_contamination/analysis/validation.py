@@ -59,8 +59,9 @@ from ..config import Config
 from ..data.labelsheet import LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path
 from ..data.sampling import LABELS, validation_path
 from ..detection.llm_annotate import annotation_path
+from ..detection.prompting import load_prompt
 from ..detection.schema import CONDITION_OF, CONTAMINATION
-from ..utils.io import write_json
+from ..utils.io import code_version, write_json
 from ..utils.logging import get_logger
 from . import viz
 from .keyword_scan import PROXY_COL
@@ -804,8 +805,16 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
             "annotators": tags,
             "n_annotators": len(cols),
             "reliability": mode,
-            "model": df["model"][0] if "model" in df.columns else None,
-            "prompt_version": df["prompt_version"][0] if "prompt_version" in df.columns else None,
+            # HANGI MODEL DOGRULANDI. Bu alanlar etiket CSV'sinden okunuyordu,
+            # ama `sampling.VALIDATION_COLUMNS` onlari hic tasimiyor - yani
+            # projenin tek yer-gercegi raporu "model: null" yaziyordu
+            # (denetim 2026-09-20). CSV tasiyorsa o kazanir, tasimiyorsa
+            # config'teki koşan model yazilir.
+            "model": (df["model"][0] if "model" in df.columns
+                      else cfg.get("detection.primary_model")),
+            "prompt_version": (df["prompt_version"][0] if "prompt_version" in df.columns
+                               else load_prompt(cfg).version),
+            "code_version": code_version(),
             "thresholds_fixed": "2026-08-29, configs/base.yaml -> validation",
             "methods_registered": "2026-09-14, DECISIONS (A modelle karsilastirilmadan once)",
         },

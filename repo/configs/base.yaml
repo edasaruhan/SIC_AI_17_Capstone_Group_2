@@ -85,7 +85,8 @@ detection:
   # (CLAUDE.md §8, kural 3) — `llm_annotate` şemayı koşulsuz uygular.
   retry_on_parse_fail: 1
   schema_path: configs/annotation_schema.json
-  # ZORUNLU, pazarlık konusu değil. SYSTEM bloğu ~2.450 token, review medyanı
+  # ZORUNLU, pazarlık konusu değil. SYSTEM bloğu 2.277 token (ölçüldü; tahmin
+  # 2.450'ydi), review medyanı
   # ~30 token: her satırın prefill'inin %99'u aynı. Kapalıysa 47.200 satırda
   # ~116M gereksiz prefill token üretilir ve Kaggle kotası boşa gider.
   # Gerçekleşen ortak önek `llm_annotate` tarafından ÖLÇÜLÜP raporlanıyor.

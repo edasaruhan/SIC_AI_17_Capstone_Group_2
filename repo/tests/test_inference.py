@@ -20,6 +20,8 @@ from gift_contamination.data.preprocess import build_clean, kcore_parquet_path
 from gift_contamination.detection.distill import StubStudent, model_dir
 from gift_contamination.detection.distill import report_path as distill_report_path
 from gift_contamination.detection.inference import (
+    PARTS_MANIFEST,
+    check_parts_manifest,
     inference_report_path,
     inferred_path,
     input_path,
@@ -90,6 +92,31 @@ def test_a_restart_does_not_recompute_finished_parts(kcore: Config):
 
     assert {p.name: p.stat().st_mtime_ns for p in ilk} == damgalar
     assert inferred_path(kcore, "pilot").exists()
+
+
+def test_parts_from_another_student_are_refused_not_silently_reused(kcore: Config):
+    """Baska bir modelin/backend'in parcalari `distilled` damgasi ALAMAZ.
+
+    Parcalar yalnizca dosya adiyla atlaniyor ve nihai damga o an yuklu
+    ogrenciden geliyor; manifest olmasa stub parcalari gercek model kosusunda
+    sessizce "distilled" diye yazilirdi (denetim 2026-09-20).
+    """
+    prepare_inputs(kcore, "pilot")
+    _stub_model(kcore)
+    run(kcore, "pilot", backend="stub", chunk_rows=2)
+    inferred_path(kcore, "pilot").unlink()          # nihai cikti kayboldu, parcalar duruyor
+
+    manifest = json.loads((parts_dir(kcore, "pilot") / PARTS_MANIFEST).read_text(encoding="utf-8"))
+    assert manifest["backend"] == "stub"
+
+    # Ayni parcalarla baska bir ogrenci istendiginde kosu DURMALI.
+    with pytest.raises(RuntimeError, match="baska bir kosudan kalmis"):
+        check_parts_manifest(parts_dir(kcore, "pilot"), model_key="base", backend="hf",
+                             model_name="answerdotai/ModernBERT-base", chunk_rows=2)
+
+    # Ayni ogrenci devam edebilmeli (kesintiden donus bozulmadi).
+    check_parts_manifest(parts_dir(kcore, "pilot"), model_key="base", backend="stub",
+                         model_name=manifest["model"], chunk_rows=2)
 
 
 def test_a_lost_row_fails_loudly(kcore: Config):

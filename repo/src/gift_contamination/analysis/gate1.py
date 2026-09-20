@@ -49,7 +49,7 @@ from ..detection.llm_annotate import (
     trial_annotation_path,
 )
 from ..detection.schema import PurchaseType
-from ..utils.io import read_json, write_json
+from ..utils.io import code_version, read_json, write_json
 from ..utils.logging import get_logger
 from . import viz
 from .keyword_scan import PROXY_COL
@@ -84,7 +84,21 @@ def load_joined(cfg: Config, role: str) -> pl.DataFrame:
     flags = pl.read_parquet(
         annotation_sample_path(cfg, role), columns=["row_id", "category", PROXY_COL]
     )
-    return labels.join(flags, on=["row_id", "category"], how="left")
+    joined = labels.join(flags, on=["row_id", "category"], how="left")
+    # JOIN DENETIMI (kardes modullerin hepsinde var, burada yoktu - denetim
+    # 2026-09-20). Ornekleme parquet'i etiketlemeden SONRA yeniden uretilirse
+    # `row_id`ler kayar ve vekil bayragi bos gelir; `beyond_keyword`
+    # `fill_null(False)` uyguladigi icin her satir "vekil isaretlemedi" sayilir
+    # ve 2. olcut olcmedigi bir seyi PASS eder.
+    bos = int(joined[PROXY_COL].null_count())
+    if joined.height != labels.height or bos:
+        raise RuntimeError(
+            f"{role}: vekil bayragi join'i tutmadi - {joined.height} satir "
+            f"(etiket {labels.height}), {bos} satirda `{PROXY_COL}` bos. "
+            "Ornekleme dosyasi etiketlemeden sonra yeniden uretilmis olabilir; "
+            "Kapi 1'in 2. olcutu bu kolona dayaniyor."
+        )
+    return joined
 
 
 # ------------------------------------------------------------ 1) mevsimsellik
@@ -332,6 +346,8 @@ def evaluate(cfg: Config, role: str) -> dict:
         "meta": {
             "category": cfg.category_slug(role),
             "n_main": main.height,
+            # Kapinin kaniti HANGI KODLA uretildi (denetim 2026-09-20).
+            "code_version": code_version(),
             "prompt_version": df["prompt_version"][0],
             "model": df["model"][0],
             # Esikler kosudan once sabitlendi; raporda da gorunsun ki

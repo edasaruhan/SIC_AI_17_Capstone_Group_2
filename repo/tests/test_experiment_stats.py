@@ -79,6 +79,27 @@ def test_paired_bootstrap_recovers_a_known_difference():
     assert es.paired_bootstrap(a, b, names=["m"], n_boot=500, ci=0.95, seed=7)["m"] == out
 
 
+def test_paired_bootstrap_resamples_users_not_conditions():
+    """ESLI olmasi testle kilitli olmali, yoksa GA'lar sessizce sisirilir.
+
+    Onceki iki test eslesmeyen bir uygulamayla DA geciyordu: b'nin varyansi
+    GA'yi 0,1'in etrafinda genisletirdi ama hala sifiri dislardi
+    (denetim 2026-09-20). Burada kullanici basi fark SABIT: esli bootstrap
+    her tekrarda tam olarak o sabiti bulur, GA genisligi sifirdir. Iki kosulu
+    bagimsiz yeniden orneklenen bir uygulamada genislik b'nin varyansini
+    tasir ve bu assert duser.
+    """
+    rng = np.random.default_rng(11)
+    b = rng.normal(0.3, 0.5, size=2000)
+    a = b + 0.05                          # her kullanicida AYNI fark
+
+    out = es.paired_bootstrap(a, b, names=["m"], n_boot=500, ci=0.95, seed=9)["m"]
+
+    assert out["diff"] == pytest.approx(0.05, abs=1e-12)
+    genislik = out["ci"][1] - out["ci"][0]
+    assert genislik < 1e-9, f"GA genisligi {genislik:.4f} - kosullar ayni orneklemi paylasmiyor"
+
+
 def test_paired_bootstrap_without_a_difference_covers_zero():
     rng = np.random.default_rng(2)
     b = rng.normal(0.3, 0.2, size=3000)

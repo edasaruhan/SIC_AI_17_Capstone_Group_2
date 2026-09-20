@@ -90,6 +90,37 @@ def test_run_records_prompt_version_and_model(sampled: Config):
 
 
 # ------------------------------------------------------------- kesinti/devam
+def test_a_resumed_run_does_not_lose_its_quality_counters(sampled: Config):
+    """Kesintiden sonra kalite oranlari OLCULMEMIS bir sayiya bolunmemeli.
+
+    Eski hali `stats_w{worker}.json`i EZIYORDU: ikinci kosu yalnizca kendi
+    satirlarinin sayaclarini birakiyor, `_write_stats` ise paydaya birlesmis
+    TAM satir sayisini koyuyordu. Kapi 1'in 3. olcutu tam bu iki orani okudugu
+    icin, hic olculmemis bir sayi esikten gecebilirdi (denetim 2026-09-20).
+    """
+    annotate(sampled, "pilot", backend_name="stub")
+    shards = shard_dir(sampled, "pilot")
+    parts = sorted(shards.glob("part_*.parquet"))
+    assert len(parts) > 1
+
+    parts[-1].unlink()                              # kosu burada koptu
+    annotation_path(sampled, "pilot").unlink()
+    annotate(sampled, "pilot", backend_name="stub")  # devam
+
+    # Ilk kosunun sayac dosyasi duruyor, ezilmedi.
+    assert len(list(shards.glob("stats_w*.json"))) > 1
+    report = json.loads(
+        annotation_stats_path(sampled, "pilot").read_text(encoding="utf-8")
+    )
+    q = report["quality"]
+    # Iki kosunun sayaclari TOPLANDI: 6 satir + kopmada yeniden uretilen 3.
+    # Ezilseydi yalnizca ikinci kosunun 3'u kalirdi ve oranlar 6'ya bolunurdu.
+    assert q["n_rows_generated"] == 9
+    assert q["counters_cover_all_rows"] is True
+    # Ve isci sayisi dosya sayisiyla SISMEDI.
+    assert report["meta"]["n_workers"] == 1
+
+
 def test_interrupted_run_resumes_instead_of_restarting(sampled: Config):
     """Yarim kalan kosu bastan baslamamali.
 
@@ -467,10 +498,14 @@ def test_report_records_the_code_version(sampled: Config):
     )["meta"]
 
     assert "code_version" in meta
-    # Depo degilse None olabilir; varsa kisa SHA gibi gorunmeli.
+    # Depo degilse None olabilir; varsa kisa SHA, arkasinda calisma agacinin
+    # durumu olabilir: `-dirty` (commit'lenmemis degisiklik) ya da `-unknown`
+    # (durum sorulamadi). Bkz. tests/test_io.py.
     if meta["code_version"] is not None:
-        assert 6 <= len(meta["code_version"]) <= 12
-        assert meta["code_version"].isalnum()
+        sha, _, durum = meta["code_version"].partition("-")
+        assert 6 <= len(sha) <= 12
+        assert sha.isalnum()
+        assert durum in ("", "dirty", "unknown")
 
 
 # ------------------------------------------------- deneme kosusu (Kapi 1 / 4)
