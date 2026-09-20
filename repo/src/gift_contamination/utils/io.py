@@ -63,7 +63,12 @@ def code_version() -> str | None:
     surum = out.stdout.strip()
     if not surum:
         return None
-    kirli = git("status", "--porcelain", "--untracked-files=no")
+    # YALNIZCA DAVRANISI BELIRLEYEN yollar sorulur. `reports/` de izleniyor ama
+    # orasi CIKTI: bir raporu yazmak bir sonraki raporu "dirty" damgalardi ve
+    # damga anlamsizlasirdi. Soru "bu sayilari ureten KOD commit'li miydi".
+    kirli = git("status", "--porcelain", "--untracked-files=no", "--",
+                "src", "scripts", "configs", "prompts", "pyproject.toml",
+                "requirements.txt", "requirements-llm.txt", "requirements-recbole.txt")
     # Belirlenemiyorsa iddia BUYUTULMEZ: temiz oldugunu varsaymak yerine
     # bilinmedigini yaz.
     if kirli is None or kirli.returncode != 0:

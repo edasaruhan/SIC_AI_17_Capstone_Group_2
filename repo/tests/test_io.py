@@ -27,8 +27,11 @@ def _git(path: Path, *args: str) -> None:
 @pytest.fixture
 def depo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(tmp_path, "init", "-q")
-    (tmp_path / "a.txt").write_text("ilk", encoding="utf-8")
-    _git(tmp_path, "add", "a.txt")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("ilk = 1\n", encoding="utf-8")
+    (tmp_path / "reports").mkdir()
+    (tmp_path / "reports" / "r.json").write_text("{}", encoding="utf-8")
+    _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "ilk")
     monkeypatch.setattr(io, "REPO_ROOT", tmp_path)
     return tmp_path
@@ -41,17 +44,23 @@ def test_code_version_is_the_short_hash_when_the_tree_is_clean(depo: Path):
     assert not surum.endswith("-dirty")
 
 
-def test_code_version_says_dirty_when_a_tracked_file_changed(depo: Path):
-    """Commit'lenmemis degisiklikle uretilen cikti temiz gorunmemeli."""
-    (depo / "a.txt").write_text("degisti", encoding="utf-8")
+def test_code_version_says_dirty_when_the_code_changed(depo: Path):
+    """Commit'lenmemis KOD degisikligiyle uretilen cikti temiz gorunmemeli."""
+    (depo / "src" / "a.py").write_text("ilk = 2\n", encoding="utf-8")
 
     assert io.code_version().endswith("-dirty")
 
 
+def test_writing_a_report_does_not_make_the_stamp_dirty(depo: Path):
+    """`reports/` CIKTI. Bir raporu yazmak bir sonrakini 'dirty' damgalasaydi
+    damga anlamini yitirirdi - soru "bu sayilari ureten KOD commit'li miydi"."""
+    (depo / "reports" / "r.json").write_text('{"yeni": 1}', encoding="utf-8")
+
+    assert not io.code_version().endswith("-dirty")
+
+
 def test_an_untracked_file_does_not_make_the_stamp_dirty(depo: Path):
-    """Ciktinin kendisi (rapor, figur) calisma agacinda duruyor olabilir;
-    izlenmeyen dosya kodun surumunu degistirmez."""
-    (depo / "cikti.json").write_text("{}", encoding="utf-8")
+    (depo / "src" / "yeni.py").write_text("x = 1\n", encoding="utf-8")
 
     assert not io.code_version().endswith("-dirty")
 
