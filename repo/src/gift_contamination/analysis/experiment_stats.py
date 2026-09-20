@@ -36,10 +36,11 @@ import numpy as np
 import polars as pl
 
 from ..config import Config, resolve_roles
-from ..recsys.conditions import REPORTABLE_LABEL_SOURCES, _seed_for, condition_report_path
+from ..recsys.conditions import REPORTABLE_LABEL_SOURCES, condition_report_path
 from ..recsys.run_experiment import METRIC_ALIASES, experiment_path, peruser_path
 from ..utils.io import code_version, read_json, write_json
 from ..utils.logging import get_logger
+from ..utils.seeding import seed_for
 
 log = get_logger("analysis.experiment_stats")
 
@@ -74,7 +75,7 @@ def metric_keys(cfg: Config) -> list[str]:
             for k in cfg.get("experiment.topk")]
 
 
-def _ci(boot: np.ndarray, ci: float) -> list[float]:
+def bootstrap_ci(boot: np.ndarray, ci: float) -> list[float]:
     lo, hi = np.quantile(boot, [(1 - ci) / 2, 1 - (1 - ci) / 2], axis=0)
     return [float(lo), float(hi)]
 
@@ -109,7 +110,7 @@ def paired_bootstrap(a: np.ndarray, b: np.ndarray, *, names: list[str], n_boot: 
             "mean_a": float(a[:, j].mean()),
             "mean_b": ort_b,
             "diff": fark,
-            "ci": _ci(boot[:, j], ci),
+            "ci": bootstrap_ci(boot[:, j], ci),
             "relative_diff": fark / ort_b if ort_b else None,
         }
     return out
@@ -124,7 +125,7 @@ def independent_bootstrap_diff(x: np.ndarray, y: np.ndarray, *, names: list[str]
     y = np.asarray(y, dtype=np.float64).reshape(len(y), -1)
     return {ad: {"effect_x": float(x[:, j].mean()), "effect_y": float(y[:, j].mean()),
                  "diff": float(x[:, j].mean() - y[:, j].mean()),
-                 "ci": _ci(bx[:, j] - by[:, j], ci)}
+                 "ci": bootstrap_ci(bx[:, j] - by[:, j], ci)}
             for j, ad in enumerate(names)}
 
 
@@ -184,13 +185,13 @@ def peruser_means(cfg: Config, role: str, code: str, model: str, seeds: list[int
     return pl.concat(parcalar).group_by("user_id").agg([pl.col(n).mean() for n in names]).sort("user_id")
 
 
-def _aligned(x: pl.DataFrame, y: pl.DataFrame, names: list[str]) -> tuple[np.ndarray, np.ndarray]:
+def aligned_peruser(x: pl.DataFrame, y: pl.DataFrame, names: list[str]) -> tuple[np.ndarray, np.ndarray]:
     if x.height != y.height or not x["user_id"].equals(y["user_id"]):
         raise RuntimeError("iki kosulun kullanici kumesi farkli - esli karsilastirma yapilamaz (Kapi 2, olcut 1)")
     return x.select(names).to_numpy(), y.select(names).to_numpy()
 
 
-def _common_seeds(runs: dict, *codes: str) -> list[int]:
+def common_seeds(runs: dict, *codes: str) -> list[int]:
     ortak = None
     for code in codes:
         s = {seed for (c, seed) in runs if c == code}
@@ -234,14 +235,14 @@ def gate2(cfg: Config, role: str, model: str, runs: dict) -> dict:
     # 3. plasebo tabani
     karsit = {}
     for a, b in PLACEBO_PAIRS:
-        seeds = _common_seeds(runs, a, b)
+        seeds = common_seeds(runs, a, b)
         if not seeds:
             karsit[f"{a}-{b}"] = None
             continue
-        x, y = _aligned(peruser_means(cfg, role, a, model, seeds, [metric]),
+        x, y = aligned_peruser(peruser_means(cfg, role, a, model, seeds, [metric]),
                         peruser_means(cfg, role, b, model, seeds, [metric]), [metric])
         sonuc = paired_bootstrap(x, y, names=[metric], n_boot=n_boot, ci=ci,
-                                 seed=_seed_for(base_seed, f"gate2/{role}/{model}/{a}-{b}"))[metric]
+                                 seed=seed_for(base_seed, f"gate2/{role}/{model}/{a}-{b}"))[metric]
         karsit[f"{a}-{b}"] = {**sonuc, "seeds": seeds, "n_users": len(x),
                               "passed": sonuc["ci"][0] <= 0}
     if None in karsit.values():
@@ -276,14 +277,14 @@ def contrasts(cfg: Config, role: str, model: str, runs: dict, names: list[str]) 
     out = {}
     for a, b, soru, plasebo in CONTRASTS:
         anahtar = f"{a}-{b}"
-        seeds = _common_seeds(runs, a, b)
+        seeds = common_seeds(runs, a, b)
         if not seeds:
             out[anahtar] = {"question": soru, "skipped": "iki kosulun ortak seed'i yok"}
             continue
-        x, y = _aligned(peruser_means(cfg, role, a, model, seeds, names),
+        x, y = aligned_peruser(peruser_means(cfg, role, a, model, seeds, names),
                         peruser_means(cfg, role, b, model, seeds, names), names)
         sonuc = paired_bootstrap(x, y, names=names, n_boot=n_boot, ci=ci,
-                                 seed=_seed_for(base_seed, f"stats/{role}/{model}/{anahtar}"))
+                                 seed=seed_for(base_seed, f"stats/{role}/{model}/{anahtar}"))
         for ad, s in sonuc.items():
             s["direction"] = direction(s["ci"])
             if plasebo:
@@ -305,10 +306,10 @@ def dose_response(cfg: Config, model: str, runs_by_role: dict, names: list[str])
         farklar = {}
         for role in DOSE_ROLES:
             runs = runs_by_role[role][model]
-            seeds = _common_seeds(runs, a, b)
+            seeds = common_seeds(runs, a, b)
             if not seeds:
                 break
-            x, y = _aligned(peruser_means(cfg, role, a, model, seeds, names),
+            x, y = aligned_peruser(peruser_means(cfg, role, a, model, seeds, names),
                             peruser_means(cfg, role, b, model, seeds, names), names)
             farklar[role] = x - y
         if len(farklar) < 2:
@@ -319,7 +320,7 @@ def dose_response(cfg: Config, model: str, runs_by_role: dict, names: list[str])
             "metrics": independent_bootstrap_diff(
                 farklar[yuksek], farklar[dusuk], names=names,
                 n_boot=int(cfg.get("experiment.bootstrap_iters")), ci=float(cfg.get("experiment.ci")),
-                seed=_seed_for(int(cfg.get("seed")), f"dose/{model}/{a}-{b}")),
+                seed=seed_for(int(cfg.get("seed")), f"dose/{model}/{a}-{b}")),
         }
     return out
 

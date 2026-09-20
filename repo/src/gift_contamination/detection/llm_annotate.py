@@ -427,7 +427,7 @@ def _worker_slice(df: pl.DataFrame, worker: int, workers: int) -> pl.DataFrame:
     return df.sort("row_id").gather_every(workers, offset=worker)
 
 
-def _resolve_gpus(cfg: Config, backend_name: str) -> int:
+def _resolve_gpus(cfg: Config, backend_name: str, requested: int | str | None = None) -> int:
     """Kac veri-paralel surec kosacak.
 
     Kaggle iki T4 veriyor. Model tek karta sigdigi icin (Qwen3-4B fp16 ~8 GB,
@@ -439,9 +439,12 @@ def _resolve_gpus(cfg: Config, backend_name: str) -> int:
     Kaggle kotasi OTURUM saati olarak sayiliyor, GPU basina degil - yani iki
     GPU kullanmak kotayi da yariya indiriyor.
     """
-    requested = cfg.get("detection.gpus")
+    if requested is None:
+        requested = cfg.get("detection.gpus")
     tp = cfg.get("detection.tensor_parallel_size")
     if backend_name != "vllm":
+        if requested not in (None, 1, "1"):
+            log.warning("backend=%s icin gpus=%s yok sayildi", backend_name, requested)
         return 1   # kuru kosuda GPU yok, surec cogaltmak anlamsiz
 
     try:
@@ -496,7 +499,7 @@ def annotate(
     backend_name: str = "vllm",
     limit: int | None = None,
     force: bool = False,
-    gpus: int | None = None,
+    gpus: int | str | None = None,
 ) -> Path:
     """Tek giris noktasi. `gpus > 1` ise kendini alt sureclerde cogaltir."""
     dest = annotation_path(cfg, role)
@@ -524,11 +527,11 @@ def annotate(
             leftover.unlink()
     shards.mkdir(parents=True, exist_ok=True)
 
-    n_gpus = gpus if gpus is not None else _resolve_gpus(cfg, backend_name)
-    if backend_name != "vllm" and n_gpus > 1:
-        # Kuru kosuda GPU yok; surec cogaltmak yalnizca gurultu uretir.
-        log.warning("backend=%s icin gpus=%s yok sayildi", backend_name, n_gpus)
-        n_gpus = 1
+    # `gpus` HER ZAMAN ayni kapidan gecer: "auto" cozulmeli, elle verilen sayi da
+    # kart sayisina karsi dogrulanmali. Dogrudan atamak ikisini de atliyordu -
+    # `--gpus auto` CLI'de `int()` ile patliyor, `--gpus 4` ise iki kartli bir
+    # makinede sessizce dort surec aciyordu (denetim 2026-09-20).
+    n_gpus = _resolve_gpus(cfg, backend_name, requested=gpus)
     started = time.perf_counter()
     if n_gpus > 1:
         _spawn_workers(cfg, role, backend_name, limit, n_gpus)
@@ -1001,7 +1004,7 @@ def main(argv: list[str] | None = None) -> int:
         log.info("=== kategori: %s (%s) ===", role, cfg.category_slug(role))
         annotate(cfg, role, backend_name=args.backend, limit=args.limit,
                  force=args.force,
-                 gpus=int(args.gpus) if args.gpus is not None else None)
+                 gpus=args.gpus)
     return 0
 
 

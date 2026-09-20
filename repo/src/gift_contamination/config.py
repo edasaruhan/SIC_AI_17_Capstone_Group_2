@@ -92,8 +92,15 @@ class Config:
         return f"Config(source={self.source})"
 
 
-def add_standard_args(parser: argparse.ArgumentParser, *, category: bool = True) -> None:
-    """CLAUDE.md §7'deki komut sözleşmesinin ortak bayrakları."""
+def add_standard_args(parser: argparse.ArgumentParser, *, category: bool = True,
+                      force: bool = True) -> None:
+    """CLAUDE.md §7'deki komut sözleşmesinin ortak bayrakları.
+
+    `force=False`: komut zaten her çağrıldığında yeniden hesaplıyorsa bayrak
+    EKLENMEZ. `eda` ve `deep_eda` onu kabul edip sessizce yok sayıyordu —
+    kullanıcıya olmayan bir davranış vaat eden bir bayrak, hiç olmayandan
+    kötüdür (denetim 2026-09-20).
+    """
     parser.add_argument("--config", default=DEFAULT_CONFIG, help="YAML config yolu")
     if category:
         parser.add_argument(
@@ -101,11 +108,12 @@ def add_standard_args(parser: argparse.ArgumentParser, *, category: bool = True)
             default="pilot",
             help="Kategori rolü (pilot/high/mid/low) veya tümü için 'all'",
         )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Çıktı zaten varsa bile yeniden hesapla",
-    )
+    if force:
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Çıktı zaten varsa bile yeniden hesapla",
+        )
 
 
 def resolve_roles(cfg: Config, category: str) -> list[str]:

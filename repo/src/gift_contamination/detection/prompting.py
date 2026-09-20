@@ -126,12 +126,3 @@ def load_prompt(cfg: Config | None = None, path: Path | None = None) -> Prompt:
         user_template=user_template,
         source=src,
     )
-
-
-def render(
-    product_title: str, category: str, title: str, text: str, cfg: Config | None = None
-) -> str:
-    """Tek seferlik kullanim icin kisayol; toplu kosuda `load_prompt` bir kez cagirilir."""
-    return load_prompt(cfg).render(
-        product_title=product_title, category=category, title=title, text=text
-    )

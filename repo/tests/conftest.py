@@ -105,8 +105,13 @@ def cfg(tmp_path: Path) -> Config:
             # devam-ettirme yolu (bitmis satirlari atlama) gercekten sinansin.
             "shard_rows": 3,
         },
-        # gate1 figuru (F17) bu iki anahtari okuyor.
-        "eda": {"figure_dpi": 72, "figure_format": "png"},
+        # gate1 figuru (F17) dpi ve formati okuyor; `min_year` EDA'nin zaman
+        # eksenli figurleri icin gerekiyor. `publish_figures_to` BILEREK YOK:
+        # varsayilan "kopyalama" olmali, yoksa bir test kazara depodaki
+        # ../data-research/figures klasorunu ezebilirdi.
+        "eda": {"figure_dpi": 72, "figure_format": "png", "min_year": 2000},
+        # `deep_eda` mevsimsellik tablosu icin okuyor (base.yaml ile AYNI).
+        "analysis": {"expected_peaks": [12, 1]},
         # Hafta 5. Esikler configs/base.yaml ile AYNI (gate1 gerekcesi). Testler
         # yalnizca `stub` ogrenciyle kosar - model indirilmez, GPU gerekmez.
         "distill": {

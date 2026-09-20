@@ -20,7 +20,7 @@ from gift_contamination.recsys.conditions import (
     REMOVED_LABELS,
     SHADOW_LABELS,
     SHADOW_SUFFIX,
-    _seed_for,
+    seed_for,
     apply_condition,
     universe,
 )
@@ -184,8 +184,8 @@ def test_seed_for_is_pinned_so_it_cannot_become_hash():
     deseni kullaniyor. Bu sayi degisirse C4/C4b'nin sectigi satirlar ve
     butun bootstrap seed'leri degisir.
     """
-    assert _seed_for(42, "C4") == 993655479
-    assert _seed_for(42, "C4b") == 353048883
+    assert seed_for(42, "C4") == 993655479
+    assert seed_for(42, "C4b") == 353048883
 
 
 def test_c4_is_reproducible_across_processes():

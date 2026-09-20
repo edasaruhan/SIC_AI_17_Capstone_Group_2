@@ -32,8 +32,15 @@ log = get_logger("analysis.eda")
 
 # ------------------------------------------------------------------ yardimcilar
 def available_roles(cfg: Config) -> list[str]:
-    """Artefakti hazir olan kategoriler, sabit anlati sirasinda."""
-    roles = [r for r in viz.ROLE_ORDER if keyword_path(cfg, r).exists()]
+    """Artefakti hazir olan kategoriler, sabit anlati sirasinda.
+
+    `ROLE_ORDER` ANLATI sirasi, config'in kendisi degil: config daha az rol
+    tanimliyorsa (or. tek kategorili bir kosu) tanimsiz rol atlanmali, yoksa
+    `keyword_path` ConfigError atip butun EDA'yi dusururdu.
+    """
+    tanimli = set(cfg.category_roles())
+    roles = [r for r in viz.ROLE_ORDER
+             if r in tanimli and keyword_path(cfg, r).exists()]
     if not roles:
         raise FileNotFoundError(
             "Hicbir kategoride keyword taramasi yok. Once kosun:\n"
@@ -57,14 +64,14 @@ def gini(counts: np.ndarray) -> float:
     return float((2 * (idx * x).sum()) / (n * x.sum()) - (n + 1) / n)
 
 
-def _md_table(rows: list[dict], headers: list[str]) -> str:
+def md_table(rows: list[dict], headers: list[str]) -> str:
     out = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
     for r in rows:
         out.append("| " + " | ".join(str(r.get(h, "")) for h in headers) + " |")
     return "\n".join(out)
 
 
-def _pct(x: float | None, digits: int = 2) -> str:
+def pct(x: float | None, digits: int = 2) -> str:
     return "—" if x is None else f"{x * 100:.{digits}f}%"
 
 
@@ -85,7 +92,7 @@ def table_funnel(cfg: Config, roles: list[str]) -> list[dict]:
                     "rows": f"{v['rows']:,}",
                     "users": f"{v['users']:,}",
                     "items": f"{v['items']:,}",
-                    "retained": _pct(v["rows"] / base if base else None, 1),
+                    "retained": pct(v["rows"] / base if base else None, 1),
                 }
             )
     return rows
@@ -130,13 +137,13 @@ def table_corpus(cfg: Config, roles: list[str]) -> list[dict]:
                 "density": f"{n / (n_u * n_i):.2e}",
                 "int/user (mean)": f"{u.mean():.2f}",
                 "int/user (median)": f"{int(np.median(u))}",
-                f"users ≥{k}": _pct(float((u >= k).mean()), 2),
+                f"users ≥{k}": pct(float((u >= k).mean()), 2),
                 "int/item (mean)": f"{i.mean():.2f}",
-                f"items ≥{k}": _pct(float((i >= k).mean()), 1),
+                f"items ≥{k}": pct(float((i >= k).mean()), 1),
                 "item Gini": f"{gini(i):.3f}",
-                "top-10% items' share": _pct(top10, 1),
+                "top-10% items' share": pct(top10, 1),
                 "median words": f"{int(med_words)}",
-                ">768 words": _pct(long_share, 3),
+                ">768 words": pct(long_share, 3),
                 "period": f"{span[0]:%Y-%m} → {span[1]:%Y-%m}",
             }
         )
@@ -153,11 +160,11 @@ def table_keyword(cfg: Config, roles: list[str]) -> list[dict]:
             {
                 "category": label(cfg, role),
                 "reviews": f"{d['n_reviews']:,}",
-                "gift evidence": _pct(o["kw_gift_evidence"]["rate"]),
-                "speculative": _pct(o["kw_gift_speculative"]["rate"]),
-                "received": _pct(o["kw_gift_received"]["rate"]),
-                "**proxy rate**": f"**{_pct(d['proxy_rate'])}**",
-                "naive single-regex": _pct(d["naive_any_family_rate"]),
+                "gift evidence": pct(o["kw_gift_evidence"]["rate"]),
+                "speculative": pct(o["kw_gift_speculative"]["rate"]),
+                "received": pct(o["kw_gift_received"]["rate"]),
+                "**proxy rate**": f"**{pct(d['proxy_rate'])}**",
+                "naive single-regex": pct(d["naive_any_family_rate"]),
                 "inflation": f"{d['inflation_factor']:.2f}×"
                 if d["inflation_factor"]
                 else "—",
@@ -487,7 +494,7 @@ def run(cfg: Config) -> None:
     for name, rows in tables.items():
         if not isinstance(rows, list) or not rows:
             continue
-        md += [f"\n## {name.replace('_', ' ')}\n", _md_table(rows, list(rows[0])), ""]
+        md += [f"\n## {name.replace('_', ' ')}\n", md_table(rows, list(rows[0])), ""]
     md_path = cfg.path("results", "eda_tables.md")
     md_path.write_text("\n".join(md), encoding="utf-8")
     log.info("yazildi: %s", md_path)
@@ -495,11 +502,11 @@ def run(cfg: Config) -> None:
     for name, fn in FIGURES:
         fn(cfg, roles, cfg.path("figures", f"{name}.{ext}"))
 
-    _publish(cfg, ext, FIGURES)
+    publish(cfg, ext, FIGURES)
     log.info("EDA tamam: %d tablo, %d figur", len(tables), len(FIGURES))
 
 
-def _publish(cfg: Config, ext: str, figures: list) -> None:
+def publish(cfg: Config, ext: str, figures: list) -> None:
     """Figurleri teslim klasorune kopyalar; kanonik kaynak reports/figures kalir."""
     import shutil
 
@@ -521,7 +528,8 @@ def _publish(cfg: Config, ext: str, figures: list) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_standard_args(parser, category=False)
+    # `--force` YOK: bu komut zaten her kosuda yeniden hesapliyor.
+    add_standard_args(parser, category=False, force=False)
     args = parser.parse_args(argv)
     run(Config.load(args.config))
     return 0

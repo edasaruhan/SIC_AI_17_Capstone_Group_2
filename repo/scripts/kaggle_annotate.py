@@ -13,7 +13,9 @@ ON KOSULLAR (Kaggle arayuzunde, elle):
   2. Notebook > Settings > Internet = **On**  (vLLM kurulumu + HF model indirme)
   3. Add Input > Datasets > kendi ozel dataset'iniz:
      `data/interim/*_annotation_sample.parquet` dosyalari (4 dosya, ~6 MB)
-     Ekledikten sonra sag panelde gorunen TAM yolu DATASET_PATH'e yazin.
+     Dataset'in adi onemsiz: DATASET_PATH = None iken dosyalar /kaggle/input
+     altinda aranir (Kaggle'in baglama yolu surumden surume degisiyor; elle
+     yazilan yol en sik hata kaynagiydi). Bulunan yollar hucrede yazdirilir.
 
 KOSU BITINCE: /kaggle/working/out/ altindaki parquet + json dosyalarini indirin
 ve depodaki data/annotations/ + reports/results/ altina koyun.
@@ -36,8 +38,8 @@ IKI KOSU MODU VAR:
 
 # ---------------------------------------------------------------- ayarlar
 CATEGORY = "high"          # high=Toys_and_Games · pilot=All_Beauty · mid · low
-# Kaggle'da "Add Input > Datasets" ile ekledikten sonra sag panelde gorunen TAM yol.
-DATASET_PATH = "/kaggle/input/recsys-interim"
+# None: /kaggle/input altinda aranir . or. "/kaggle/input/recsys-interim"
+DATASET_PATH = None
 REPO = "https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_2.git"
 LIMIT = None               # duman testi icin ornegin 200; tam kosu icin None
 # Diskteki cikti EZILSIN mi? Duman testinden (LIMIT=200) sonra tam kosuya
@@ -99,7 +101,10 @@ os.chdir(REPO_DIR)
 # ------------------------------------------------- ornekleme dosyalarini yerlestir
 # Config yollari depo koku ile goreli; dataset'ten kopyalamak, Kaggle'a ozel bir
 # config turevi tutmaktan basit ve az hataya acik (6 MB).
-src_dir = Path(DATASET_PATH)
+src_dir = Path(DATASET_PATH or "/kaggle/input")
+if not src_dir.exists():
+    print(f"!! {src_dir} yok - /kaggle/input altinda araniyor")
+    src_dir = Path("/kaggle/input")
 dest_dir = REPO_DIR / "data" / "interim"
 dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -110,10 +115,11 @@ found += sorted(src_dir.rglob("prompt_trial_*_source.parquet"))
 if not found:
     raise SystemExit(
         f"Ornekleme dosyasi bulunamadi: {src_dir}\n"
-        "Add Input > Datasets ile ozel dataset'i ekleyin ve DATASET_PATH'i "
-        "sag paneldeki TAM yol ile degistirin."
+        "Add Input > Datasets ile ozel dataset'i ekleyin (dataset'in adi "
+        "onemsiz; dosyalar /kaggle/input altinda aranir)."
     )
 for f in found:
+    print(f"  {f}")
     shutil.copy(f, dest_dir / f.name)
 print(f"{len(found)} girdi dosyasi kopyalandi -> {dest_dir}")
 if TRIAL and not any(p.name.startswith("prompt_trial_") for p in found):

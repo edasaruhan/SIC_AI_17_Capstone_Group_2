@@ -36,7 +36,7 @@ from ..data.preprocess import (
 from ..utils.io import write_json
 from ..utils.logging import get_logger
 from . import viz
-from .eda import _md_table, _pct, available_roles, label
+from .eda import available_roles, label, md_table, pct
 from .keyword_scan import PROXY_COL, keyword_path
 
 log = get_logger("analysis.deep_eda")
@@ -77,13 +77,13 @@ def table_detection_surface(cfg: Config, roles: list[str]) -> list[dict]:
             {
                 "category": label(cfg, role),
                 "gift-flagged reviews": f"{agg['n']:,}",
-                "evidence in title": _pct(agg["in_title"], 1),
+                "evidence in title": pct(agg["in_title"], 1),
                 "median position in body": f"{agg['pos_median']:.3f}",
                 "90th pct position": f"{agg['pos_p90']:.3f}",
-                "evidence lost @512 tok": _pct(agg["lost_512 tok (BERT)"], 3),
-                "evidence lost @1024 tok": _pct(agg["lost_1024 tok (config)"], 3),
-                "recipient recoverable": _pct(agg["has_recipient"], 1),
-                "occasion recoverable": _pct(agg["has_occasion"], 1),
+                "evidence lost @512 tok": pct(agg["lost_512 tok (BERT)"], 3),
+                "evidence lost @1024 tok": pct(agg["lost_1024 tok (config)"], 3),
+                "recipient recoverable": pct(agg["has_recipient"], 1),
+                "occasion recoverable": pct(agg["has_occasion"], 1),
             }
         )
     return rows
@@ -109,7 +109,7 @@ def _composition(cfg: Config, roles: list[str], col: str, top: int) -> list[dict
                     "category": label(cfg, role),
                     col.replace("kw_", ""): r[col],
                     "n": f"{r['len']:,}",
-                    "share": _pct(r["len"] / total, 1),
+                    "share": pct(r["len"] / total, 1),
                 }
             )
     return rows
@@ -170,12 +170,12 @@ def table_sequence_feasibility(cfg: Config, roles: list[str]) -> list[dict]:
                 "category": label(cfg, role),
                 "users in k-core": f"{n_u:,}",
                 "with ≥1 gift": f"{any_gift.height:,} ({100 * any_gift.height / n_u:.1f}%)",
-                "last item is a gift": _pct(per_user["last_is_gift"].mean(), 2),
-                "entire sequence is gifts": _pct(
+                "last item is a gift": pct(per_user["last_is_gift"].mean(), 2),
+                "entire sequence is gifts": pct(
                     (per_user["frac"] == 1.0).mean(), 3
                 ),
                 "**eval-eligible users**": f"**{100 * (1 - per_user['last_is_gift'].mean()):.1f}%**",
-                "mean contamination (gift users)": _pct(
+                "mean contamination (gift users)": pct(
                     any_gift["frac"].mean(), 1
                 )
                 if any_gift.height
@@ -213,7 +213,7 @@ def table_corpus_comparison(cfg: Config, roles: list[str]) -> list[dict]:
             rows.append(
                 {
                     "category": label(cfg, role),
-                    "clean corpus": _pct(clean_rate),
+                    "clean corpus": pct(clean_rate),
                     "k-core corpus": "—",
                     "shift": "k-core bos",
                 }
@@ -222,8 +222,8 @@ def table_corpus_comparison(cfg: Config, roles: list[str]) -> list[dict]:
         rows.append(
             {
                 "category": label(cfg, role),
-                "clean corpus": _pct(clean_rate),
-                "k-core corpus": _pct(k["rate"]),
+                "clean corpus": pct(clean_rate),
+                "k-core corpus": pct(k["rate"]),
                 "shift": f"{(k['rate'] / clean_rate - 1) * 100:+.1f}%",
                 "k-core interactions": f"{k['n']:,}",
             }
@@ -278,13 +278,13 @@ def table_confounds(cfg: Config, roles: list[str]) -> list[dict]:
         rows.append(
             {
                 "category": label(cfg, role),
-                "gift rate, shortest 20%": _pct(short),
-                "gift rate, longest 20%": _pct(long),
+                "gift rate, shortest 20%": pct(short),
+                "gift rate, longest 20%": pct(long),
                 "length ratio": f"{long / short:.2f}×" if short else "—",
-                "unverified share (raw)": _pct(unverified_share, 1),
-                "non-ASCII text": _pct(quality["non_ascii"], 2),
-                "duplicated text, raw": _pct(quality["dup"], 2),
-                "duplicated text, after filters": _pct(dup_clean, 2),
+                "unverified share (raw)": pct(unverified_share, 1),
+                "non-ASCII text": pct(quality["non_ascii"], 2),
+                "duplicated text, raw": pct(quality["dup"], 2),
+                "duplicated text, after filters": pct(dup_clean, 2),
             }
         )
     return rows
@@ -313,16 +313,25 @@ def table_seasonality_summary(cfg: Config, roles: list[str]) -> list[dict]:
             r["month"]: r["proxy_rate"] * 100
             for r in read_json(rates_path(cfg, role))["by_month"]
         }
-        trough = sum(by_month[m] for m in summer) / len(summer)
+        # Eksik ay "olculmedi" yazar, 0 YAZMAZ ve KeyError ile kosuyu dusurmez:
+        # hic review'i olmayan bir ay ile %0 hediye orani ayni sey degil.
+        def ay(m: int) -> str:
+            v = by_month.get(m)
+            return "—" if v is None else f"{v:.2f}%"
+
+        yaz = [by_month[m] for m in summer if m in by_month]
+        trough = sum(yaz) / len(yaz) if yaz else None
+        aralik = by_month.get(12)
         rows.append(
             {
                 "category": label(cfg, role),
-                "Jan": f"{by_month[1]:.2f}%",
-                "Feb": f"{by_month[2]:.2f}%",
-                "Jun–Sep trough (mean)": f"{trough:.2f}%",
-                "Nov": f"{by_month[11]:.2f}%",
-                "Dec": f"{by_month[12]:.2f}%",
-                "Dec ÷ summer": f"{by_month[12] / trough:.2f}×",
+                "Jan": ay(1),
+                "Feb": ay(2),
+                "Jun–Sep trough (mean)": "—" if trough is None else f"{trough:.2f}%",
+                "Nov": ay(11),
+                "Dec": ay(12),
+                "Dec ÷ summer": ("—" if not trough or aralik is None
+                                 else f"{aralik / trough:.2f}×"),
             }
         )
     return rows
@@ -356,8 +365,8 @@ def table_gift_rating(cfg: Config, roles: list[str]) -> list[dict]:
                 "gift mean": f"{g['mean']:.3f}",
                 "rest mean": f"{r['mean']:.3f}",
                 "difference": f"{g['mean'] - r['mean']:+.3f}",
-                "gift 5★": _pct(g["top"], 1),
-                "rest 5★": _pct(r["top"], 1),
+                "gift 5★": pct(g["top"], 1),
+                "rest 5★": pct(r["top"], 1),
             }
         )
     return rows
@@ -391,7 +400,7 @@ def table_duplication_by_length(cfg: Config, roles: list[str]) -> list[dict]:
                     "category": label(cfg, role),
                     "length (words)": str(r["bucket"]),
                     "reviews": f"{r['n']:,}",
-                    "duplicated text": _pct(r["dup_rate"], 1),
+                    "duplicated text": pct(r["dup_rate"], 1),
                 }
             )
     return rows
@@ -430,7 +439,7 @@ def table_temporal_resolution(cfg: Config, roles: list[str]) -> list[dict]:
         rows.append(
             {
                 "category": label(cfg, role),
-                "consecutive pairs on the same day": _pct(float((gaps == 0).mean()), 1),
+                "consecutive pairs on the same day": pct(float((gaps == 0).mean()), 1),
                 "median gap (days)": f"{gaps.median():.0f}",
                 "**held-out item same day as previous**": f"**{100 * float((eval_gap == 0).mean()):.1f}%**",
                 "median gap before held-out item (days)": f"{eval_gap.median():.0f}",
@@ -469,18 +478,20 @@ def table_cross_category(cfg: Config, roles: list[str]) -> list[dict]:
     )
     multi = user.filter(pl.col("cats") >= 2)
 
+    # Paydalar bos olabilir (tek kategorili bir config'te `multi` hep bos) -
+    # bolme yerine "olculmedi" yaziliyor; depodaki konvansiyon `pct(None)`.
+    coklu_pay = (pct(multi.height / user.height, 1) if user.height else pct(None))
+    hediye_ile = multi.filter(pl.col("gift_only_cats") > 0).height
     rows = [
         {
             "metric": "customers observed in ≥2 of the four categories",
             "value": f"{multi.height:,}",
-            "of": f"{user.height:,} distinct customers ({100 * multi.height / user.height:.1f}%)",
+            "of": f"{user.height:,} distinct customers ({coklu_pay})",
         },
         {
             "metric": "…of those, entered ≥1 category **only** via a gift",
-            "value": f"{multi.filter(pl.col('gift_only_cats') > 0).height:,}",
-            "of": _pct(
-                multi.filter(pl.col("gift_only_cats") > 0).height / multi.height, 1
-            )
+            "value": f"{hediye_ile:,}",
+            "of": (pct(hediye_ile / multi.height, 1) if multi.height else pct(None))
             + " of multi-category customers",
         },
         {
@@ -839,7 +850,7 @@ def run(cfg: Config) -> None:
           "_Uretim: `python -m gift_contamination.analysis.deep_eda`_\n"]
     for name, rows in tables.items():
         if rows:
-            md += [f"\n## {name.replace('_', ' ')}\n", _md_table(rows, list(rows[0])), ""]
+            md += [f"\n## {name.replace('_', ' ')}\n", md_table(rows, list(rows[0])), ""]
     path = cfg.path("results", "deep_eda_tables.md")
     path.write_text("\n".join(md), encoding="utf-8")
     log.info("yazildi: %s", path)
@@ -847,15 +858,16 @@ def run(cfg: Config) -> None:
     for name, fn in FIGURES:
         fn(cfg, roles, cfg.path("figures", f"{name}.{ext}"))
 
-    from .eda import _publish
+    from .eda import publish
 
-    _publish(cfg, ext, FIGURES)
+    publish(cfg, ext, FIGURES)
     log.info("derin EDA tamam: %d tablo, %d figur", len(tables), len(FIGURES))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_standard_args(parser, category=False)
+    # `--force` YOK: bu komut zaten her kosuda yeniden hesapliyor.
+    add_standard_args(parser, category=False, force=False)
     args = parser.parse_args(argv)
     run(Config.load(args.config))
     return 0

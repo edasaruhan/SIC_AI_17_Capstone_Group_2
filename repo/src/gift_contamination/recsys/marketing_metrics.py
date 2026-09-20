@@ -49,6 +49,7 @@ from ..data.metadata import meta_parquet_path
 from ..detection.contamination import CONTAMINATION
 from ..utils.io import code_version, read_json, write_json
 from ..utils.logging import get_logger
+from ..utils.seeding import seed_for
 from .atomic import SPLIT_TEST, SPLIT_TRAIN, SPLIT_VALID
 from .run_experiment import peruser_path, read_condition
 
@@ -104,7 +105,11 @@ def topk_subcat_share(pu: pl.DataFrame, targets: pl.DataFrame, sub: pl.DataFrame
     """Kullanici basi: top-k'nin `targets` (user_id, subcat) kumesinden gelen payi."""
     hedef = targets.with_columns(pl.lit(True).alias("_hit"))
     return (pu.select("user_id", pl.col("topk_items").list.head(k).alias("item_id"))
-            .explode("item_id")
+            # `empty_as_null` ACIK yaziliyor: Polars 2.0 varsayilani tersine
+            # cevirecek ve top-k'si bos bir kullanici sonuctan tamamen DUSERDI -
+            # yani ortalamanin paydasi sessizce degisirdi. Bugunku davranis
+            # korunuyor (bos liste -> tek null satir -> pay 0).
+            .explode("item_id", empty_as_null=True)
             .join(sub, on="item_id", how="left")
             .join(hedef, on=["user_id", "subcat"], how="left")
             .group_by("user_id")
@@ -180,7 +185,7 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
     m1: dict = {}
     for a, b, eksen in M1_CONTRASTS:
         anahtar = f"{a}-{b}"
-        seeds = es._common_seeds(runs, a, b)
+        seeds = es.common_seeds(runs, a, b)
         if not seeds:
             m1[anahtar] = {"axis": eksen, "skipped": "iki kosulun ortak seed'i yok"}
             continue
@@ -188,19 +193,19 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
         maruz = hedef.select("user_id").unique().join(test_users, on="user_id")
         x = seed_mean_share(cfg, role, a, model, seeds, hedef, sub_all, k).join(maruz, on="user_id").sort("user_id")
         y = seed_mean_share(cfg, role, b, model, seeds, hedef, sub_all, k).join(maruz, on="user_id").sort("user_id")
-        xa, ya = es._aligned(x, y, ["share"])
+        xa, ya = es.aligned_peruser(x, y, ["share"])
         if not len(xa):
             m1[anahtar] = {"axis": eksen, "skipped": "hediye-yalniz alt kategorisi olan test kullanicisi yok"}
             continue
         s = es.paired_bootstrap(xa, ya, names=["share"], n_boot=n_boot, ci=ci,
-                                seed=es._seed_for(base, f"m1/{role}/{model}/{anahtar}"))["share"]
+                                seed=seed_for(base, f"m1/{role}/{model}/{anahtar}"))["share"]
         m1[anahtar] = {"axis": eksen, "seeds": seeds, "n_exposed_users": len(xa),
                        "n_test_users": test_users.height, **s, "direction": es.direction(s["ci"])}
     out["M1_waste_share"] = m1
 
     # ---- M2
     a, b = M2_PAIR
-    seeds = es._common_seeds(runs, a, b)
+    seeds = es.common_seeds(runs, a, b)
     n_max = int(cfg.get("marketing.m2_max_self_after_gift"))
     min_users = int(cfg.get("marketing.m2_min_users_per_bucket"))
     if not seeds:
@@ -225,7 +230,7 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
         pb = seed_mean_share(cfg, role, b, model, seeds, hedef, sub_all, k).join(kume.select("user_id"), on="user_id").sort("user_id")
         if pa.height != kume.height or not pa["user_id"].equals(kume["user_id"]):
             raise RuntimeError("M2: top-K dosyasinda olmayan test kullanicisi var - dosyalar karismis")
-        xa, ya = es._aligned(pa, pb, ["share"])
+        xa, ya = es.aligned_peruser(pa, pb, ["share"])
         n_u = kume["n_self_after"].to_numpy()
         kova = np.minimum(n_u, n_max)
         fazla = (xa - ya).ravel()
@@ -239,7 +244,7 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
                else {"half_life": None, "reason": "yeterli kova yok"})
         boot_hl = []
         if fit.get("half_life") is not None:
-            rng = np.random.default_rng(es._seed_for(base, f"m2/{role}/{model}"))
+            rng = np.random.default_rng(seed_for(base, f"m2/{role}/{model}"))
             for _ in range(n_boot):
                 idx = rng.integers(0, len(fazla), size=len(fazla))
                 bo, badet = _bucket_means(kova[idx], fazla[idx], n_max)
@@ -256,7 +261,7 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
                          "share_a": _f(ort_a[i]), "share_b": _f(ort_b[i]), "excess": _f(ort[i]),
                          "used_in_fit": bool(i in set(uygun.tolist()))} for i in range(n_max + 1)],
             "fit": fit,
-            "half_life_interactions_ci": (es._ci(np.array(boot_hl), ci) if len(boot_hl) >= 0.5 * n_boot else None),
+            "half_life_interactions_ci": (es.bootstrap_ci(np.array(boot_hl), ci) if len(boot_hl) >= 0.5 * n_boot else None),
             "bootstrap_fit_success_share": round(len(boot_hl) / n_boot, 4) if hl is not None else None,
             "median_gap_days": gap,
             "half_life_weeks": (hl * gap / 7 if hl is not None and gap is not None else None),
@@ -277,7 +282,7 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
                 "segment_sizes": {s: int(dilim.filter(pl.col("segment") == s).height) for s in SEGMENTS}}
     for a, b in M3_CONTRASTS:
         anahtar = f"{a}-{b}"
-        seeds = es._common_seeds(runs, a, b)
+        seeds = es.common_seeds(runs, a, b)
         if not seeds:
             m3[anahtar] = {"skipped": "iki kosulun ortak seed'i yok"}
             continue
@@ -289,9 +294,9 @@ def evaluate_role_model(cfg: Config, role: str, model: str, runs: dict, c0: pl.D
             if xs.is_empty():
                 seg_out[s] = {"skipped": "dilim bos"}
                 continue
-            xa, ya = es._aligned(xs, ys, names)
+            xa, ya = es.aligned_peruser(xs, ys, names)
             r = es.paired_bootstrap(xa, ya, names=names, n_boot=n_boot, ci=ci,
-                                    seed=es._seed_for(base, f"m3/{role}/{model}/{anahtar}/{s}"))
+                                    seed=seed_for(base, f"m3/{role}/{model}/{anahtar}/{s}"))
             for v in r.values():
                 v["interpretation"] = es.interpret_placebo(v["ci"])
             seg_out[s] = {"n_users": len(xa), "metrics": r}

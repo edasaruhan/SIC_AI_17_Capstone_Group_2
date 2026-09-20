@@ -17,7 +17,6 @@ from gift_contamination.detection.prompting import (
     REQUIRED_FIELDS,
     load_prompt,
     prompt_path,
-    render,
 )
 
 MINIMAL = """# test_prompt
@@ -98,7 +97,8 @@ def test_prompt_keeps_the_rules_learned_from_the_trial_pass():
 
 
 def test_render_fills_every_placeholder():
-    out = render("Wooden Puzzle", "Toys_and_Games", "Nice", "bought for my grandson")
+    out = load_prompt().render(product_title="Wooden Puzzle", category="Toys_and_Games",
+                               title="Nice", text="bought for my grandson")
 
     assert "Wooden Puzzle" in out
     assert "Toys_and_Games" in out
@@ -185,8 +185,9 @@ def test_review_text_with_braces_is_not_treated_as_a_template():
     `str.format` bunu yer tutucu sanip kosunun ortasinda patliyordu. Review
     metni kullanici icerigidir ve ASLA sablon olarak yorumlanmamali.
     """
-    out = render("Robot Kit", "Toys_and_Games", "Missing {ROBOT}",
-                 "One of the {LOOSE} pieces fell out. Also {} and {0}.")
+    out = load_prompt().render(
+        product_title="Robot Kit", category="Toys_and_Games", title="Missing {ROBOT}",
+        text="One of the {LOOSE} pieces fell out. Also {} and {0}.")
 
     assert "{LOOSE}" in out
     assert "{ROBOT}" in out

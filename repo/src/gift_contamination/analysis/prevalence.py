@@ -42,7 +42,6 @@ Kullanim:
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +52,7 @@ from ..data.sampling import LABELS, _stratum_seed
 from ..detection.llm_annotate import annotation_path
 from ..detection.schema import CONTAMINATION
 from ..utils.io import code_version, read_json, write_json
+from ..utils.stats import Z95, wilson_interval
 from ..utils.logging import get_logger
 from . import viz
 from .validation import (
@@ -71,7 +71,6 @@ FRAME_MAIN = "main"
 # Dar tanim C1'e, genis tanim C1b'ye karsilik gelir. Tanim burada DEGIL,
 # `detection.schema.CONTAMINATION`'da - dogrulama ve deney ayni kumeyi okuyor.
 DEFINITIONS: dict[str, tuple[str, ...]] = CONTAMINATION
-Z95 = 1.959963985
 
 
 def prevalence_path(cfg: Config) -> Path:
@@ -84,19 +83,14 @@ def figure_path(cfg: Config) -> Path:
 
 
 def wilson(k: int, n: int, z: float = Z95) -> tuple[float | None, float | None]:
-    """Wilson skor araligi, yuzde olarak.
+    """Wilson skor araligi, YUZDE olarak ve iki basamaga yuvarlanmis.
 
-    Normal yaklasim (p +- z*sqrt(p(1-p)/n)) kucuk oranlarda sinirin disina
-    tasar; `received` %0,6 seviyesinde ve orada Wald araligi negatife
-    dusebiliyor. Wilson bu kusuru tasimiyor.
+    Formul `utils.stats.wilson_interval`'da; burada yalnizca sunum var.
     """
-    if n <= 0:
+    lo, hi = wilson_interval(k, n, z)
+    if lo is None:
         return (None, None)
-    p = k / n
-    payda = 1 + z * z / n
-    merkez = (p + z * z / (2 * n)) / payda
-    yari = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / payda
-    return (round(100 * (merkez - yari), 2), round(100 * (merkez + yari), 2))
+    return (round(100 * lo, 2), round(100 * hi, 2))
 
 
 def load_main(cfg: Config, role: str) -> pl.DataFrame:

@@ -23,7 +23,6 @@ Kullanim:
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 
 import polars as pl
@@ -31,6 +30,7 @@ import polars as pl
 from ..config import Config, DEFAULT_CONFIG, resolve_roles
 from ..data.preprocess import clean_parquet_path
 from ..utils.io import code_version, relative_to_repo, should_skip, write_json
+from ..utils.stats import wilson_interval
 from ..utils.logging import get_logger, log_output
 from .keyword_scan import PROXY_COL, keyword_path
 
@@ -134,14 +134,16 @@ def build_sample(cfg: Config, roles: list[str], *, force: bool = False) -> Path:
 
 # ----------------------------------------------------------------- puanlama
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    """Wilson %95 guven araligi. Kucuk n ve uc oranlarda normal yaklasimdan iyi."""
-    if n == 0:
+    """Wilson %95 guven araligi, ORAN olarak ve [0, 1]'e kirpilmis.
+
+    Formul `utils.stats.wilson_interval`'da. `z` varsayilani bilerek 1,96'da
+    birakildi: `keyword_precision.json` o degerle uretildi ve sonuc gorulduk-
+    ten sonra tanim degistirilmiyor (bkz. utils/stats.py).
+    """
+    lo, hi = wilson_interval(k, n, z)
+    if lo is None:
         return (float("nan"), float("nan"))
-    p = k / n
-    d = 1 + z**2 / n
-    centre = (p + z**2 / (2 * n)) / d
-    half = z * math.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / d
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return (max(0.0, lo), min(1.0, hi))
 
 
 def score(cfg: Config) -> dict:

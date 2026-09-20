@@ -38,7 +38,6 @@ Kullanim:
 from __future__ import annotations
 
 import argparse
-import zlib
 from pathlib import Path
 
 import polars as pl
@@ -49,6 +48,7 @@ from ..config import Config, add_standard_args, resolve_roles
 from ..detection.contamination import CONTAMINATION
 from ..utils.io import read_json, write_json
 from ..utils.logging import get_logger, log_output
+from ..utils.seeding import seed_for
 from .atomic import (
     SPLIT_TRAIN,
     load_atomic,
@@ -95,15 +95,6 @@ def condition_report_path(cfg: Config, role: str, code: str) -> Path:
     return cfg.path("results", f"condition_{cfg.category_slug(role)}_{code}.json")
 
 
-def _seed_for(base: int, key: str) -> int:
-    """`sampling._stratum_seed` ile ayni desen: crc32, surecler arasi KARARLI.
-
-    `hash()` PYTHONHASHSEED ile degisir ve `seed: 42` ile yeniden
-    uretilebilirlik iddiasini yalanlar.
-    """
-    return (base + zlib.crc32(str(key).encode("utf-8"))) % (2**31 - 1)
-
-
 def gift_mask(code: str) -> pl.Expr:
     """Kosulun EGITIMDEN cikardigi etiketler. C4/C4b icin anlamsiz (rastgele secer)."""
     labels = REMOVED_LABELS[code]
@@ -144,7 +135,7 @@ def apply_condition(df: pl.DataFrame, code: str, *, seed: int) -> tuple[pl.DataF
         indexed = df.with_row_index("_row")
         aday = indexed.filter(train)["_row"]
         drop = (
-            aday.sample(n_remove, seed=_seed_for(seed, code), shuffle=True)
+            aday.sample(n_remove, seed=seed_for(seed, code), shuffle=True)
             if n_remove
             else pl.Series("_row", [], dtype=aday.dtype)
         )

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "code_version": "cbd3abd",
+    "code_version": "3f904a6-dirty",
     "frame": "main",
     "n_per_category": 10000,
     "model": "Qwen/Qwen3-4B-Instruct-2507",

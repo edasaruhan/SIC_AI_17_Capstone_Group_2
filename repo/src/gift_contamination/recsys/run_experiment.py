@@ -235,6 +235,30 @@ def experiment_path(cfg: Config, role: str, code: str, model: str, seed: int) ->
     return cfg.path("results", f"experiment_{slug}_{code}_{model}_seed{seed}.json")
 
 
+def epochs_ran(trainer, cap: int) -> dict:
+    """Egitim GERCEKTEN kac epoch surdu ve tavana dedi mi.
+
+    Neden gerekiyor: RecBole'un epoch satirlari Kaggle loglarina dusmedi ve
+    raporlanan 72 kosunun hicbirinde "300 tavanina degen var miydi" sorusu
+    cevaplanamiyor (SONUCLAR.md 7). Erken durdurma devredeyken tavana degmek
+    "model hala ogreniyordu, kesildi" demektir - karsitliklari bozmaz (protokol
+    her kosulda ayni) ama mutlak sayilari okurken bilinmesi gerekir.
+
+    `train_loss_dict` RecBole Trainer'in kendi kaydi: egitilen her epoch icin
+    bir giris. Checkpoint'ten okumak yerine buradan aliniyor, cunku checkpoint
+    yalnizca EN IYI epoch'u tasiyor ve 100-300 MB'lik dosyayi bir tamsayi icin
+    yeniden yuklemek gerekirdi.
+
+    Belirlenemezse sessizce None: bu bir KAYIT alani, kapi degil (`code_version`
+    ile ayni gerekce). Gecmis 72 kosuyu kurtarmaz, bundan sonrasini kaydeder.
+    """
+    kayip = getattr(trainer, "train_loss_dict", None)
+    if not kayip:
+        return {"epochs_trained": None, "hit_epoch_cap": None}
+    n = int(max(kayip)) + 1   # epoch indisleri 0'dan basliyor
+    return {"epochs_trained": n, "hit_epoch_cap": n >= int(cap)}
+
+
 def checkpoint_dir(cfg: Config, role: str, code: str, model: str, seed: int) -> Path:
     """Kosu basina checkpoint klasoru (RecBole'un varsayilani gibi calisma dizinine gore).
 
@@ -629,7 +653,9 @@ def run(
             "condition": code,
             "model": model,
             "seed": seed,
+            # `epochs` TAVAN, `epochs_trained` gercekte kosan sayi.
             "epochs": conf["epochs"],
+            **epochs_ran(trainer, conf["epochs"]),
             "device": str(conf["device"]),
             "eval_batch_size": int(conf["eval_batch_size"]),
             # Bos yazici kondu mu (bkz. `stub_tensorboard_if_broken`) - sebep metni

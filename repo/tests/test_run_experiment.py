@@ -15,6 +15,7 @@ from gift_contamination.recsys.conditions import SHADOW_SUFFIX
 from gift_contamination.recsys.run_experiment import (
     UserItemMask,
     checkpoint_dir,
+    epochs_ran,
     eval_mask_pairs,
     hash_test_pairs,
     per_user_topk_metrics,
@@ -279,3 +280,34 @@ def test_parallel_runs_never_share_a_checkpoint_dir(cfg):
 
     assert len(set(klasorler)) == len(klasorler)
     assert all(not p.is_absolute() and p.parts[0] == "saved" and len(p.parts) == 2 for p in klasorler)
+
+
+# --------------------------------------------------------- kac epoch kosuldu
+class _Trainer:
+    def __init__(self, loss_dict):
+        self.train_loss_dict = loss_dict
+
+
+def test_epochs_trained_counts_the_epochs_recbole_actually_ran():
+    """Rapor bugune kadar yalnizca TAVANI yaziyordu, yani 72 kosunun hangisi
+    erken durdu soylenemiyordu (SONUCLAR 7)."""
+    assert epochs_ran(_Trainer({0: 1.0, 1: 0.8, 2: 0.7}), cap=300) == {
+        "epochs_trained": 3, "hit_epoch_cap": False,
+    }
+
+
+def test_hitting_the_cap_is_flagged():
+    """Tavana degen kosu 'model hala ogreniyordu, kesildi' demek; mutlak
+    sayilar bu bilgi olmadan okunamaz."""
+    assert epochs_ran(_Trainer({i: 1.0 for i in range(5)}), cap=5) == {
+        "epochs_trained": 5, "hit_epoch_cap": True,
+    }
+
+
+def test_an_unknowable_epoch_count_is_recorded_as_unknown_not_as_zero():
+    """Kayit alani, kapi degil: RecBole surumu alani tasimiyorsa kosu durmaz -
+    ama 0 yazip 'hic egitilmedi' iddiasinda da bulunmaz."""
+    assert epochs_ran(_Trainer({}), cap=300) == {
+        "epochs_trained": None, "hit_epoch_cap": None,
+    }
+    assert epochs_ran(object(), cap=300)["epochs_trained"] is None

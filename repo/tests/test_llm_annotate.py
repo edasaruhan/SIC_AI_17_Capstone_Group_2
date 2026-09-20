@@ -410,6 +410,33 @@ def test_stub_backend_never_spawns_workers(sampled: Config):
     ).height
 
 
+def test_gpus_auto_is_accepted_by_the_command_line(sampled: Config):
+    """Yardim metni `auto`'yu gecerli gosteriyordu ama CLI onu `int()`'e
+    veriyordu: `--gpus auto` her cagride ValueError'du (denetim 2026-09-20).
+    Kaggle'da kullanilan deger tam olarak bu."""
+    import yaml
+
+    from gift_contamination.detection import llm_annotate
+
+    # Fixture config'i yalnizca bellekte; CLI dosyadan okur.
+    sampled.source.write_text(yaml.safe_dump(sampled._data), encoding="utf-8")
+
+    assert llm_annotate.main([
+        "--config", str(sampled.source), "--category", "pilot",
+        "--backend", "stub", "--gpus", "auto",
+    ]) == 0
+    assert annotation_path(sampled, "pilot").exists()
+
+
+def test_gpus_given_by_hand_still_passes_the_card_check(sampled: Config):
+    """Elle verilen sayi dogrudan atanıyordu, yani `_resolve_gpus`'un
+    kart/tensor-parallel denetimini atliyordu. Ayni kapidan gecmeli."""
+    from gift_contamination.detection import llm_annotate
+
+    assert llm_annotate._resolve_gpus(sampled, "stub", requested=4) == 1
+    assert llm_annotate._resolve_gpus(sampled, "stub", requested="auto") == 1
+
+
 def test_report_records_how_many_gpus_ran(sampled: Config):
     """Throughput sayisi kac GPU ile alindigi bilinmeden yorumlanamaz."""
     for w in range(2):
