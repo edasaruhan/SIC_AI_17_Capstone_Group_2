@@ -59,8 +59,25 @@ def test_writing_a_report_does_not_make_the_stamp_dirty(depo: Path):
     assert not io.code_version().endswith("-dirty")
 
 
-def test_an_untracked_file_does_not_make_the_stamp_dirty(depo: Path):
+def test_a_new_uncommitted_code_file_makes_the_stamp_dirty(depo: Path):
+    """Kod yolunda henuz commit'lenmemis YENI bir modul de koddur.
+
+    Eskiden `--untracked-files=no` ile soruluyordu ve bu test tersini kilitliyordu:
+    commit'lenmemis yeni bir modulun urettigi cikti, o modulu HIC icermeyen bir
+    commit'le temiz damgalaniyordu (`robustness_posthoc.json` ilk kosusunda, denetim
+    2026-09-21). `__pycache__` ve `egg-info` gitignore'da; sayilmazlar.
+    """
     (depo / "src" / "yeni.py").write_text("x = 1\n", encoding="utf-8")
+
+    assert io.code_version().endswith("-dirty")
+
+
+def test_an_ignored_file_on_a_code_path_does_not_make_the_stamp_dirty(depo: Path):
+    (depo / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+    _git(depo, "add", ".gitignore")
+    _git(depo, "commit", "-q", "-m", "ignore")
+    (depo / "src" / "__pycache__").mkdir()
+    (depo / "src" / "__pycache__" / "a.cpython-312.pyc").write_bytes(b"\x00")
 
     assert not io.code_version().endswith("-dirty")
 

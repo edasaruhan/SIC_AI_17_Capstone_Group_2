@@ -66,7 +66,11 @@ def code_version() -> str | None:
     # YALNIZCA DAVRANISI BELIRLEYEN yollar sorulur. `reports/` de izleniyor ama
     # orasi CIKTI: bir raporu yazmak bir sonraki raporu "dirty" damgalardi ve
     # damga anlamsizlasirdi. Soru "bu sayilari ureten KOD commit'li miydi".
-    kirli = git("status", "--porcelain", "--untracked-files=no", "--",
+    # Izlenmeyen dosyalar da SAYILIR: kod yolunda commit'lenmemis yeni bir modul de
+    # koddur (eskiden `--untracked-files=no`du ve yeni bir modulun ciktisi onu hic
+    # icermeyen bir commit'le temiz damgalaniyordu - denetim 2026-09-21).
+    # `__pycache__` ve `egg-info` gitignore'da; `status` onlari gostermez.
+    kirli = git("status", "--porcelain", "--untracked-files=all", "--",
                 "src", "scripts", "configs", "prompts", "pyproject.toml",
                 "requirements.txt", "requirements-llm.txt", "requirements-recbole.txt")
     # Belirlenemiyorsa iddia BUYUTULMEZ: temiz oldugunu varsaymak yerine
