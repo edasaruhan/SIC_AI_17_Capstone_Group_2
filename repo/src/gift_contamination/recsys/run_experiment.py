@@ -252,11 +252,52 @@ def epochs_ran(trainer, cap: int) -> dict:
     Belirlenemezse sessizce None: bu bir KAYIT alani, kapi degil (`code_version`
     ile ayni gerekce). Gecmis 72 kosuyu kurtarmaz, bundan sonrasini kaydeder.
     """
+    bos = {"epochs_trained": None, "hit_epoch_cap": None, "best_epoch": None,
+           "epochs_since_best": None, "stopping_step": None}
     kayip = getattr(trainer, "train_loss_dict", None)
     if not kayip:
-        return {"epochs_trained": None, "hit_epoch_cap": None}
+        return bos
     n = int(max(kayip)) + 1   # epoch indisleri 0'dan basliyor
-    return {"epochs_trained": n, "hit_epoch_cap": n >= int(cap)}
+    out = {**bos, "epochs_trained": n, "hit_epoch_cap": n >= int(cap)}
+    # EN IYI epoch: RecBole `cur_step`i son iyilesmeden beri gecen DEGERLENDIRME sayisi
+    # olarak tutuyor (`early_stopping`; sabir `stopping_step`i asinca durur). Tavana
+    # degen bir kosuda bu sayi kucukse model tavanda hala iyilesiyordu - yalnizca
+    # "tavana degdi" demek bunu ayirt etmez (2026-09-21, seed 42 yeniden kosusu icin).
+    adim, eval_step = getattr(trainer, "cur_step", None), getattr(trainer, "eval_step", 1)
+    if isinstance(adim, int) and isinstance(eval_step, int) and eval_step > 0:
+        out["epochs_since_best"] = adim * eval_step
+        out["best_epoch"] = n - adim * eval_step
+    sabir = getattr(trainer, "stopping_step", None)
+    out["stopping_step"] = sabir if isinstance(sabir, int) else None
+    return out
+
+
+def library_versions() -> dict:
+    """Kosuyu ureten ortam: torch, CUDA, GPU, RecBole, numpy. Bulunamayan None.
+
+    72 kosunun raporunda bunlar YOKTU; Kaggle imaji degisirse "ayni kod ayni sonucu
+    verdi mi" sorusu surum bilinmeden cevaplanamaz (2026-09-21). Kayit alani, kapi
+    degil: torch'suz ortamda (testler) da calisir.
+    """
+    import importlib  # noqa: PLC0415
+
+    def surum(ad: str) -> str | None:
+        try:
+            return str(importlib.import_module(ad).__version__)
+        except Exception:  # noqa: BLE001
+            return None
+
+    out = {"torch": surum("torch"), "recbole": surum("recbole"), "numpy": surum("numpy"),
+           "cuda": None, "gpu": None}
+    if out["torch"] is not None:
+        try:
+            import torch  # noqa: PLC0415
+
+            out["cuda"] = torch.version.cuda
+            out["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+        except Exception:  # noqa: BLE001
+            pass
+    return out
 
 
 def checkpoint_dir(cfg: Config, role: str, code: str, model: str, seed: int) -> Path:
@@ -657,6 +698,7 @@ def run(
             "epochs": conf["epochs"],
             **epochs_ran(trainer, conf["epochs"]),
             "device": str(conf["device"]),
+            "versions": library_versions(),
             "eval_batch_size": int(conf["eval_batch_size"]),
             # Bos yazici kondu mu (bkz. `stub_tensorboard_if_broken`) - sebep metni
             # surum numaralari tasiyor, mutlak yol tasimiyor.

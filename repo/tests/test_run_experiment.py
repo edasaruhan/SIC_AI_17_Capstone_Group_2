@@ -16,6 +16,7 @@ from gift_contamination.recsys.run_experiment import (
     UserItemMask,
     checkpoint_dir,
     epochs_ran,
+    library_versions,
     eval_mask_pairs,
     hash_test_pairs,
     per_user_topk_metrics,
@@ -284,30 +285,61 @@ def test_parallel_runs_never_share_a_checkpoint_dir(cfg):
 
 # --------------------------------------------------------- kac epoch kosuldu
 class _Trainer:
-    def __init__(self, loss_dict):
+    def __init__(self, loss_dict, cur_step=None, stopping_step=None, eval_step=1):
         self.train_loss_dict = loss_dict
+        if cur_step is not None:
+            self.cur_step = cur_step
+        if stopping_step is not None:
+            self.stopping_step = stopping_step
+        self.eval_step = eval_step
 
 
 def test_epochs_trained_counts_the_epochs_recbole_actually_ran():
     """Rapor bugune kadar yalnizca TAVANI yaziyordu, yani 72 kosunun hangisi
     erken durdu soylenemiyordu (SONUCLAR 7)."""
-    assert epochs_ran(_Trainer({0: 1.0, 1: 0.8, 2: 0.7}), cap=300) == {
-        "epochs_trained": 3, "hit_epoch_cap": False,
-    }
+    out = epochs_ran(_Trainer({0: 1.0, 1: 0.8, 2: 0.7}), cap=300)
+
+    assert out["epochs_trained"] == 3 and out["hit_epoch_cap"] is False
 
 
 def test_hitting_the_cap_is_flagged():
     """Tavana degen kosu 'model hala ogreniyordu, kesildi' demek; mutlak
     sayilar bu bilgi olmadan okunamaz."""
-    assert epochs_ran(_Trainer({i: 1.0 for i in range(5)}), cap=5) == {
-        "epochs_trained": 5, "hit_epoch_cap": True,
-    }
+    out = epochs_ran(_Trainer({i: 1.0 for i in range(5)}), cap=5)
+
+    assert out["epochs_trained"] == 5 and out["hit_epoch_cap"] is True
+
+
+def test_best_epoch_separates_early_stopping_from_still_improving_at_the_cap():
+    """RecBole `cur_step` = son iyilesmeden beri gecen degerlendirme sayisi; sabir
+    (`stopping_step`) asilinca durur. 120 epoch + cur_step 11 -> en iyi 109. epoch,
+    erken durdu. 300 epoch + cur_step 2 -> tavanda hala iyilesiyordu."""
+    erken = epochs_ran(_Trainer({i: 1.0 for i in range(120)}, cur_step=11, stopping_step=10), cap=300)
+    assert erken == {"epochs_trained": 120, "hit_epoch_cap": False, "best_epoch": 109,
+                     "epochs_since_best": 11, "stopping_step": 10}
+
+    tavan = epochs_ran(_Trainer({i: 1.0 for i in range(300)}, cur_step=2, stopping_step=10), cap=300)
+    assert tavan["hit_epoch_cap"] is True and tavan["best_epoch"] == 298
+
+    # eval_step > 1: cur_step degerlendirme sayar, epoch degil.
+    iki = epochs_ran(_Trainer({i: 1.0 for i in range(40)}, cur_step=3, eval_step=2), cap=300)
+    assert iki["epochs_since_best"] == 6 and iki["best_epoch"] == 34
 
 
 def test_an_unknowable_epoch_count_is_recorded_as_unknown_not_as_zero():
     """Kayit alani, kapi degil: RecBole surumu alani tasimiyorsa kosu durmaz -
     ama 0 yazip 'hic egitilmedi' iddiasinda da bulunmaz."""
     assert epochs_ran(_Trainer({}), cap=300) == {
-        "epochs_trained": None, "hit_epoch_cap": None,
+        "epochs_trained": None, "hit_epoch_cap": None, "best_epoch": None,
+        "epochs_since_best": None, "stopping_step": None,
     }
     assert epochs_ran(object(), cap=300)["epochs_trained"] is None
+    assert epochs_ran(_Trainer({0: 1.0}), cap=300)["best_epoch"] is None   # cur_step yok
+
+
+def test_library_versions_never_crash_without_torch():
+    """Ana ortamda torch yok; alan yine yazilir, bilinmeyen None kalir."""
+    out = library_versions()
+
+    assert set(out) == {"torch", "recbole", "numpy", "cuda", "gpu"}
+    assert out["numpy"] is not None

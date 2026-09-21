@@ -153,6 +153,19 @@ kosullar = CONDITIONS or CFG["experiment"]["conditions"]
 seedler = [int(s) for s in (SEEDS or CFG["seeds"])]
 
 # ------------------------------------------------------- girdileri yerlestir
+def _sha256(yol: Path) -> str:
+    import hashlib  # noqa: PLC0415
+
+    h = hashlib.sha256()
+    with open(yol, "rb") as f:
+        for blok in iter(lambda: f.read(1 << 20), b""):
+            h.update(blok)
+    return h.hexdigest()
+
+
+# Girdinin OZETI oturum ozetine yazilir: "ayni veriyle mi kostu" sorusu dataset adina
+# ya da yukleme tarihine degil icerige baglanir (seed 42 yeniden kosusu, 2026-09-21).
+GIRDI_OZETI: dict[str, dict[str, str]] = {}
 src = Path(DATASET_PATH or "/kaggle/input")
 if not src.exists():
     print(f"!! {src} yok - /kaggle/input altinda araniyor")
@@ -173,7 +186,10 @@ for rol in kategoriler:
     shutil.copy(inter[0], hedef / inter[0].name)
     shutil.copy(split[0], hedef / "split.json")
     etiket = json.loads((hedef / "split.json").read_text(encoding="utf-8")).get("label_source")
-    print(f"{slug}: {inter[0].stat().st_size / 1e6:.0f} MB · etiket kaynagi {etiket}")
+    GIRDI_OZETI[slug] = {"inter_sha256": _sha256(hedef / inter[0].name),
+                         "split_sha256": _sha256(hedef / "split.json")}
+    print(f"{slug}: {inter[0].stat().st_size / 1e6:.0f} MB · etiket kaynagi {etiket} · "
+          f"sha256 {GIRDI_OZETI[slug]['inter_sha256'][:16]}")
     if etiket != "distilled":
         print(f"!! UYARI: {slug} etiket kaynagi '{etiket}' - bu kosular DUMAN TESTIDIR, raporlanamaz.")
 
@@ -319,6 +335,7 @@ while not kuyruk.empty():  # sistematik hata yuzunden hic alinmayan isler
 # ------------------------------------------------------------------ ozet
 (OUT / "oturum_ozeti.json").write_text(json.dumps({
     "plan": PLAN, "toplam_sn": round(time.time() - T_BASLA), "biten": ozet, "bitmeyen": hatalar,
+    "girdi_sha256": GIRDI_OZETI,
     "en_uzun_kosu_sn": {f"{SLUG[r]}/{m}": round(s) for (r, m), s in sorted(SURE.items())},
 }, ensure_ascii=False, indent=2), encoding="utf-8")
 print(f"\nTOPLAM {time.time() - T_BASLA:.0f} sn · biten {len(ozet)} / {len(isler)}")
