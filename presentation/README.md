@@ -81,13 +81,13 @@ Planlanan 16 ana slayt yerine 17 var: RQ2'nin "plaseboya karşı" ve "hiçbir ş
 yapmamaya karşı" sonuçları tek slayta sığmıyordu ve ikincisi bulguyu
 sınırlandıran taraf — ayrı slayt oldu.
 
-## Bilinen kusur
+## Bilinen kusur — giderildi (2026-09-21)
 
-`F20_distill_fidelity_base.png`'in alt başlığında İngilizce metnin içinde tek bir
-Türkçe parantez var ("egitimden once"). O dize `distill_report_base.json`'ın
-`meta` alanında duruyor ve figüre oradan basılıyor; düzeltmek ya damıtmayı
-yeniden koşmayı ya da makine tarafından yazılmış bir artefaktı elle düzenlemeyi
-gerektirirdi. İkincisi projenin kuralına aykırı, o yüzden olduğu gibi bırakıldı.
+`F20`'nin alt başlığındaki Türkçe parantez ("egitimden once") figür kodundan
+geliyordu: `result_figures` damıtma raporunun makinenin yazdığı notunu olduğu gibi
+basıyordu. Artık yalnızca tarihi basıyor (`f20_subtitle`, testli). Artefakt elle
+düzenlenmedi; burada daha önce "düzeltmek damıtmayı yeniden koşmayı gerektirir"
+yazıyordu, bu yanlıştı.
 
 ## Ekip adları
 

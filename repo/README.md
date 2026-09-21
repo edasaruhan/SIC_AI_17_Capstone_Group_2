@@ -135,7 +135,7 @@ python -m gift_contamination.analysis.precision_check score
 Testler:
 
 ```bash
-pytest tests -q          # 441 test
+pytest tests -q          # 463 test
 ```
 
 Sonuçların tamamını tek komutla görmek (veri dosyası gerekmez, yalnız standart

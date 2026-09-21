@@ -155,7 +155,7 @@ This reverses the model choice. **Qwen3.5**, the current small-model family, is 
 **Is a 4B model enough?** The task is four-way classification of short text against a fixed schema, not open-ended generation. Two measurements from this project's own exploratory analysis bound the difficulty. First, the label-bearing evidence sits early — median position 1–3% into the review body, with 8–11% of it in the title. Second, a naive lexical proxy already reaches 58.3% precision on the positive class, so the model's task is to correct a well-characterised error pattern — speculative gift language, and gifts *received* rather than given — rather than to find a signal from nothing. A 4B instruction-tuned model is a defensible fit for that, and the macro-F1 ≥ 0.75 gate exists precisely to catch the case where it is not.
 
 > **Erratum — 2026-09-20 (audit).** The macro-F1 ≥ 0.75 gate referred to here was measured and
-> **not met**: 0.5404 [0.4897–0.5869] on the 500 human-labelled rows (0.494 population-weighted).
+> **not met**: 0.5405 [0.4897–0.5869] on the 500 human-labelled rows (0.494 population-weighted).
 > It was never encoded in `configs/base.yaml` and therefore never enforced; the escalation paths
 > named in this document (prompt v2/v4, switching to Qwen3-8B, the Gemma second annotator) were
 > not taken — a prompt revision would have required re-running Gate 1, and the 500 validation

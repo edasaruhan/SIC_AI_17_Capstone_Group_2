@@ -38,7 +38,7 @@ SUBTITLE = ("Detecting gift purchases as a distinct class of noise "
             "in e-commerce recommender systems")
 TEAM = "AI in Marketing Capstone, Group 2 — [Team Member 1] / [Team Member 2] / [Team Member 3]"
 RUNNING = "This Was Not For Me · SIC AI 17 Capstone · Group 2"
-DATE = "20 September 2026"
+DATE = "21 September 2026"
 GITHUB = "github.com/edasaruhan/SIC_AI_17_Capstone_Group_2"
 
 CATEGORIES = ["Toys_and_Games", "Grocery_and_Gourmet_Food", "Video_Games", "All_Beauty"]
@@ -177,9 +177,9 @@ def load() -> dict:
         "dose": stats["dose_response"],
         "m2": m2,
         "m1": m1,
-        # Insan dogrulamasi: nokta deger `llm_vs_human` (butun teslim
-        # belgelerinin andigi 0,5404), aralik `llm_vs_human_sample_ci`
-        # blogundan - ayni istatistigin iki hesabi, dorduncu hanede ayrisiyor.
+        # Insan dogrulamasi: nokta deger `llm_vs_human`, aralik
+        # `llm_vs_human_sample_ci` blogundan. Iki blok 2026-09-21'e kadar dorduncu
+        # hanede ayrisiyordu (0,5404 / 0,5405 - yuvarlama hatasi); artik ikisi de 0,5405.
         "human": {
             "verdict": val["verdict"],
             "macro_f1": val["measurements"]["llm_vs_human"]["macro_f1"],
@@ -582,7 +582,8 @@ def s04_questions(prs, N):
         size=13.5, bold=True, color=ACCENT, space_after=6)
     put(tf, "A 95 % bootstrap interval that excludes zero in the expected direction → "
             "reported as a LOWER BOUND (alt_sınır), because label noise pulls a "
-            "placebo contrast toward the placebo.   An interval containing zero → "
+            "placebo contrast toward the placebo (assuming the detector's mistakes are no "
+            "more informative than random rows — A4).   An interval containing zero → "
             "NOT DETECTABLE (saptanamadı) — never \"no effect\".   An interval "
             "excluding zero in the opposite direction → NEGATIVE (negatif), reported "
             "as such.",
@@ -734,9 +735,9 @@ def s07_honesty(prs, N):
     tf = textbox(sl, x + 0.2, 5.58, w - 0.4, 1.0)
     put(tf, "Why the study is still readable", size=12.5, bold=True, color=ACCENT,
         space_after=5)
-    put(tf, "Label noise makes a gift-deletion condition look MORE like its random-deletion "
-            "placebo, not less. So every effect on the next slides is a lower bound, "
-            "and the direction cannot be an artefact of a weak detector.",
+    put(tf, "The placebo holds the amount of deleted data fixed, and the effect scales "
+            "with the gift share — neither depends on detector accuracy. What the weak "
+            "detector changes is what is measured: the rows it FLAGS as gifts.",
         size=10.5, color=INK, space_after=0, line=1.12)
     foot(sl, 7)
     notes(sl, "Bu slaydi atlamiyoruz, aksine one aliyoruz. Concept note'ta iki "
@@ -744,10 +745,12 @@ def s07_honesty(prs, N):
               "en az sifir seksen. Olculen degerler sifir elli dort ve sifir altmis "
               "sekiz - ikisi de tutmuyor. Ayrica tek etiketleyici calisti, yani "
               "planlanan Fleiss kappa hic olculmedi; Hafta 4'un artefakttaki karari "
-              "INCOMPLETE. Peki calisma neden hala okunabilir? Cunku etiket "
-              "gurultusu hediye-silme kosulunu rastgele-silme plasebosuna "
-              "YAKLASTIRIR; yani bulunan etki gercek etkinin alt siniri. Zayif "
-              "dedektor bulgunun yonunu uydurmaz, ancak buyuklugunu kucultur.")
+              "INCOMPLETE. Peki calisma neden hala okunabilir? Iki sey dedektorun "
+              "dogruluguna bagli degil: plasebo silinen veri miktarini sabit tutuyor, "
+              "ve etki kategorinin hediye payiyla buyuyor. Zayif dedektorun degistirdigi "
+              "sey ne olculdugu: 'hediyeler' degil, dedektorun hediye DEDIGI satirlar. "
+              "Bunlarin ucte biri insana gore hediye degil, cogu kendi cocuguna alim - "
+              "o yuzden 'alt sinir' okumasi bir varsayima dayaniyor, A4'te yaziyor.")
 
 
 def s08_distill(prs, N):
@@ -1380,7 +1383,7 @@ def a04_limits(prs, N):
             ["1", "Two pre-registered detector gates were missed "
                   f"(macro-F1 {N['human']['macro_f1']:.4f} vs ≥ 0.75; gift precision "
                   f"{N['human']['gift_precision']:.2f} vs ≥ 0.80)",
-             "Effects are lower bounds; absolute prevalence is uncertain"],
+             "Absolute prevalence is uncertain; effects measure detector-flagged rows"],
             ["2", "The primary metric changed from NDCG@10 to Recall@10 before the runs",
              "Pre-registered, dated, and NDCG is still reported — but it is a change"],
             ["3", f"{N['human']['n_annotators']} human annotator; the planned Fleiss κ "
@@ -1390,12 +1393,18 @@ def a04_limits(prs, N):
                   "false positives",
              "The treatment is \"delete what the detector flags\", not \"delete gifts\""],
             ["5", "Gifts in a user's validation row are never removed",
-             "Weakens C1 for the sequential model specifically"],
+             "Direction of the effect on the sequential model is untested"],
             ["6", "Number of epochs actually trained was not recorded for the 72 runs",
-             "Now written to every new run report; the old runs cannot be recovered"]]
-    table(sl, M, 2.02, CW, rows, [0.6, 6.0, 5.3], row_h=0.52, size=10, head_size=9.5,
+             "Seed-42 cells re-run on 21 Sept with the same data to measure it"],
+            ["7", "Intervals resample users, not training runs (seed variance excluded)",
+             "Toys: every seed agrees in sign · Grocery: seed spread ≈ interval width"],
+            ["8", "The placebo matches the number of rows, not the users they come from",
+             "Post-hoc: the Toys effect holds even for users neither condition touched"],
+            ["9", "\"Lower bound\" assumes false positives are as informative as random rows",
+             "Most are purchases for the buyer's own child — not guaranteed"]]
+    table(sl, M, 1.95, CW, rows, [0.6, 6.0, 5.3], row_h=0.41, size=9.5, head_size=9,
           first_bold=True)
-    put(textbox(sl, M, 5.72, CW, 1.1),
+    put(textbox(sl, M, 6.18, CW, 0.8),
         "Ten further limitations are listed in repo/docs/SONUCLAR.md §7, including: two "
         "categories and two models only; English-language reviews; review date used as a "
         "proxy for purchase date; \"waste\" measured as slot share rather than conversion; "
@@ -1408,10 +1417,12 @@ def a04_limits(prs, N):
               "dedektorun dogrulugu ve etiket guvenilirligiyle ilgili ve en "
               "agirlari. Dorduncusu ince ama onemli: C1 aslinda 'hediyeleri sil' "
               "degil 'dedektorun isaretledigini sil' kosulu. Besincisi sirali "
-              "modele ozel. Altincisi bir kayit eksikligi ve artik duzeltildi - "
-              "yeni kosular gerçek epoch sayisini yaziyor, ama gecmis yetmis iki "
-              "kosu kurtarilamiyor. Geri kalan on madde SONUCLAR.md yedinci "
-              "bolumde.")
+              "modele ozel ve etkisinin yonu sinanmadi. Altincisi bir kayit eksikligi: "
+              "seed 42'nin yirmi dort hucresi ayni veriyle yeniden kosuluyor. Yedi ve "
+              "sekiz ikinci denetimde bulundu: guven araliklari egitim degiskenligini "
+              "kapsamiyor ve plasebo kullanici duzeyinde eslenmedi - ikisi de post-hoc "
+              "olculdu ve Toys bulgusunu degistirmiyor. Dokuzuncusu alt sinir okumasinin "
+              "varsayimi. Geri kalan on madde SONUCLAR.md yedinci bolumde.")
 
 
 def a05_repro(prs, N):

@@ -2672,3 +2672,107 @@ taşır, hiçbir birincil sayının yerine geçmez (`analysis/robustness.py`).
 `recsys/run_experiment.py` (yalnızca rapor alanları), `scripts/kaggle_experiment.py`
 (yalnızca girdi özeti)
 **Kim:** Kullanıcı (ekip adına) · kayıt: ekip
+
+---
+
+### 2026-09-21 — İkinci denetim: bulgular ve düzeltmeler (birincil sayı DEĞİŞMEDİ)
+
+**Karar:** Proje baştan sona yeniden denetlendi. Denetimde ham veriden değişmezler bağımsız
+olarak yeniden hesaplandı, kritik kod yolu okundu ve yayımlanan iddialar veriyle
+karşılaştırıldı. Bulunan her şey ya düzeltildi ya da sınırlılık olarak yazıldı. Hiçbir
+birincil sayı değişmedi; tek istisna makro-F1'in 4. basamağı.
+
+#### Bağımsız yeniden hesapla doğrulananlar (sorun yok)
+
+- **5-core ve bölme:**
+  - Toys 2.164.018, Grocery 2.434.594 satır; en düşük kullanıcı ve ürün derecesi 5.
+  - Yinelenen (kullanıcı, ürün) çifti 0; bütün satırlar `verified`.
+  - Her kullanıcıda test = son satır, valid = sondan ikinci; train ≤ valid ≤ test.
+- **Koşullar:**
+  - Beş koşulda da valid ve test satırları C0 ile birebir aynı.
+  - C1 eğitimdeki bütün `gift_given` satırlarını siliyor; C4 aynı sayıda satır siliyor
+    (C1b/C4b için de aynısı).
+  - C3'ün gölge satırları yalnızca eğitimde.
+- **Etiketler:** öğrenci etiketleri 5-core'un her satırında ve hepsi `distilled`. LLM–insan
+  sınıf bazlı P/R/F1 yeniden hesaplandı ve tuttu.
+- **Kaggle girdisi:** yüklenen `.inter` ve `split.json` dosyaları yereldekilerle SHA-256
+  düzeyinde aynı.
+- **Kod farkı:** koşulardan (`f3183df`) bu yana deney kodundaki fark yalnızca rapor
+  alanları, bir koruma ve aynı formülle taşınmış `seed_for`.
+
+#### Bulunan ve düzeltilen kusurlar
+
+- **Makro-F1 yuvarlama hatası.** `validation.compare` sınıf F1'lerini 3 basamağa yuvarlayıp
+  sonra ortalıyordu. Rapor 0,5405 yerine **0,5404** yazıyordu; aynı dosyadaki bootstrap bloğu
+  zaten 0,5405'ti.
+  - `validation_500.json` yeniden üretildi; diff'te yalnızca `macro_f1` ve damga değişti.
+  - Güncellenen belgeler: rapor, SONUCLAR ve concept-note / technology-review /
+    implementation-plan errataları. Eski DECISIONS kayıtlarındaki 0,5404 tarihî olarak kaldı.
+- **F20'deki Türkçe parantez figür kodundan geliyordu.** Figür, damıtma raporunun makinenin
+  yazdığı `thresholds_fixed` notunu olduğu gibi basıyordu; artık yalnızca tarihi basıyor.
+  - 2026-09-21 capstone kaydındaki "düzeltmek damıtmayı yeniden koşmayı gerektirir"
+    değerlendirmesi **yanlıştı**.
+  - F21–F23 bayt düzeyinde aynı kaldı.
+- **`marketing_metrics.json`'ın kirli damgası** (`3f904a6-dirty`). Makinede başka bir şey
+  koşmazken tek başına koşuldu; 3 dakika sürdü ve yalnızca damga değişti.
+- **Damga, izlenmeyen kod dosyasını saymıyordu.** `code_version` `--untracked-files=no`
+  kullanıyordu; commit'lenmemiş yeni bir modülün çıktısı, o modülü içermeyen bir commit'le
+  temiz damgalanıyordu. Bu, `robustness_posthoc.json`'ın ilk koşusunda görüldü.
+  - Bir test tam tersini kilitliyordu; test tersine çevrildi.
+  - `__pycache__` ve `egg-info` gitignore'da olduğu için sayılmıyor.
+
+#### Geri çekilen ya da daraltılan iddialar
+
+- **"Valid satırındaki hediye C1 − C4 ve C1 − C0 farklarını küçültür, büyütmez."** Bu iddia
+  2026-09-19 kaydında, SONUCLAR §7 madde 5'te, GENEL_BAKIS'ta, raporda ve deck'te geçiyordu.
+  Bir varsayımdı: SASRec'te hediye satırlarını silmek zaten net zararlı (C1 − C0 < 0), yani
+  yön sınanmadı. Beş yerde "yön sınanmadı" diye düzeltildi. 2026-09-19 kaydının metnine
+  dokunulmadı; bu kayıt onu düzeltiyor.
+- **"Alt sınır" gerekçesi.** Önceden kayıtlı kural değişmedi. Ama kuralın gerekçesi kaçırılan
+  hediyeler için doğru; yanlış pozitifler için ise o satırların rastgele bir satır kadar
+  bilgi taşımasını varsayıyor. Yanlış pozitiflerin çoğu kendi çocuğuna alım, ve C1b sonucu bu
+  satırların da ortalamadan az bilgi taşıdığını düşündürüyor.
+  - Raporun "gürültülü detektör plasebo kontrollü bir farkı üretemez, yalnızca gizler"
+    cümlesi ve deck slayt 7'deki "yön zayıf detektörün eseri olamaz" kutusu düzeltildi.
+  - Varsayım SONUCLAR §7 madde 19'a yazıldı.
+- **Küçük ifadeler:**
+  - "Far cheaper than it is usually assumed" cümlesi kaynaksızdı, çıkarıldı.
+  - "Five slots in a hundred" yalnızca BPR için geçerli (SASRec'te 1,3); öyle yazıldı.
+  - "Gift rows should be down-weighted" bir öneri değil, çıkarım olarak yazıldı.
+  - Kök README'deki "Grocery'de saptanamıyor" → "çok küçük ya da saptanamıyor".
+  - Erken durdurmanın hediye içeren valid hedefleri SONUCLAR §7 madde 7'ye eklendi.
+
+#### Post-hoc analizler (ön kayıtta işaretli; `robustness_posthoc.json`)
+
+- **Seed düzeyi:**
+  - Toys'ta her karşıtlıkta üç seed de aynı işareti veriyor; C1 − C4, seed ortalamasının
+    standart hatasının 13–17 katı.
+  - Grocery'de seed yayılımı kullanıcı GA'sıyla aynı mertebede. SASRec C1 − C4'te üç seed de
+    pozitif; BPR C1 − C4'te işaret değişiyor (1/3).
+- **Maruziyet ayrıştırması:**
+  - C1, Toys test kullanıcılarının %44'üne dokunuyor; C4 %73'üne.
+  - Toys'ta C1 − C4 dört grubun dördünde pozitif; **iki koşulun da dokunmadığı** kullanıcılarda
+    SASRec +0,677 [+0,507, +0,864], BPR +0,515 [+0,389, +0,638].
+  - Grocery'de pozitif ortalama tedavinin dokunmadığı kullanıcılardan geliyor.
+
+Yeni sınırlılıklar: SONUCLAR §7 madde 17–19, rapor §9 madde 6–8, deck A4 satır 7–9.
+
+#### Kod (sonuç değiştirmeyen)
+
+- `validation.primary_reference` (A): doğrulama, kalibrasyon ve damıtma paketi aynı birincil
+  referansı okuyor. Çok etiketleyicide çoğunluk duyarlılık bloğuna yazılıyor. `validation_500`
+  ve `prevalence` yeniden üretildi; yalnızca `primary_reference` alanı ve damga eklendi.
+- `analysis/robustness.py` ve `analysis/reproduction.py` eklendi.
+- Koşu raporu artık `best_epoch`, `epochs_since_best`, `stopping_step` ve `versions` yazıyor.
+  Gerçek RecBole trainer'ıyla yerelde 2 epoch'luk duman koşusunda doğrulandı.
+- Kaggle hücresi girdi SHA-256'sını oturum özetine yazıyor.
+
+**Testler:** 441 → 463.
+
+**Etkilediği bölüm:** `analysis/validation.py`, `analysis/prevalence.py`,
+`analysis/result_figures.py`, `analysis/robustness.py`, `analysis/reproduction.py`,
+`detection/distill.py`, `recsys/run_experiment.py`, `utils/io.py`,
+`scripts/kaggle_experiment.py`, `configs/base.yaml`, SONUCLAR, GENEL_BAKIS, CLAUDE.md,
+ETIKETLEME_REHBERI, kök README, final raporu, deck, one-pager, üç teslim belgesinin
+errataları
+**Kim:** Ekip (denetim)

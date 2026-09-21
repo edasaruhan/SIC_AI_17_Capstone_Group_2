@@ -13,11 +13,14 @@ karşılaştırıyor.
 | Soru | Cevap |
 |---|---|
 | **RQ1** — hediye ne kadar yaygın? | Toys'ta review'ların **%19,0**'u [15,8–22,3] (insan kalibrasyonlu). Grocery / All Beauty / Video Games %5–8. Dört kategoride de Aralık–Ocak tepesi (1,58–2,08×). |
-| **RQ2** — hediyeyi çıkarmak kendi sonraki alımın tahminini iyileştirir mi? | Hediye satırları **aynı sayıda rastgele satırdan belirgin daha az işe yarıyor** (C1 > C4): Toys'ta SASRec +%16, BPR +%40 Recall@10. Grocery'de saptanamıyor → **doz–yanıt tutuyor**. |
+| **RQ2** — hediyeyi çıkarmak kendi sonraki alımın tahminini iyileştirir mi? | Hediye satırları **aynı sayıda rastgele satırdan belirgin daha az işe yarıyor** (C1 > C4): Toys'ta SASRec +%16, BPR +%40 Recall@10. Grocery'de çok küçük ya da saptanamıyor → **doz–yanıt tutuyor**. |
 | **RQ3** — silmek mi, işaretlemek mi? | Bu çalışmadaki işaretleme (gölge token) her iki seçenekten de kötü ya da onlardan ayırt edilemiyor. |
 | **RQ4** — liste ne kadar süre kirli kalıyor? | SASRec × Toys'ta fazla pay **2,0 puan**la başlıyor ve **~1 kendi alımında** yarıya iniyor (≈2–4 hafta). |
 
-72 koşu (2 kategori × 2 model × 6 koşul × 3 seed), Kapı 2 dört hücrede de PASS, 441 test.
+72 koşu (2 kategori × 2 model × 6 koşul × 3 seed), Kapı 2 dört hücrede de PASS, 463 test.
+**Süren iki doğrulama (2026-09-21):** seed 42'nin 24 hücresi epoch sayısı ve birebir yeniden
+üretim için Kaggle'da yeniden koşuluyor; iki ekip üyesi doğrulama setini etiketliyor (κ).
+İkisinin de kuralları sonuçlardan önce yazıldı ([`DECISIONS.md`](repo/docs/DECISIONS.md)).
 **Capstone raporunun tamamı: [`final-report/final-report.md`](final-report/final-report.md)** ·
 ayrıntı, güven aralıkları ve sınırlılıklar: [`repo/docs/SONUCLAR.md`](repo/docs/SONUCLAR.md) ·
 her başlığı tek komutla basmak için: `python repo/scripts/demo.py`
@@ -49,7 +52,7 @@ her başlığı tek komutla basmak için: `python repo/scripts/demo.py`
 cd repo
 python -m venv .venv && .venv/Scripts/activate     # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt && pip install -e .
-python -m pytest tests -q                           # 441 test
+python -m pytest tests -q                           # 463 test
 ```
 
 Veri dosyaları (`data/`), model ağırlıkları (`models/`) ve kullanıcı başı deney çıktıları

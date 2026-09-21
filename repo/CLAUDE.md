@@ -88,6 +88,10 @@ src/gift_contamination/
                          #   Ana ortamda koşar; kullanıcı başı parquet'leri okur
     result_figures.py    # F20 damıtma sadakati · F21 koşul karşıtlıkları · F22 M2 ·
                          #   F23 M1. Yalnızca raporlanmış JSON'u çizer, hesap yapmaz
+    robustness.py        # POST-HOC (2026-09-21): seed düzeyi karşıtlıklar + maruziyet
+                         #   ayrıştırması. Birincil DEĞİL, çıktı `post_hoc: true`
+    reproduction.py      # seed 42 yeniden koşusunun denetimi: birebir aynılık, epoch
+                         #   sayısı, tavan bayrağı (kurallar DECISIONS 2026-09-21 ön kaydı)
   recsys/
     atomic.py            # RecBole .inter üretimi + zaman bazlı leave-one-out.
                          #   Bölme ve evren C0'da DONAR (kural 3'ün sonucu).
@@ -388,6 +392,9 @@ python -m gift_contamination.analysis.experiment_stats --config configs/base.yam
 python -m gift_contamination.recsys.marketing_metrics --config configs/base.yaml
 # Sonuç figürleri F20–F23 (girdi JSON'u olmayan figür atlanır)
 python -m gift_contamination.analysis.result_figures --config configs/base.yaml
+# 2026-09-21 — post-hoc sağlamlık (birincil DEĞİL) ve seed 42 yeniden koşusunun denetimi
+python -m gift_contamination.analysis.robustness   --config configs/base.yaml
+python -m gift_contamination.analysis.reproduction --config configs/base.yaml --rerun <out_klasörü> [<out_klasörü> ...]
 ```
 
 > Bütün modüller yazıldı (2026-09-14) ve gerçek veride koştu. **Sonuç raporu:
@@ -405,7 +412,7 @@ python -m gift_contamination.analysis.result_figures --config configs/base.yaml
 
 Kurallar:
 - **Veri üreten** her komut idempotent: çıktı varsa `--force` olmadan yeniden
-  hesaplamaz. **Analiz/figür adımları değil** — `analysis.experiment_stats`, `recsys.marketing_metrics`, `analysis.result_figures`, `analysis.validation` ve `analysis.eda`/`deep_eda` her
+  hesaplamaz. **Analiz/figür adımları değil** — `analysis.experiment_stats`, `recsys.marketing_metrics`, `analysis.result_figures`, `analysis.validation`, `analysis.robustness`, `analysis.reproduction` ve `analysis.eda`/`deep_eda` her
   çağrıldığında yeniden hesaplar ve çıktıyı ezer (girdileri zaten commit'li JSON'lar,
   maliyet 4–14 dk). Kural 2026-09-20'de gerçeğe çekildi.
 - Her komut çıktı yolunu ve satır sayısını loglamalı.
@@ -486,7 +493,9 @@ Kurallar:
   figür boş çizilmek yerine atlanıyor mu; yerel model yolu figüre sızıyor mu; M2 lejantı
   GA'sı sınırsız bir yarı ömrü süre ölçümü gibi göstermiyor mu
 - `test_validation.py` — Fleiss κ elle hesaplanmış örneğe eşit mi; `n < 20` sınıf
-  genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor
+  genel κ'ya girmiyor mu; beraberlik `tie` olarak mı işaretleniyor; makro-F1 yuvarlanmamış
+  sınıf F1'lerinden mi; **birincil referans A iken üç etiketleyicili raporun ölçümleri tek
+  etiketleyicili raporla birebir aynı mı** ve çoğunluk ayrı blokta mı (ön kayıt 2026-09-21)
 - `test_prevalence.py` — Wilson GA elle hesaplanmış aralığa eşit mi; yaygınlık
   YALNIZCA `main`'den mi okunuyor; iki tanımdan biri sessizce seçilmiyor mu;
   `human_validated` diskten mi okunuyor (elle iddia edilmiyor)
@@ -496,8 +505,14 @@ Kurallar:
 - `test_inference.py` — 5-core'un her satırına TAM bir etiket mi; kesintiden sonra
   bitmiş parça yeniden hesaplanmıyor mu; kapıyı geçmemiş öğrenci reddediliyor mu; **başka
   bir modelin/backend'in parçaları sessizce `distilled` damgası almıyor mu** (manifest)
-- `test_io.py` — `code_version` commit'lenmemiş değişikliği `-dirty` diye işaretliyor mu;
+- `test_io.py` — `code_version` commit'lenmemiş değişikliği `-dirty` diye işaretliyor mu —
+  kod yolunda henüz commit'lenmemiş **yeni** dosya dahil (2026-09-21), gitignore'daki değil;
   depo dışında `None` mu; `relative_to_repo` işletim sistemi kullanıcı adını sızdırmıyor mu
+- `test_robustness.py` — seed düzeyi farklar ve işaret uyumu elle hesaba eşit mi; maruziyet
+  grupları doğru atanıyor mu (mutasyonla doğrulandı); çıktı `post_hoc` damgalı mı
+- `test_reproduction.py` — "birebir aynı" üç koşulun üçünü de istiyor mu; tek bir farklı top-K
+  listesi hücreyi düşürüyor mu; eski kopya yeniden koşu sanılmıyor mu; tavana değen koşu
+  `stop_and_decide` veriyor mu; kopyalar hiçbir analizin okumadığı alt klasörde mi
 
 > **Mutasyonla doğrulanmış üç değişmez (2026-09-20 denetimi).** Bir test "geçiyor" diye
 > koruma sağlamaz; koruduğu şeyi bozunca DÜŞMELİ. Şunlar bozulunca düşecek biçimde

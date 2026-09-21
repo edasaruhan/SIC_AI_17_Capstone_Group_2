@@ -156,7 +156,7 @@ de PASS**. Ayrıntılı durum için **§8**.
 | Kapı 2 | **PASS (4/4)** — Toys/Grocery × SASRec/BPR |
 | **RQ2** — C1 − C4, Recall@10 (Toys) | SASRec **+%15,7** · BPR **+%40,0** (ikisi de GA'sı sıfırın üstünde → alt sınır); Grocery +%1,2 / saptanamadı |
 | **RQ4** — M2 yarı ömür (Toys, SASRec) | **0,66** kendi alımı [0,53–0,82] ≈ 2,4 hafta |
-| Geçen test | **441** |
+| Geçen test | **463** |
 
 ### Hangi veri, ne kadar
 
@@ -452,7 +452,7 @@ yayınlanamaz.
 | Pazarlama metrikleri M1/M2/M3 (`marketing_metrics`) | 72 koşuyla (4 dk) · M2 tanımı **onaylandı** (2026-09-19, değerler görülmeden) | `test_marketing_metrics`; `marketing_metrics.json`; iki kez koşturuldu, çıktı birebir aynı |
 | Sonuç figürleri F20–F23 (`result_figures`) | gerçek sayılarla çizildi | `test_result_figures`; dördü de göz ile kontrol edildi; F22 lejantı GA'yı gösteriyor (DECISIONS 2026-09-19) |
 | **Sonuç raporu** (`docs/SONUCLAR.md`) | RQ1–RQ4, GA'lar ve sınırlılıklarla | her sayı `reports/results/` JSON'larından; sonuçtan sonra eklenen iki analiz işaretli |
-| Test paketi | **441 test geçiyor** | `pytest tests -q`; üç kritik değişmez 2026-09-20'de mutasyonla doğrulandı |
+| Test paketi | **463 test geçiyor** | `pytest tests -q`; üç kritik değişmez 2026-09-20'de mutasyonla doğrulandı |
 | **Demo** (`scripts/demo.py`) | veri dosyası ve bağımlılık gerektirmeden koşuyor | `test_demo`; çıktıdaki her sayı commit'li JSON'dan okunuyor, hiçbiri betikte yazılı değil |
 | **Capstone final raporu** (`../final-report/final-report.md`) | yazıldı (İngilizce, 13 bölüm) | her bölüm kaynak JSON'unu adıyla anıyor; tutturulamayan iki kapı ve tek etiketleyici metinde açıkça yazıyor |
 | **Sunum** (`../presentation/`) | 22 slayt `.pptx` + PDF, tek sayfalık `one_pager.pdf` | `build_deck.py` / `build_one_pager.py` sayıları `reports/results/*.json`'dan okuyor; 22 slaytın PNG'si tek tek gözle kontrol edildi |
@@ -489,14 +489,20 @@ anahtar kalmasını engelliyor.
 - Deneme setiyle uyum **F1 olarak raporlanamaz**: prompt tam o satırlar okunarak yazıldı.
 - **Deney koşularının kaç epoch eğitildiği bilinmiyor** — RecBole'un epoch satırları loglara
   düşmedi. 300 tavanına değen koşu olup olmadığı söylenemez; protokol her koşulda aynı
-  olduğu için karşıtlıkları bozmaz.
+  olduğu için karşıtlıkları bozmaz. **2026-09-21:** seed 42'nin 24 hücresi bu soru için
+  Kaggle'da yeniden koşuluyor (`analysis.reproduction`, kurallar DECISIONS ön kaydında).
 - SASRec'in erken durdurma (valid) kümesi koşula göre küçülüyor: eğitim geçmişi boşalan
   kullanıcı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
 - **Valid satırındaki hediye hiçbir koşulda silinmiyor** (sonuçtan sonra fark edildi):
   koşullar yalnızca eğitim satırlarını değiştiriyor, SASRec valid satırını test girdisinde
   görüyor. Toys'ta test kullanıcılarının %15,6'sında bu satır `gift_given`. SASRec'in C1
-  etkilerini küçültür; M2'nin n = 0 kovasını etkiler. Tanım değiştirilmedi; post-hoc
-  duyarlılık `SONUCLAR.md` §6.1, gerekçe DECISIONS 2026-09-19.
+  etkilerini **hangi yönde** değiştirdiği sınanmadı (önceki "küçültür" ifadesi bir
+  varsayımdı, 2026-09-21'de düzeltildi); M2'nin n = 0 kovasını etkiler. Tanım
+  değiştirilmedi; post-hoc duyarlılık `SONUCLAR.md` §6.1, gerekçe DECISIONS 2026-09-19.
+- **GA'lar eğitim (seed) değişkenliğini kapsamıyor** ve **plasebo kullanıcı düzeyinde
+  eşlenmedi** (2026-09-21 denetimi). İkisi de post-hoc ölçüldü (`SONUCLAR.md` §4.6): Toys
+  bulgusu ikisinden de etkilenmiyor, Grocery'nin küçük etkileri ise seed yayılımıyla aynı
+  mertebede.
 
 ---
 

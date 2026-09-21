@@ -27,7 +27,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch, Rectangle
 
-from build_deck import (GITHUB, TEAM, ci, load, pct, pts, thousands,
+from build_deck import (DATE, GITHUB, TEAM, ci, load, pct, pts, thousands,
                         verdict_en)
 
 HERE = Path(__file__).resolve().parent
@@ -152,7 +152,7 @@ def build(out_pdf: Path, out_png: Path) -> tuple[Path, Path]:
        "recommender systems", size=10.5, color=INK2)
     _rule(fig, 0.880)
     _t(fig, L, 0.872, TEAM, size=7.5, weight="bold")
-    _t(fig, L, 0.860, f"{GITHUB}  ·  20 September 2026  ·  code version "
+    _t(fig, L, 0.860, f"{GITHUB}  ·  {DATE}  ·  code version "
                       f"{N['provenance']['experiment_stats.json']}",
        size=7, color=MUTED)
 
@@ -215,11 +215,11 @@ def build(out_pdf: Path, out_png: Path) -> tuple[Path, Path]:
 
     # ------------------------------------------------------ iddia / degil
     y2 = y1 - 0.218
-    ch = 0.136
+    ch = 0.146
     iddia = [
         "Gift purchases are measurable at scale, and common.",
-        "Gift rows carry less usable preference signal than random rows, with a "
-        "dose–response across two categories.",
+        "Rows flagged as gifts carry less usable preference signal than random rows "
+        "(every seed agrees in Toys), with a dose–response across two categories.",
         "The excess a gift opens decays with the user's own later purchases.",
         "The one flagging method we tested is worse than deleting.",
     ]
@@ -229,7 +229,8 @@ def build(out_pdf: Path, out_png: Path) -> tuple[Path, Path]:
         f"pre-registered gates (≥ 0.75, ≥ 0.80) were missed.",
         "That deleting gifts is a production recommendation — the net effect against "
         "doing nothing is model-dependent.",
-        "That this generalises beyond two Amazon categories and two models.",
+        "That it is a strict lower bound: a third of flagged rows are not gifts.",
+        "That it generalises beyond two categories and two models.",
         "That wasted slots are lost revenue; conversion was never measured.",
     ]
     for j, (bas, maddeler, zemin, renk) in enumerate(
@@ -246,7 +247,7 @@ def build(out_pdf: Path, out_png: Path) -> tuple[Path, Path]:
             yy -= 0.0105 * (1 + sarili.count("\n")) + 0.0042
 
     # -------------------------------------------------------------- yontem
-    y3 = y2 - ch - 0.020
+    y3 = y2 - ch - 0.014
     _t(fig, L, y3, "HOW IT WAS MEASURED", size=7.5, color=ACCENT, weight="bold")
     yontem = (
         f"{N['teacher']['model'].split('/')[-1]} (prompt {N['teacher']['prompt']}, "

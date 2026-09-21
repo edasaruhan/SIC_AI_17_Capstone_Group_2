@@ -4,14 +4,14 @@
 
 **Team:** AI in Marketing Capstone, Group 2 — [Team Member 1] / [Team Member 2] / [Team Member 3]
 
-**Repository:** github.com/edasaruhan/SIC_AI_17_Capstone_Group_2 · **Date:** 20 September 2026
+**Repository:** github.com/edasaruhan/SIC_AI_17_Capstone_Group_2 · **Date:** 21 September 2026
 
 > Every number in this report is read from a JSON file committed in
 > [`repo/reports/results/`](../repo/reports/results/); the source file is named in each
 > section. Thresholds, contrasts, interpretation rules and marketing-metric definitions
 > were written **before the experiment was run** and are dated in
-> [`repo/docs/DECISIONS.md`](../repo/docs/DECISIONS.md). Two analyses were added after the
-> results were seen; both are marked *post-hoc* where they appear, and neither replaces a
+> [`repo/docs/DECISIONS.md`](../repo/docs/DECISIONS.md). Four analyses were added after the
+> results were seen; all are marked *post-hoc* where they appear, and none replaces a
 > primary number. A single command reproduces the headline figures from the committed
 > artefacts: `python repo/scripts/demo.py`.
 
@@ -42,9 +42,12 @@ excess **halves after roughly one self-purchase** (≈2–4 weeks). Flagging gif
 token instead of deleting them was worse than both alternatives in three of four cells.
 
 The detector itself did **not** meet the two accuracy thresholds pre-registered in the
-concept note (macro-F1 ≥ 0.75, gift precision ≥ 0.80); measured values were 0.5404 and 0.68.
-The project proceeded with that measurement recorded, and because label noise pulls a
-placebo contrast *toward* the placebo, every effect below is reported as a **lower bound**.
+concept note (macro-F1 ≥ 0.75, gift precision ≥ 0.80); measured values were 0.5405 and 0.68.
+The project proceeded with that measurement recorded. Under the pre-registered rule every
+detectable placebo contrast is reported as a **lower bound** — a reading that holds if the
+detector's mistakes are no more informative than random rows, which §9 shows is not
+guaranteed. What the design does establish is that the rows the detector flags as gifts
+carry less information than average rows.
 
 **Results at a glance**
 
@@ -100,7 +103,8 @@ on a recommender had to survive a control that rules out "you just deleted data.
 any run and is applied verbatim:
 
 - confidence interval entirely above zero → **"lower bound"** (label noise drags the estimate
-  toward the placebo, so the true effect is at least this large);
+  toward the placebo, so the true effect is at least this large — an argument that assumes
+  the detector's false positives are as informative as random rows; see §9, item 8);
 - interval contains zero → **"not detected"** — never "no effect";
 - interval entirely below zero → **"negative"**.
 
@@ -262,9 +266,12 @@ model output.
 
 - The plan called for **three** annotators and Fleiss' κ ≥ 0.60. Only one annotator was
   available. Inter-annotator reliability was therefore **never measured**, and the Week 4
-  gate is recorded as **INCOMPLETE** — it was never written as PASS.
+  gate is recorded as **INCOMPLETE** — it was never written as PASS. (On 21 September two
+  more annotators began labelling the same 500 rows; the rules — κ ≥ 0.60 unchanged, every
+  published number stays on A's labels, the majority vote reported beside it — were
+  committed first.)
 - The concept note pre-registered two accuracy thresholds: **macro-F1 ≥ 0.75** and
-  **`gift_given` precision ≥ 0.80**. Measured: **macro-F1 0.5404** [0.4897, 0.5869] and
+  **`gift_given` precision ≥ 0.80**. Measured: **macro-F1 0.5405** [0.4897, 0.5869] and
   **precision 0.68** (0.6485 when reweighted to the population). **Both were missed.**
 - The registered response to a miss was "write prompt v4" or "raise the confidence
   threshold". Neither was done. Prompt v4 would have required re-running Gate 1 from
@@ -277,9 +284,11 @@ model output.
 The measured consequence is carried explicitly into every result: in the population, the C1
 label has **precision 0.65 and recall 0.80**; C1b has precision 0.84 and recall 0.74. One in
 three rows called "gift" is not one — most often an item bought for the buyer's own child,
-which the schema calls `household`. Because a noisy label makes the treatment condition more
-like the placebo, this biases every RQ2 effect **toward zero**. That is why the pre-registered
-interpretation rule says "lower bound" and not "effect".
+which the schema calls `household`. Missed gifts make the treatment condition more like the
+placebo and bias RQ2 effects **toward zero**; that is why the pre-registered interpretation
+rule says "lower bound" and not "effect". False positives only do the same if they are as
+informative as random rows — and since most of them are purchases for the buyer's own child,
+that is an assumption, not a fact (§9, item 8).
 
 ### 6.5 Distillation and full-corpus inference
 
@@ -348,7 +357,8 @@ Per-user metrics are averaged over the three seeds first, then two conditions ar
 **the same users** with a paired bootstrap (1,000 resamples; 2,000 in Gate 2; 95 % percentile
 intervals). Resampling users rather than conditions is what makes the interval a statement
 about user-level variability and not about seed noise; a test in the suite fails if the
-implementation ever stops pairing.
+implementation ever stops pairing. The flip side is that the interval does **not** include
+training randomness — a post-hoc seed-level check is in §7.3.
 
 Every seed used anywhere in the pipeline is derived from the single configured `seed: 42`
 through `zlib.crc32`, never through Python's `hash()` — `hash()` varies with
@@ -443,8 +453,9 @@ Source: `experiment_stats.json`,
 the user's own next purchase substantially better. Gift interactions therefore carry **less
 information about the user's own preference than an average interaction does** — which is a
 direct measurement of contamination, not an inference from it. Because C1's precision is
-0.65, some deleted rows were not gifts, which pulls the contrast toward the placebo: these
-numbers are lower bounds.
+0.65, some deleted rows were not gifts; under the pre-registered rule these numbers are
+lower bounds, with the caveat in §9 (item 8) — strictly, they measure the rows the detector
+flags as gifts.
 
 **Secondary contrast — C1 − C0** (deleting gifts vs doing nothing):
 
@@ -485,6 +496,23 @@ are more gifts. Comparing the two categories directly (`dose_response`):
 The effect is significantly larger in the high-gift category in all four comparisons. This is
 a **two-point** dose–response: it confirms the direction, and says nothing about the shape of
 the curve.
+
+**Post-hoc robustness (defined after the results were seen; not a primary result).** Two
+questions a reviewer would ask, answered from the existing runs (`robustness_posthoc.json`):
+
+- *Is the effect larger than training noise?* The intervals above resample users, not
+  training runs. Seed by seed, Toys C1 − C4 is +0.485 / +0.599 / +0.551 (SASRec) and
+  +0.451 / +0.555 / +0.441 (BPR): the same sign in every seed, 13–17 times the seed-level
+  standard error. In Grocery the seed spread is as large as the user interval — SASRec is
+  +0.016 / +0.049 / +0.043 (positive in all three, but small), BPR −0.010 / +0.074 / −0.004
+  (sign changes; already "not detected").
+- *Is the placebo matched at the right level?* C4 deletes as many rows as C1, but spreads them
+  over more users: it touches the training history of 73 % of Toys test users against C1's
+  44 %. Splitting test users by which condition touched their own history, the Toys effect is
+  present in all four groups — including users **neither** condition touched (+0.68 SASRec,
+  +0.52 BPR), whose own input is identical in C1 and C4. So the Toys result is not an artefact
+  of the placebo disturbing more users. In Grocery the small positive average comes from users
+  C1 did not touch; among users whose gifts C1 removed, the interval contains zero.
 
 ### 7.4 RQ3 — Delete, or flag?
 
@@ -587,41 +615,45 @@ gifts the category contains.
 
 **What it does not support.** It does not support "delete gifts from your training set". In
 the sequential model that made accuracy worse, because a quarter of the Toys training data is
-a lot to give up. The practical reading is narrower and more useful: **gift rows should be
-down-weighted, not necessarily deleted** — and the experiment that would establish the right
-weighting (C2) is exactly the one this project scoped out.
+a lot to give up. The evidence is consistent with **down-weighting gift rows rather than
+deleting them** — but that is an inference, and the experiment that would test it (C2) is
+exactly the one this project scoped out.
 
 **Marketing implications.** Three are directly supported:
 
-1. **Budget.** In a high-gift category, roughly five recommendation slots in a hundred chase
+1. **Budget.** In a high-gift category and a matrix-factorisation model (BPR), roughly five
+   recommendation slots in a hundred (1.3 in SASRec) chase
    an interest that a gift created, for a third of the user base. If retargeting spend is
    allocated by recommender score — the common case — that share of spend is being aimed at
    the wrong person's taste.
 2. **Timing.** Contamination in a sequential model is **short-lived**: one self-purchase
    halves it. A campaign suppression rule triggered by a suspected gift does not need to run
    for a season; it needs to survive about one purchase cycle, two to four weeks in Toys.
-   This is a far cheaper intervention than it is usually assumed to be.
 3. **Model choice matters more than it looks.** The same contamination expresses itself as
    *decay* in a sequential model and as *dilution* in a matrix-factorisation model. A team
    deciding how to mitigate needs to know which of the two they are running; the wrong mental
    model leads to the wrong suppression window.
 
 **On the detector's weakness.** A reader is entitled to ask why results from a detector with
-macro-F1 0.54 should be believed. The answer is the direction of the bias and the design
-around it. Label noise makes the treatment condition resemble the placebo, so it shrinks the
-measured effect; a noisy detector cannot manufacture a placebo-controlled difference, it can
-only hide one. The effects reported here survived that. What the weak detector *does* forbid
-is any claim about a specific user or a specific row — and no such claim is made.
+macro-F1 0.54 should be believed. Two parts of the answer do not depend on the detector's
+accuracy: the placebo holds the amount of deleted data fixed, and the effect scales with how
+many gifts a category contains. What the weak detector changes is *what* is being measured.
+Missed gifts can only dilute the effect. False positives are different: by the human
+reference about a third of the rows called "gift" are not gifts, mostly purchases for the
+buyer's own child — not random rows. C1 − C4 is therefore best read as the effect of
+removing the rows the detector calls gifts, rather than as a guaranteed lower bound on a pure
+gift effect (§9, item 8). The weak detector also forbids any claim about a specific user or
+a specific row, and no such claim is made.
 
 ---
 
 ## 9. Limitations
 
-The full list of sixteen is in [`../repo/docs/SONUCLAR.md`](../repo/docs/SONUCLAR.md) §7. The
-five that a reader should weigh first:
+The full list of nineteen is in [`../repo/docs/SONUCLAR.md`](../repo/docs/SONUCLAR.md) §7. The
+eight that a reader should weigh first:
 
 1. **Two pre-registered detector thresholds were missed** (macro-F1 ≥ 0.75, gift precision
-   ≥ 0.80; measured 0.5404 and 0.68). The registered remedies were not applied, for the
+   ≥ 0.80; measured 0.5405 and 0.68). The registered remedies were not applied, for the
    reasons given in §6.4 and dated in DECISIONS. The project proceeded with the measurement
    on the record.
 2. **The primary metric is Recall@10, not the NDCG@10 the concept note specified.** The
@@ -633,20 +665,39 @@ five that a reader should weigh first:
    person's judgement.
 4. **The C1 label is noisy** (population precision 0.65). Roughly a third of rows called
    "gift" are, to a human, not gifts — usually items bought for the buyer's own child. All
-   RQ2 effects are lower bounds.
+   RQ2 effects are reported as lower bounds under the pre-registered rule (see item 8).
 5. **The gift in the validation row is never removed** (noticed after the results). Conditions
    change training rows only, so the interaction immediately before the test item stays in
    place in every condition. In Toys that row is `gift_given` for **15.6 %** of test users
    (37.0 % on the broad set); in Grocery 2.6 % / 6.5 %. SASRec therefore sees it at test time
-   even in C1, which makes C1 a partial cleanup and **shrinks** C1 − C4 and C1 − C0 rather
-   than inflating them. BPR is unaffected, as it never trains on validation rows.
+   even in C1, which makes C1 a partial cleanup. **In which direction that moves C1 − C4 and
+   C1 − C0 was not tested**: a gift in the last position may mislead the model, but deleting
+   gift rows already costs SASRec accuracy (C1 − C0 < 0), so the opposite is also possible.
+   (An earlier version of this report said it "shrinks" the contrasts; that was an
+   assumption and has been corrected.) BPR is unaffected, as it never trains on validation
+   rows. Early stopping also selects on validation targets that include gifts in every
+   condition; the effect of that was not measured.
+6. **The intervals exclude training randomness.** They resample users over seed-averaged
+   metrics. Toys is unaffected (every seed agrees in sign, §7.3); in Grocery the seed spread is
+   as large as the user interval, so the Grocery "lower bound" rests on user sampling alone.
+7. **The placebo is matched in count, not per user.** C4 touches 73 % of Toys test users'
+   training histories against C1's 44 %. The post-hoc split in §7.3 shows the Toys effect
+   survives among users neither condition touched; a per-user-matched placebo was not run.
+8. **"Lower bound" rests on an assumption.** Missed gifts pull the contrast toward the
+   placebo; false positives do so only if they are as informative as random rows. Most false
+   positives are purchases for the buyer's own child, and the broad-axis result suggests such
+   rows are also below-average in information. C1 − C4 therefore measures the effect of the
+   rows the detector flags as gifts; that a pure gift effect is at least as large is not
+   guaranteed. The pre-registered label was kept; its assumption is now stated.
 
 Also on the record: how many epochs each run actually trained was not captured (RecBole's
 epoch lines did not reach the Kaggle logs), so it cannot be said whether any run hit the
 300-epoch cap — the protocol was identical across conditions, so contrasts are unaffected,
-but absolute metrics cannot be claimed to be fully converged. The runner now records
-`epochs_trained` for future runs. No hyperparameter search was performed. The experiment
-covers two categories and two model families. The calibration assumes human–LLM agreement is
+but absolute metrics cannot be claimed to be fully converged. The runner now records the
+epochs trained and the best epoch. Since 21 September the 24 seed-42 cells are being re-run
+on Kaggle with unchanged data to measure them, and to check that today's code reproduces the
+published numbers; the rules for reading that re-run were committed before it started. No
+hyperparameter search was performed. The experiment covers two categories and two model families. The calibration assumes human–LLM agreement is
 category-independent, which does not hold in Toys. No multiple-comparison correction was
 applied; the primary contrast was pre-specified and the rest are secondary.
 
@@ -670,7 +721,7 @@ python -m pytest tests -q                 # the full suite
 | Layer | Where |
 |---|---|
 | Code, config, tests | `repo/src/`, `repo/configs/`, `repo/tests/` |
-| Committed evidence (133 JSON reports) | `repo/reports/results/` |
+| Committed evidence (JSON reports) | `repo/reports/results/` |
 | Figures F1–F23 | `repo/reports/figures/` |
 | Results report, decisions, overview | `repo/docs/SONUCLAR.md`, `DECISIONS.md`, `GENEL_BAKIS.md` |
 | Kaggle notebook cells | `repo/scripts/kaggle_*.py` |
@@ -706,29 +757,32 @@ verbatim review text into a public repository.
 ## 11. Conclusion and future work
 
 Gift purchases are a real, measurable and previously unquantified class of noise in
-e-commerce implicit feedback. In Toys and Games roughly one review in five is a gift; those
-interactions carry demonstrably less information about the buyer's own next purchase than
-average interactions do; the effect scales with how gift-heavy the category is; and in a
+e-commerce implicit feedback. In Toys and Games roughly one review in five is a gift; the
+interactions a detector flags as gifts carry demonstrably less information about the buyer's
+own next purchase than average interactions do, in every seed and even for users whose own
+history the treatment never touched; the effect scales with how gift-heavy the category is; and in a
 sequential recommender the resulting distortion decays after about one self-purchase, while
 in a matrix-factorisation recommender it dilutes instead. Flagging gifts with shadow tokens
 was worse than both deleting and ignoring them.
 
 The most valuable next steps are, in order:
 
-1. **Measure annotator reliability.** Two more annotators on the same 500 rows, Fleiss' κ.
-   This is the cheapest way to strengthen every downstream claim, and it closes the one gate
-   that is still INCOMPLETE.
+1. **Measure annotator reliability** — started 21 September: two more annotators are
+   labelling the same 500 rows for Fleiss' κ. It is the cheapest way to strengthen every
+   downstream claim, and it closes the one gate that is still INCOMPLETE.
 2. **Run C2 — down-weighting instead of deleting.** The results point at it directly: gift
    rows are below-average but not worthless, and deletion throws away the part that is still
    useful. This is the experiment most likely to produce a deployable recommendation.
 3. **Improve the detector and re-measure.** A prompt v4 written against the *development* set,
-   or a larger annotator model, with Gate 1 re-run from scratch. Every effect here is a lower
-   bound; a better detector would tighten them.
-4. **Extend the dose–response.** Two points establish direction only. Four or five categories
+   or a larger annotator model, with Gate 1 re-run from scratch. A more precise detector would
+   make C1 − C4 a cleaner measure of the gift effect itself (§9, item 8).
+4. **A per-user-matched placebo.** Deleting, for each user, as many random rows as C1 deletes
+   from that user would remove by design the confound that §7.3 could only examine post hoc.
+5. **Extend the dose–response.** Two points establish direction only. Four or five categories
    spanning the gift-rate range would establish shape.
-5. **Broaden the model family.** GRU4Rec, ItemKNN and a popularity baseline would show
+6. **Broaden the model family.** GRU4Rec, ItemKNN and a popularity baseline would show
    whether "decay in sequential, dilution in MF" is the general pattern.
-6. **Cross-model agreement on the labels.** A second annotator LLM from a different lab on a
+7. **Cross-model agreement on the labels.** A second annotator LLM from a different lab on a
    ~5K subsample would separate model-specific bias from genuine signal.
 
 ---

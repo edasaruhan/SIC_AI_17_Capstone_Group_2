@@ -91,7 +91,7 @@ A final property makes the intervention unusually attractive commercially: becau
 
 > **Erratum — 2026-09-20 (audit).** Three of the criteria above were not met as written, and
 > the project proceeded anyway. Recording that here rather than leaving it to the reader:
-> (a) **detector macro-F1 measured 0.5404** [0.4897–0.5869] against the human labels, not
+> (a) **detector macro-F1 measured 0.5405** [0.4897–0.5869] against the human labels, not
 > ≥ 0.75, and **`gift_given` precision measured 0.68** (0.6485 population-weighted), not
 > ≥ 0.80 — neither threshold was ever written into `configs/base.yaml`, so neither was
 > enforced as a gate; (b) inter-annotator agreement was **never measured** — only one of the

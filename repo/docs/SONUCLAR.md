@@ -9,6 +9,13 @@
 > sonrası). Sonuç görüldükten sonra eklenenler ikidir, ikisi de yerinde öyle işaretli:
 > valid satırındaki hediyelerin sayımı (§6.1, §7 madde 5) ve M2'nin n = 0 kovası hariç
 > duyarlılığı (§6.1). Hiçbiri birincil bir sayının yerine geçmiyor.
+>
+> **Güncelleme 2026-09-21 (ikinci denetim).** Hiçbir birincil sayı değişmedi. Değişenler:
+> makro-F1'in 4. basamağı (0,5404 → 0,5405, yuvarlama hatası) · iki post-hoc sağlamlık
+> analizi (§4.6, seed düzeyi ve maruziyet ayrıştırması) · iki iddianın düzeltilmesi
+> (§7 madde 5 ve 19) · üç yeni sınırlılık (§7 madde 17–19). Seed 42'nin 24 hücresi epoch
+> sayısı için Kaggle'da yeniden koşuluyor, B ve C doğrulama setini etiketliyor; ikisinin
+> kuralları sonuçlardan önce yazıldı (DECISIONS 2026-09-21 ön kaydı).
 
 ---
 
@@ -66,8 +73,9 @@ Grocery **238.756**.
 **İstatistik.** Kullanıcı başı metrik önce üç seed üzerinden ortalanır; iki koşul aynı
 kullanıcılar üzerinde **eşli bootstrap**la karşılaştırılır (1.000 tekrar, %95 yüzdelik GA;
 Kapı 2'de 2.000). Önceden kayıtlı yorum kuralı (plasebo karşıtlıkları): GA sıfırın üstündeyse
-**"alt sınır"** (etiket gürültüsü farkı plaseboya doğru çeker), sıfırı içeriyorsa
-**"saptanamadı"** — "etki yok" yazılmaz.
+**"alt sınır"** (etiket gürültüsü farkı plaseboya doğru çeker — dayandığı varsayım §7 madde
+19), sıfırı içeriyorsa **"saptanamadı"** — "etki yok" yazılmaz. GA **kullanıcı örneklemini**
+kapsıyor, eğitimin (seed'in) değişkenliğini kapsamıyor (§4.6, §7 madde 17).
 
 ---
 
@@ -154,7 +162,10 @@ kendi sonraki alımını belirgin daha iyi tahmin ediyor. Yani hediye satırlar�
 kendi tercihi hakkında ortalama bir satırdan **daha az** bilgi taşıyor — kontaminasyonun
 doğrudan ölçüsü bu. C1 etiketinin kesinliği 0,65 olduğundan silinen satırların bir kısmı
 aslında hediye değil; bu da farkı plaseboya doğru çeker. Sayılar bu yüzden gerçek etkinin
-**alt sınırı**.
+**alt sınırı**. Bu okuma, yanlış pozitiflerin rastgele bir satır kadar bilgi taşıdığını
+varsayıyor. Yanlış pozitiflerin çoğu kendi çocuğuna alım (`household`) olduğu için bu
+varsayım zayıf (§7 madde 19): kesin olan, **detektörün hediye dediği satırların** ortalama
+bir satırdan az bilgi taşıdığı.
 
 ### 4.3 C1 − C0 (hediyeyi silmek vs hiçbir şey silmemek)
 
@@ -202,6 +213,68 @@ bağımsız bootstrap'la karşılaştırılır.
 Hediye payı yüksek kategoride (Toys, C1 %24,7) etki, düşük kategoridekinden (Grocery, %3,1)
 dört karşılaştırmada da anlamlı büyük. Bu **iki noktalı** bir doz–yanıt: yön doğru, eğrinin
 biçimi hakkında bir şey söylemiyor.
+
+### 4.6 Post-hoc sağlamlık (sonuç görüldükten SONRA tanımlandı; birincil değil)
+
+Kaynak: `robustness_posthoc.json` (`post_hoc: true`). İki analiz de 2026-09-21 denetiminde,
+72 koşunun sonuçları görüldükten sonra tanımlandı (DECISIONS 2026-09-21 ön kaydı). Hiçbiri
+birincil bir sayının yerine geçmiyor ve yorum kuralı uygulanmıyor.
+
+**(a) Seed düzeyi.** §4.2–4.4'ün GA'ları kullanıcıları yeniden örnekliyor. Yani "hangi
+kullanıcılar" belirsizliğini ölçüyor, "hangi eğitim koşusu" belirsizliğini ölçmüyor. Aşağıda
+aynı karşıtlık her seed'de ayrı (koşu raporunun kendi test ortalaması, Recall@10 puan).
+
+| Hücre | Karşıtlık | seed 42 / 1337 / 2024 | İşaret uyumu | seed sd/√3 | Kullanıcı GA'sının yarı genişliği |
+|---|---|---|---:|---:|---:|
+| Toys · SASRec | C1 − C4 | +0,485 / +0,599 / +0,551 | 3/3 | 0,033 | 0,064 |
+| Toys · SASRec | C1 − C0 | −0,321 / −0,305 / −0,292 | 3/3 | 0,008 | 0,057 |
+| Toys · SASRec | C1b − C4b | +1,183 / +1,234 / +1,259 | 3/3 | 0,022 | 0,077 |
+| Toys · BPR | C1 − C4 | +0,451 / +0,555 / +0,441 | 3/3 | 0,037 | 0,046 |
+| Toys · BPR | C1 − C0 | +0,078 / +0,080 / +0,056 | 3/3 | 0,008 | 0,043 |
+| Toys · BPR | C1b − C4b | +1,049 / +1,085 / +1,009 | 3/3 | 0,022 | 0,054 |
+| Grocery · SASRec | C1 − C4 | +0,016 / +0,049 / +0,043 | 3/3 | 0,010 | 0,031 |
+| Grocery · SASRec | C1 − C0 | +0,000 / +0,023 / +0,024 | 2/3 | 0,008 | 0,029 |
+| Grocery · SASRec | C1b − C4b | +0,114 / +0,055 / +0,107 | 3/3 | 0,019 | 0,031 |
+| Grocery · BPR | C1 − C4 | −0,010 / +0,074 / −0,004 | 1/3 | 0,027 | 0,029 |
+| Grocery · BPR | C1 − C0 | −0,027 / +0,021 / −0,005 | 2/3 | 0,014 | 0,029 |
+| Grocery · BPR | C1b − C4b | +0,115 / +0,174 / +0,152 | 3/3 | 0,017 | 0,030 |
+
+**Okuma.**
+- **Toys:** her karşıtlıkta üç seed de aynı işareti veriyor. C1 − C4, seed ortalamasının
+  standart hatasının 13–17 katı.
+- **Grocery:** seed yayılımı kullanıcı GA'sıyla aynı mertebede.
+  - SASRec C1 − C4'ün "alt sınır" okumasında üç seed'in üçü de pozitif. Ama GA yalnızca
+    kullanıcı örneklemini kapsıyor; eğitim değişkenliği de hesaba katılsa aralık genişler.
+  - BPR C1 − C4'te seed'ler işaret bile değiştiriyor (1/3); bu karşıtlık zaten "saptanamadı".
+- **Doz–yanıt** (Toys ≫ Grocery) bundan etkilenmiyor.
+
+**(b) Maruziyet ayrıştırması.** Plasebo satır **sayısını** korpus düzeyinde eşliyor,
+kullanıcı düzeyinde eşlemiyor. Toys'ta C1 test kullanıcılarının %44'ünün eğitim geçmişine
+dokunuyor, C4 ise %73'üne. Test kullanıcıları, iki koşulun hangisinin kendi eğitim satırını
+sildiğine göre dört gruba ayrıldı (Recall@10 puan, eşli bootstrap %95 GA):
+
+| Hücre | Karşıtlık | Hiçbiri | Yalnız plasebo | Yalnız tedavi | İkisi de | Grup payı % |
+|---|---|---|---|---|---|---|
+| Toys · SASRec | C1 − C4 | +0,677 [+0,507, +0,864] | +0,681 [+0,562, +0,794] | +0,407 [+0,246, +0,584] | +0,362 [+0,265, +0,450] | 16 / 40 / 10 / 34 |
+| Toys · SASRec | C1b − C4b | +1,856 [+1,117, +2,559] | +2,579 [+2,386, +2,804] | +1,113 [+0,776, +1,475] | +0,731 [+0,655, +0,800] | 2 / 25 / 3 / 70 |
+| Toys · BPR | C1 − C4 | +0,515 [+0,389, +0,638] | +0,703 [+0,611, +0,792] | +0,341 [+0,218, +0,472] | +0,248 [+0,185, +0,312] | 16 / 40 / 10 / 34 |
+| Toys · BPR | C1b − C4b | +1,748 [+1,207, +2,252] | +2,684 [+2,509, +2,858] | +0,535 [+0,319, +0,768] | +0,468 [+0,421, +0,516] | 2 / 25 / 3 / 70 |
+| Grocery · SASRec | C1 − C4 | +0,041 [+0,002, +0,078] | +0,094 [+0,015, +0,174] | −0,032 [−0,125, +0,065] | −0,114 [−0,273, +0,057] | 71 / 15 / 10 / 3 |
+| Grocery · SASRec | C1b − C4b | +0,106 [+0,059, +0,153] | +0,105 [+0,038, +0,170] | +0,051 [−0,028, +0,136] | +0,068 [−0,020, +0,167] | 47 / 24 / 16 / 13 |
+| Grocery · BPR | C1 − C4 | +0,018 [−0,016, +0,055] | +0,056 [−0,018, +0,131] | +0,009 [−0,084, +0,096] | −0,065 [−0,212, +0,081] | 71 / 15 / 10 / 3 |
+| Grocery · BPR | C1b − C4b | +0,141 [+0,092, +0,185] | +0,208 [+0,145, +0,274] | +0,068 [−0,009, +0,151] | +0,154 [+0,075, +0,231] | 47 / 24 / 16 / 13 |
+
+**Okuma.**
+- **Toys:** etki dört grubun dördünde de var. **İki koşulun da dokunmadığı** kullanıcılarda
+  da var (SASRec +0,68, BPR +0,52).
+  - Bu kullanıcıların kendi girdisi iki koşulda aynı; fark yalnızca modelin öğrendiğinden
+    geliyor. Yani Toys bulgusu "plasebo daha çok kullanıcının geçmişini bozdu" diye
+    açıklanamıyor.
+  - Tedavinin dokunduğu kullanıcılarda etki daha küçük: bu kullanıcılar kendi hediye
+    satırlarını da kaybediyor.
+- **Grocery:** C1 − C4'ün pozitif ortalaması tedavinin dokunmadığı kullanıcılardan geliyor.
+  C1'in eğitim satırını sildiği kullanıcılarda GA sıfırı içeriyor, nokta tahmini de negatif.
+  Gruplar küçük ve analiz post-hoc; sınanmış bir açıklama yok.
 
 ---
 
@@ -329,7 +402,7 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
 ## 7. Sınırlılıklar
 
 1. **Önceden kayıtlı iki detektör eşiği tutturulamadı.** `concept-note` §5 iki eşik
-   yazmıştı: makro-F1 **≥ 0,75** ve `gift_given` kesinliği **≥ 0,80**. Ölçülen: **0,5404**
+   yazmıştı: makro-F1 **≥ 0,75** ve `gift_given` kesinliği **≥ 0,80**. Ölçülen: **0,5405**
    [0,4897–0,5869] (popülasyonda 0,494) ve **0,68** (popülasyonda 0,6485). Eşiklerin yazılı
    karşılığı "prompt v4 yaz / modeli değiştir" ve "confidence eşiğini yükselt"ti; ikisi de
    yapılmadı — v4, Kapı 1'in yeniden koşulmasını gerektiriyordu ve 500 doğrulama satırı
@@ -344,24 +417,36 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
    Gerekçe: DECISIONS 2026-09-20.
 3. **İnsan referansı tek kişi; etiket güvenilirliği ölçülmedi.** Hafta 4 kapısı bu yüzden
    INCOMPLETE (asla PASS yazılmadı). Bütün kalibrasyon ve etiket kalitesi sayıları tek
-   etiketleyiciye göre.
+   etiketleyiciye göre. **2026-09-21:** B ve C aynı 500 satırı etiketliyor. κ kapısı ve
+   çoğunluk referansıyla duyarlılık, kuralları önceden yazılmış olarak eklenecek. Yayımlanan
+   sayılar A'ya göre kalacak.
 4. **C1 etiketi gürültülü:** popülasyonda kesinlik 0,65 (öğrenci 0,66) — "hediye" denen
    satırların yaklaşık üçte biri insana göre hediye değil, çoğu kendi çocuğuna alınan. RQ2
    etkileri bu yüzden alt sınır; gerçek etki muhtemelen daha büyük.
 5. **Valid satırındaki hediye silinmiyor** (sonuçtan sonra fark edildi, §6.1). Koşullar
    yalnızca eğitim satırlarını değiştiriyor; testten önceki son etkileşim (valid) her koşulda
    yerinde. Toys'ta test kullanıcılarının **%15,6**'sında bu satır `gift_given` (C1b kümesiyle
-   %37,0); Grocery'de %2,6 / %6,5. SASRec onu C1/C1b/C3'te de test girdisinde görüyor. Yani
-   SASRec için C1 kısmi bir temizlik ve C1 − C4 ile C1 − C0 farklarını **küçültür**, büyütmez.
-   BPR valid satırıyla hiçbir koşulda eğitilmediği için etkilenmiyor. Tasarım bilinçliydi
-   (bölme C0'da donar), sonuca etkisi önceden yazılmamıştı.
+   %37,0); Grocery'de %2,6 / %6,5. SASRec onu C1/C1b/C3'te de test girdisinin son ürünü
+   olarak görüyor; yani SASRec için C1 kısmi bir temizlik. **Bunun C1 − C4 ve C1 − C0'ı hangi
+   yönde etkilediği sınanmadı.** Son pozisyondaki hediye modeli yanıltıyorsa tam temizlik C1'i
+   iyileştirirdi. Ama SASRec'te hediye satırlarını silmek zaten net zararlı (C1 − C0 < 0,
+   §4.3), yani tersi de mümkün. (Bu maddenin önceki sürümünde ve DECISIONS 2026-09-19'da
+   "farkları küçültür, büyütmez" yazıyordu. O bir varsayımdı; 2026-09-21 denetiminde
+   düzeltildi.) BPR valid satırıyla hiçbir koşulda eğitilmediği için etkilenmiyor. Tasarım
+   bilinçliydi (bölme C0'da donar), sonuca etkisi önceden yazılmamıştı.
 6. **Kaç epoch eğitildiği bilinmiyor.** RecBole'un epoch satırları loglara düşmedi; 300
    tavanına değen koşu olup olmadığı söylenemez. Protokol her koşulda aynı, ama mutlak
    metriklerin tam yakınsadığı iddia edilemez. Hiperparametre araması yapılmadı (RecBole
    varsayılanları, bütün koşullarda aynı). **2026-09-20'den sonraki koşular** `epochs_trained` ve
-   `hit_epoch_cap` alanlarını rapora yazıyor; geçmiş 72 koşu kurtarılamıyor.
+   `hit_epoch_cap` alanlarını rapora yazıyor; geçmiş 72 koşu kurtarılamıyor. **2026-09-21:**
+   seed 42'nin 24 hücresi aynı veri ve bugünkü kodla Kaggle'da yeniden koşuluyor. Epoch
+   sayıları ve "birebir aynı mı" sonucu geldiğinde buraya yazılacak (kurallar DECISIONS
+   2026-09-21 ön kaydında).
 7. **SASRec'in erken durdurma kümesi koşula göre küçülüyor:** eğitim geçmişi tamamen silinen
-   kullanıcının valid satırı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
+   kullanıcının valid satırı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı. Ayrıca
+   erken durdurmanın hedefi bütün koşullarda valid satırı, ve bu satır hediye de olabiliyor
+   (madde 5). C1 hediyesiz eğitiliyor ama hediye içeren bir hedef kümesiyle durduruluyor.
+   Etkisi ölçülmedi.
 8. **Deneyde iki kategori var.** Doz–yanıt iki noktalı; Video Games deneye girmedi, All
    Beauty'nin 5-core'u boş.
 9. **Kalibrasyonun varsayımı Toys'ta tutmuyor** (insan–LLM uyumu kategoriden bağımsız
@@ -381,6 +466,23 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
 15. **Çoklu karşılaştırma düzeltmesi yok.** Birincil karşıtlık (C1 − C4, Recall@10) önceden
     belirlendi; öteki karşıtlıklar ve metrikler ikincil ve GA'larıyla birlikte okunmalı.
 16. **Kapı 2'nin eski ifadesi** belgelerde başka bir ölçütü anlatıyordu (§3).
+17. **GA'lar eğitim (seed) değişkenliğini kapsamıyor.** Eşli bootstrap kullanıcıları yeniden
+    örnekliyor ve üç seed önceden ortalanıyor. Toys'ta bunun önemi yok: üç seed de aynı
+    işareti veriyor. Grocery'de ise seed yayılımı kullanıcı GA'sıyla aynı büyüklükte (§4.6a).
+    Önceden kayıtlı yöntem buydu, değiştirilmedi.
+18. **Plasebo kullanıcı düzeyinde eşlenmedi.** C4, C1 kadar satırı rastgele siliyor, ama
+    başka kullanıcılardan: Toys test kullanıcılarının %44'üne karşı %73'üne dokunuyor.
+    Ayrıştırma (§4.6b) Toys bulgusunun bununla açıklanamadığını gösteriyor. Grocery'de ise
+    küçük etki tedavinin dokunmadığı kullanıcılardan geliyor. Kullanıcı başına eşlenmiş bir
+    plasebo koşulmadı.
+19. **"Alt sınır" okuması bir varsayıma dayanıyor.** Önceden kayıtlı kural, etiket
+    gürültüsünün farkı plaseboya doğru çektiğini söylüyor. Bu, silinmeyen (kaçırılan)
+    hediyeler için doğru. Yanlış pozitifler için ise o satırların rastgele bir satır kadar
+    bilgi taşımasını gerektiriyor. Yanlış pozitiflerin çoğu kendi çocuğuna alım (`household`),
+    ve C1b − C4b sonucu bu tür satırların da ortalamadan az bilgi taşıdığını düşündürüyor.
+    Dolayısıyla C1 − C4, **detektörün hediye dediği satırların** etkisini ölçüyor. Saf hediye
+    etkisinin bundan büyük olduğu garanti değil. Önceden kayıtlı etiket ("alt sınır")
+    değiştirilmedi; yalnızca varsayımı açıkça yazıldı (2026-09-21).
 
 ---
 
@@ -393,6 +495,7 @@ cd repo
 python -m gift_contamination.analysis.experiment_stats  --config configs/base.yaml  # gate2.json, experiment_stats.json (~14 dk)
 python -m gift_contamination.recsys.marketing_metrics   --config configs/base.yaml  # marketing_metrics.json (~4 dk)
 python -m gift_contamination.analysis.result_figures    --config configs/base.yaml  # F20–F23
+python -m gift_contamination.analysis.robustness        --config configs/base.yaml  # robustness_posthoc.json (§4.6, post-hoc, <1 dk)
 ```
 
 Koşular: `scripts/kaggle_experiment.py` (DECISIONS 2026-09-16, 2026-09-18, 2026-09-19).

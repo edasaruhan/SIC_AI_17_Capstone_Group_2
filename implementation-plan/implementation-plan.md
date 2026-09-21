@@ -351,7 +351,7 @@ Oversight is built into the pipeline as gates rather than added as review:
 > that dated decision. **Correction, 2026-09-20 (audit):** this note previously said "no F1
 > threshold was ever fixed". That was wrong — `concept-note` §5 fixes macro-F1 ≥ 0.75 and
 > `gift_given` precision ≥ 0.80. Neither was written into `configs/base.yaml`, so neither was
-> enforced in code, and both were **missed**: macro-F1 measured 0.5404 [0.4897–0.5869]
+> enforced in code, and both were **missed**: macro-F1 measured 0.5405 [0.4897–0.5869]
 > (0.494 population-weighted) and precision 0.68. The project proceeded on that measurement;
 > it is limitation 1 in `repo/docs/SONUCLAR.md` §7, reasoning in `repo/docs/DECISIONS.md`
 > 2026-09-20. No threshold was invented after seeing results. Class-level F1 against the single annotator is still
