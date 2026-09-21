@@ -301,12 +301,21 @@ def fig_distill(cfg: Config, report: dict, out: Path) -> Path | None:
     # Eksenin ALTINDA: sol alt kose dusuk F1'li noktalarin ustune biniyordu.
     viz.legend(ax, len(series), loc="upper left", bbox_to_anchor=(0, -0.2), ncols=2)
     meta = report.get("meta", {})
-    model_adi = display_model_name(meta.get("model"))
     on = SMOKE if meta.get("backend") == "stub" else ""
     viz.titles(ax, f"{on}F20 · Distilled student vs its teacher and the human reference — {report.get('verdict')}",
-               f"{model_adi} · thresholds fixed before training ({meta.get('thresholds_fixed', '')}). "
-               "The 5-core row measures the clean → 5-core shift and is not part of the gate.")
+               f20_subtitle(meta))
     return viz.save(fig, out, log)
+
+
+def f20_subtitle(meta: dict) -> str:
+    """F20 alt basligi. `thresholds_fixed` makinenin yazdigi bir kayit notu
+    ("2026-09-14, configs/base.yaml -> distill.fidelity (egitimden once)"); oldugu gibi
+    basilinca Ingilizce figurde Turkce bir parantez kaliyordu. Yalnizca TARIH basilir -
+    artefakt elle duzenlenmez (denetim 2026-09-21)."""
+    tarih = str(meta.get("thresholds_fixed") or "").split(",")[0].strip()
+    ne_zaman = f" ({tarih})" if tarih else ""
+    return (f"{display_model_name(meta.get('model'))} · thresholds fixed before training{ne_zaman}. "
+            "The 5-core row measures the clean → 5-core shift and is not part of the gate.")
 
 
 # ------------------------------------------------------------------ kosu

@@ -559,3 +559,18 @@ def test_a_completely_missed_class_counts_as_zero_in_macro_f1():
     )
     assert agirlikli["per_class"]["gift_given"]["f1"]["value"] == 0.0
     assert agirlikli["macro_f1"]["value"] == pytest.approx(1 / 3, abs=1e-4)
+
+
+def test_macro_f1_averages_the_unrounded_class_f1s():
+    """Makro-F1 YUVARLANMAMIS sinif F1'lerinden ortalanir; yuvarlama yalnizca raporda.
+
+    Eski `compare()` sinif F1'lerini once 3 basamaga yuvarlayip sonra ortaliyordu.
+    Gercek raporda bu 0,5405'i 0,5404 yapti - ayni dosyadaki bootstrap blogu 0,5405
+    diyordu (denetim 2026-09-21). Burada iki sinifin F1'i de 2/3: dogru makro
+    round(0,666..., 4) = 0,6667; eski yol round(mean(0,667, 0,667), 4) = 0,667.
+    """
+    out = compare(pl.Series(["a", "a", "b"]), pl.Series(["a", "b", "b"]))
+
+    assert out["per_class"]["a"]["f1"] == 0.667
+    assert out["per_class"]["b"]["f1"] == 0.667
+    assert out["macro_f1"] == 0.6667

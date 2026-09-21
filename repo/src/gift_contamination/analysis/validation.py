@@ -318,6 +318,10 @@ def compare(reference: pl.Series, prediction: pl.Series) -> dict:
 
     classes = sorted({r for r, _ in pairs} | {p for _, p in pairs})
     per_class = {}
+    # Makro-F1 YUVARLANMAMIS degerlerin ortalamasi. Eskiden yuvarlanmis sinif
+    # F1'leri ortalaniyordu ve gercek rapor 0,5405 yerine 0,5404 yaziyordu
+    # (denetim 2026-09-21). Yuvarlama yalnizca rapora yazilan sayida.
+    f1_ham: list[float] = []
     for c in classes:
         tp = sum(1 for r, p in pairs if r == c and p == c)
         n_ref = sum(1 for r, _ in pairs if r == c)
@@ -330,6 +334,8 @@ def compare(reference: pl.Series, prediction: pl.Series) -> dict:
         # bir sinif ortalamayi YUKSELTIYORDU. Payda sifirsa gercekten tanimsiz.
         payda = 2 * tp + (n_pred - tp) + (n_ref - tp)
         f1 = round(2 * tp / payda, 3) if payda else None
+        if payda:
+            f1_ham.append(2 * tp / payda)
         per_class[c] = {
             "n_reference": n_ref, "n_predicted": n_pred,
             "precision": precision, "recall": recall, "f1": f1,
@@ -343,9 +349,7 @@ def compare(reference: pl.Series, prediction: pl.Series) -> dict:
     return {
         "n_compared": len(pairs),
         "accuracy": round(sum(1 for r, p in pairs if r == p) / len(pairs), 4),
-        "macro_f1": round(
-            float(np.mean([v["f1"] for v in per_class.values() if v["f1"] is not None])), 4
-        ) if any(v["f1"] is not None for v in per_class.values()) else None,
+        "macro_f1": round(float(np.mean(f1_ham)), 4) if f1_ham else None,
         "per_class": per_class,
         # Ikincil anahtar (etiket cifti) SART - bkz. gate1.trial_agreement:
         # esit sayilar siralamasiz kalirsa rapor kosudan kosuya degisir.

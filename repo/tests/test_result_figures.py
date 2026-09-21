@@ -98,3 +98,20 @@ def test_m2_legend_shows_the_ci_and_does_not_read_an_unbounded_one_as_a_duration
     assert rf.m2_label("Toys", sinirsiz) == "Toys · half-life 43.3 [19.4–∞] interactions"
 
     assert rf.m2_label("Toys", {"fit": {"half_life": None}}) == "Toys · half-life undefined"
+
+
+def test_f20_subtitle_prints_the_date_not_the_machine_written_note():
+    """`thresholds_fixed` makinenin yazdigi bir kayit notu ("... (egitimden once)").
+
+    F20 onu oldugu gibi basiyordu ve Ingilizce figurde tek Turkce parantez kaliyordu.
+    Artefakt elle duzenlenmez; figur yalnizca TARIHI basar (denetim 2026-09-21).
+    """
+    meta = {"model": "answerdotai/ModernBERT-base",
+            "thresholds_fixed": "2026-09-14, configs/base.yaml -> distill.fidelity (egitimden once)"}
+
+    alt = rf.f20_subtitle(meta)
+
+    assert "thresholds fixed before training (2026-09-14)." in alt
+    assert "egitimden" not in alt and "configs/" not in alt
+    assert alt.startswith("answerdotai/ModernBERT-base · ")
+    assert "(" not in rf.f20_subtitle({"model": "m"}).split("training")[1].split(".")[0]
