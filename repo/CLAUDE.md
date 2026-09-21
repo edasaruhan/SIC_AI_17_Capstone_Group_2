@@ -592,6 +592,13 @@ karşılaşınca sorsun veya `docs/DECISIONS.md`'ye "varsayıldı" notuyla yazs�
   Hafta 4 kapısı **INCOMPLETE** kalır (PASS yazılmaz), proje tarihli kararla
   ilerler, sınırlılık olarak raporlanır. Bütün ölçüm yöntemleri A'nın etiketleri
   modelle karşılaştırılmadan önce kaydedildi. Gerekçe: DECISIONS 2026-09-14
+  **2026-09-21/22:** B ve C'ye ikinci tur açıldı (kurallar önceden kayıtlı). Dönen iki
+  sayfa yapay zekâ / betik yardımıyla doldurulmuştu. İnsan etiketi sayılmadı, içeri
+  alınmadı; κ yine ölçülmedi, config `annotators: [A]` kaldı. **Dönen her etiket
+  dosyası `--ingest`'ten ÖNCE denetlenir:** sayfa adı şablondaki gibi mi (`etiketleme_<X>`),
+  açılır menü duruyor mu, dosya Excel'de mi kaydedilmiş. `label_source = xlsx_ingest`
+  damgası bunu yakalamaz; damga yolu söyler, kimin doldurduğunu söylemez. Gerekçe:
+  DECISIONS 2026-09-22
 - [x] ~~**TBD** κ eşiği 5 sınıfta hâlâ 0.60 mı?~~ → **KARARLAŞTI 2026-08-29.**
   **0,60'ta kaldı.** κ sınıf sayısıyla düşme eğiliminde diye eşiği peşinen düşürmek,
   kapıyı koşudan önce gevşetmenin başka bir biçimi olurdu. Bunun yerine iki kural,

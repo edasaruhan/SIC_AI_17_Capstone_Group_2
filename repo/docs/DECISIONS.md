@@ -2776,3 +2776,81 @@ Yeni sınırlılıklar: SONUCLAR §7 madde 17–19, rapor §9 madde 6–8, deck 
 ETIKETLEME_REHBERI, kök README, final raporu, deck, one-pager, üç teslim belgesinin
 errataları
 **Kim:** Ekip (denetim)
+
+### 2026-09-22 — Seed 42 yeniden koşusu: 24/24 birebir aynı, hiçbir koşu tavana değmedi (SONUÇ)
+
+**Olgu:** 2026-09-21 ön kaydındaki yeniden koşu Kaggle'da iki oturumda tamamlandı: Toys 12 koşu,
+7,1 saat; Grocery 12 koşu, 9,3 saat. Kod `4932567`. Yarım kalan koşu yok. Karşılaştırmayı
+`analysis/reproduction.py` yaptı; çıktı `reports/results/reproduction_seed42.json`, 24 koşu
+raporu `reports/results/reproduction/seed42/` altında.
+
+**Sonuç — ön kayıttaki kurallarla:**
+
+- **Birebir aynılık: 24/24.** Ön kayıttaki üç ölçüt 24 hücrenin hepsinde tuttu:
+  - kullanıcı başı metrik kolonlarının hepsi eşit (en büyük mutlak fark 0) ve top-K listeleri
+    eşit (Toys'un 117.386, Grocery'nin 238.756 test kullanıcısının hiçbirinde fark yok);
+  - rapordaki `test` metrikleri eşit;
+  - `test_pairs_sha256` eşit.
+  - Ayrıca 12/12 koşul JSON'ı eşit, iki kategorinin `.inter` ve `split` SHA-256'sı yerel
+    dosyalarla eşit.
+- **Orijinal kod sürümleri:** orijinal koşuların 19'u `e1c7f89`, 5'i `f3183df` ile üretilmişti.
+  Bugünkü kod ikisinin de sayılarını bit düzeyinde yeniden üretiyor.
+- **Epoch sayısı (SONUCLAR §7 madde 6'nın açık sorusu):**
+  - Seed 42'nin 24 koşusu **21–77 epoch** (medyan 51) eğitildi.
+  - Hepsi erken durdurmayla bitti: son iyileşmeden sonra 11 değerlendirme (`stopping_step` = 10).
+  - **Tavana değen koşu yok** (tavan 300).
+  - Seed 1337 ve 2024'ün 48 koşusu için tahmin (±%10) **22–81 epoch**. En yüksek tahmin Toys
+    C3 BPR seed 1337, 80,7. Tavanın %90'ına yaklaşan yok.
+  - `stop_and_decide` = false; durup karar verilecek bir durum çıkmadı.
+- **Sürümler** (ilk kez kaydedildi): torch 2.10.0+cu128, RecBole 1.2.0, numpy 1.26.4,
+  CUDA 12.8, Tesla T4. Orijinal koşuların sürümleri kaydedilmemişti. Birebir aynılık **aynı
+  sayısal sonucu** gösteriyor, aynı sürümle koşulduğunu değil.
+
+**Karar:** Orijinal 72 koşu birincil kalır. Yeniden koşunun sayıları hiçbir sonuç tablosuna
+girmez; zaten farklı değiller. SONUCLAR §7 madde 6 ("epoch sayısı kaydedilmedi, tavana yakın
+olabilir") ölçülen değerlerle yeniden yazıldı.
+
+**Etkilediği bölüm:** `reports/results/reproduction_seed42.json`,
+`reports/results/reproduction/seed42/`, SONUCLAR §7 madde 6, GENEL_BAKIS, README'ler, final
+raporu §9, deck A4 satır 6 ve A5
+**Kim:** Ekip
+
+### 2026-09-22 — B ve C'nin sayfaları insan etiketi değil: kullanılmadı, κ ölçülmedi (KAYIT)
+
+**Olgu:** Geri gelen `validation_500_B.xlsx` ve `validation_500_C.xlsx` içeri alınmadan önce
+denetlendi. Kimlik, kategori ve metin kolonları kaynakla aynıydı; 500/500 satır etiketliydi.
+Ama iki dosya da Excel'de kaydedilmemiş, bir betikle (pandas → xlsxwriter) tek seferde
+yazılmıştı:
+
+- sayfa adı `Sheet1`, şablondaki `etiketleme_B` / `etiketleme_C` değil;
+- şablondaki açılır menü yok;
+- oluşturma ve değiştirme zamanı saniyesine kadar aynı.
+
+Kullanıcıya nasıl doldurulduğu soruldu. Cevap (2026-09-22): etiketler **yapay zekâ / betik
+yardımıyla** üretildi.
+
+**Karar:**
+
+- Bu iki sayfa **insan etiketi değil**. `data/annotations/human/` altına konmadı, ingest
+  edilmedi, hiçbir sayıya girmedi. Config'te `validation.annotators: [A]` değişmedi.
+- **Fleiss κ ölçülmedi. Hafta 4 kapısı INCOMPLETE kalır.** Bu bir FAIL değil. Ön kayıttaki
+  PASS/FAIL kuralı uygulanamadı, çünkü koşulu (iki bağımsız insan etiketleyici) sağlanmadı.
+- Tek etiketleyici sınırlılığı (SONUCLAR §7 madde 3) olduğu gibi durur.
+- İçeri almadan önce, dosyaların nereden geldiğini anlamak için bu iki sayfa A'yla ve LLM'le
+  karşılaştırıldı. O karşılaştırmanın sayıları **kasıtlı olarak hiçbir yere yazılmadı**:
+  insanlar arası uyum gibi okunurlar, oysa değiller.
+
+**Gerekçe:** Bir modelin ya da betiğin etiketini "B ve C" diye raporlamak sahte bir güvenilirlik
+ölçümü olur. Projenin "vekil çıktı gerçek diye raporlanmaz" kuralı (2026-08-28) insan etiketi
+tarafında da geçerli. `label_source = xlsx_ingest` damgası bu durumu **yakalayamazdı**: damga
+dosyanın ingest yolundan geçtiğini söylüyor, kimin doldurduğunu söylemiyor. O yüzden dönen her
+etiket dosyası içeri alınmadan önce elle denetlenir.
+
+**İleride gerçek insan etiketi gelirse:** 2026-09-21 ön kaydı aynen geçerli. Repo'daki boş
+şablonlar ve kod (birincil referans A, çoğunluk duyarlılık bloğu) hazır.
+
+**Etkilediği bölüm:** SONUCLAR (başlık notu, §7 madde 3), GENEL_BAKIS, ETIKETLEME_REHBERI,
+kök README, final raporu §6.4, §9 ve §11, CLAUDE.md
+**Kim:** Kullanıcı (bilgi) · kayıt: ekip
+
+---

@@ -4,7 +4,7 @@
 
 **Team:** AI in Marketing Capstone, Group 2 — [Team Member 1] / [Team Member 2] / [Team Member 3]
 
-**Repository:** github.com/edasaruhan/SIC_AI_17_Capstone_Group_2 · **Date:** 21 September 2026
+**Repository:** github.com/edasaruhan/SIC_AI_17_Capstone_Group_2 · **Date:** 22 September 2026
 
 > Every number in this report is read from a JSON file committed in
 > [`repo/reports/results/`](../repo/reports/results/); the source file is named in each
@@ -266,10 +266,11 @@ model output.
 
 - The plan called for **three** annotators and Fleiss' κ ≥ 0.60. Only one annotator was
   available. Inter-annotator reliability was therefore **never measured**, and the Week 4
-  gate is recorded as **INCOMPLETE** — it was never written as PASS. (On 21 September two
-  more annotators began labelling the same 500 rows; the rules — κ ≥ 0.60 unchanged, every
-  published number stays on A's labels, the majority vote reported beside it — were
-  committed first.)
+  gate is recorded as **INCOMPLETE** — it was never written as PASS. A second attempt was
+  made on 21 September: two more annotators were to label the same 500 rows, under rules
+  committed first (κ ≥ 0.60 unchanged, every published number stays on A's labels). The two
+  sheets that came back had been filled in with the help of an AI model or a script. They
+  were not counted as human labels and were not used, so κ remains unmeasured.
 - The concept note pre-registered two accuracy thresholds: **macro-F1 ≥ 0.75** and
   **`gift_given` precision ≥ 0.80**. Measured: **macro-F1 0.5405** [0.4897, 0.5869] and
   **precision 0.68** (0.6485 when reweighted to the population). **Both were missed.**
@@ -662,7 +663,8 @@ eight that a reader should weigh first:
    Recall and "lower bound" on NDCG. Both metrics are printed side by side in §7.3.
 3. **One human annotator; reliability never measured.** The Week 4 gate is INCOMPLETE. Every
    calibration figure and every label-quality figure in this report rests on a single
-   person's judgement.
+   person's judgement. A second round in September returned sheets filled in with AI or
+   script help; they were discarded (§6.4).
 4. **The C1 label is noisy** (population precision 0.65). Roughly a third of rows called
    "gift" are, to a human, not gifts — usually items bought for the buyer's own child. All
    RQ2 effects are reported as lower bounds under the pre-registered rule (see item 8).
@@ -690,14 +692,13 @@ eight that a reader should weigh first:
    rows the detector flags as gifts; that a pure gift effect is at least as large is not
    guaranteed. The pre-registered label was kept; its assumption is now stated.
 
-Also on the record: how many epochs each run actually trained was not captured (RecBole's
-epoch lines did not reach the Kaggle logs), so it cannot be said whether any run hit the
-300-epoch cap — the protocol was identical across conditions, so contrasts are unaffected,
-but absolute metrics cannot be claimed to be fully converged. The runner now records the
-epochs trained and the best epoch. Since 21 September the 24 seed-42 cells are being re-run
-on Kaggle with unchanged data to measure them, and to check that today's code reproduces the
-published numbers; the rules for reading that re-run were committed before it started. No
-hyperparameter search was performed. The experiment covers two categories and two model families. The calibration assumes human–LLM agreement is
+Also on the record: the original 72 runs did not record how many epochs they trained. The 24
+seed-42 cells were therefore re-run on Kaggle on 21–22 September with unchanged data and
+today's code, under rules committed before the re-run started (`reproduction_seed42.json`).
+All 24 reproduced the published output **bit for bit**: per-user metrics, top-K lists, test
+metrics and the test-pair hash. They trained for 21–77 epochs, every one was stopped by early
+stopping, and none came near the 300-epoch cap. For the other two seeds the count is
+estimated from fit time (22–81 epochs, ±10 %). No hyperparameter search was performed. The experiment covers two categories and two model families. The calibration assumes human–LLM agreement is
 category-independent, which does not hold in Toys. No multiple-comparison correction was
 applied; the primary contrast was pre-specified and the rest are secondary.
 
@@ -738,7 +739,9 @@ RecBole 1.2.0 uses `np.float_`, removed in NumPy 2. `repo/.venv` runs the pipeli
 tests; `repo/.venv-recbole` runs the experiments.
 
 **Determinism, checked rather than asserted.** Seven cells were run twice in different Kaggle
-sessions and produced **bit-identical** output. `marketing_metrics` was run twice and produced
+sessions and produced **bit-identical** output. On 22 September all 24 seed-42 cells were
+re-run with the current code and again reproduced the published per-user output bit for
+bit. `marketing_metrics` was run twice and produced
 identical output. The analysis in this report was regenerated after a refactor on
 20 September and every number was unchanged; only the provenance stamps differed.
 
@@ -767,9 +770,10 @@ was worse than both deleting and ignoring them.
 
 The most valuable next steps are, in order:
 
-1. **Measure annotator reliability** — started 21 September: two more annotators are
-   labelling the same 500 rows for Fleiss' κ. It is the cheapest way to strengthen every
-   downstream claim, and it closes the one gate that is still INCOMPLETE.
+1. **Measure annotator reliability** — two more annotators labelling the same 500 rows by
+   hand, for Fleiss' κ. The September attempt did not produce human labels (§6.4). It is the
+   cheapest way to strengthen every downstream claim, and it closes the one gate that is
+   still INCOMPLETE.
 2. **Run C2 — down-weighting instead of deleting.** The results point at it directly: gift
    rows are below-average but not worthless, and deletion throws away the part that is still
    useful. This is the experiment most likely to produce a deployable recommendation.

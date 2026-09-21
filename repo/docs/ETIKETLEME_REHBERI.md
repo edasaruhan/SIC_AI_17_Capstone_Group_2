@@ -390,6 +390,12 @@ Dosyayı **adını değiştirmeden** kaydedip geri gönderin.
 > sayılar A'nın etiketleriyle kalacak; üçünüzün çoğunluğu yanlarına ikinci bir ölçüm
 > olarak yazılacak. Bu kurallar siz başlamadan önce yazıldı (`DECISIONS.md`,
 > 2026-09-21 ön kaydı).
+>
+> **Güncelleme (2026-09-22) — bu tur ölçülemedi.** B ve C'nin dönen sayfaları yapay zekâ /
+> betik yardımıyla doldurulmuştu; §3'teki 3. kural ("hiçbir yapay zekâya sormayın") bunun
+> için var. Bu sayfalar insan etiketi sayılmadı ve kullanılmadı. κ hâlâ **ölçülmedi**, kapı
+> INCOMPLETE. Yeniden denenirse aynı kurallar geçerli: her satırı kendiniz okuyup kendiniz
+> etiketleyin (`DECISIONS.md`, 2026-09-22).
 
 Üç dosya toplandığında tek bir komut çalışıyor ve üç sayı çıkıyor:
 

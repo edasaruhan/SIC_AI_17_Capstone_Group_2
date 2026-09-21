@@ -18,9 +18,13 @@ karşılaştırıyor.
 | **RQ4** — liste ne kadar süre kirli kalıyor? | SASRec × Toys'ta fazla pay **2,0 puan**la başlıyor ve **~1 kendi alımında** yarıya iniyor (≈2–4 hafta). |
 
 72 koşu (2 kategori × 2 model × 6 koşul × 3 seed), Kapı 2 dört hücrede de PASS, 463 test.
-**Süren iki doğrulama (2026-09-21):** seed 42'nin 24 hücresi epoch sayısı ve birebir yeniden
-üretim için Kaggle'da yeniden koşuluyor; iki ekip üyesi doğrulama setini etiketliyor (κ).
-İkisinin de kuralları sonuçlardan önce yazıldı ([`DECISIONS.md`](repo/docs/DECISIONS.md)).
+**İki doğrulama (kuralları sonuçlardan önce yazıldı, [`DECISIONS.md`](repo/docs/DECISIONS.md)
+2026-09-21/22):**
+- Seed 42'nin 24 hücresi bugünkü kodla Kaggle'da yeniden koşuldu: **24/24 bit bit aynı**,
+  21–77 epoch, 300 tavanına değen yok.
+- İkinci ve üçüncü etiketleyicinin sayfaları yapay zekâ / betik yardımıyla doldurulmuştu.
+  İnsan etiketi sayılmadılar, bu yüzden etiketleyiciler arası uyum (κ) **ölçülmedi**; insan
+  referansı hâlâ tek kişi.
 **Capstone raporunun tamamı: [`final-report/final-report.md`](final-report/final-report.md)** ·
 ayrıntı, güven aralıkları ve sınırlılıklar: [`repo/docs/SONUCLAR.md`](repo/docs/SONUCLAR.md) ·
 her başlığı tek komutla basmak için: `python repo/scripts/demo.py`

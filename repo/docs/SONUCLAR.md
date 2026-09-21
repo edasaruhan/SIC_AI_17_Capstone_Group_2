@@ -13,9 +13,15 @@
 > **Güncelleme 2026-09-21 (ikinci denetim).** Hiçbir birincil sayı değişmedi. Değişenler:
 > makro-F1'in 4. basamağı (0,5404 → 0,5405, yuvarlama hatası) · iki post-hoc sağlamlık
 > analizi (§4.6, seed düzeyi ve maruziyet ayrıştırması) · iki iddianın düzeltilmesi
-> (§7 madde 5 ve 19) · üç yeni sınırlılık (§7 madde 17–19). Seed 42'nin 24 hücresi epoch
-> sayısı için Kaggle'da yeniden koşuluyor, B ve C doğrulama setini etiketliyor; ikisinin
-> kuralları sonuçlardan önce yazıldı (DECISIONS 2026-09-21 ön kaydı).
+> (§7 madde 5 ve 19) · üç yeni sınırlılık (§7 madde 17–19). Aynı gün iki doğrulama
+> başlatıldı; kuralları sonuçlardan önce yazıldı (DECISIONS 2026-09-21 ön kaydı).
+>
+> **Güncelleme 2026-09-22 (iki doğrulamanın sonucu).** Hiçbir birincil sayı değişmedi.
+> - **Seed 42 yeniden koşusu:** 24/24 hücre bugünkü kodla **bit bit aynı** çıktı. Epoch
+>   sayısı ölçüldü: 21–77. Hepsi erken durdurmayla bitti; 300 tavanına değen yok (§7 madde 6).
+> - **B ve C:** geri gelen iki sayfa yapay zekâ / betik yardımıyla üretilmişti. İnsan etiketi
+>   sayılmadı, içeri alınmadı. κ **ölçülmedi**, Hafta 4 kapısı INCOMPLETE kalıyor (§7 madde 3).
+>   Gerekçe: DECISIONS 2026-09-22.
 
 ---
 
@@ -417,9 +423,10 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
    Gerekçe: DECISIONS 2026-09-20.
 3. **İnsan referansı tek kişi; etiket güvenilirliği ölçülmedi.** Hafta 4 kapısı bu yüzden
    INCOMPLETE (asla PASS yazılmadı). Bütün kalibrasyon ve etiket kalitesi sayıları tek
-   etiketleyiciye göre. **2026-09-21:** B ve C aynı 500 satırı etiketliyor. κ kapısı ve
-   çoğunluk referansıyla duyarlılık, kuralları önceden yazılmış olarak eklenecek. Yayımlanan
-   sayılar A'ya göre kalacak.
+   etiketleyiciye göre. 2026-09-21'de B ve C'nin aynı 500 satırı etiketlemesi kararlaştırıldı
+   ve kuralları önceden yazıldı. **2026-09-22:** geri gelen iki sayfa yapay zekâ / betik
+   yardımıyla üretilmişti. İnsan etiketi sayılmadı ve içeri alınmadı; κ ölçülmedi. Bu bir FAIL
+   değil, ölçümün yapılmamasıdır (DECISIONS 2026-09-22).
 4. **C1 etiketi gürültülü:** popülasyonda kesinlik 0,65 (öğrenci 0,66) — "hediye" denen
    satırların yaklaşık üçte biri insana göre hediye değil, çoğu kendi çocuğuna alınan. RQ2
    etkileri bu yüzden alt sınır; gerçek etki muhtemelen daha büyük.
@@ -434,14 +441,20 @@ saptanamıyor (BPR kısa dilim hariç). C1b − C4b iki kategoride de her dilimd
    "farkları küçültür, büyütmez" yazıyordu. O bir varsayımdı; 2026-09-21 denetiminde
    düzeltildi.) BPR valid satırıyla hiçbir koşulda eğitilmediği için etkilenmiyor. Tasarım
    bilinçliydi (bölme C0'da donar), sonuca etkisi önceden yazılmamıştı.
-6. **Kaç epoch eğitildiği bilinmiyor.** RecBole'un epoch satırları loglara düşmedi; 300
-   tavanına değen koşu olup olmadığı söylenemez. Protokol her koşulda aynı, ama mutlak
-   metriklerin tam yakınsadığı iddia edilemez. Hiperparametre araması yapılmadı (RecBole
-   varsayılanları, bütün koşullarda aynı). **2026-09-20'den sonraki koşular** `epochs_trained` ve
-   `hit_epoch_cap` alanlarını rapora yazıyor; geçmiş 72 koşu kurtarılamıyor. **2026-09-21:**
-   seed 42'nin 24 hücresi aynı veri ve bugünkü kodla Kaggle'da yeniden koşuluyor. Epoch
-   sayıları ve "birebir aynı mı" sonucu geldiğinde buraya yazılacak (kurallar DECISIONS
-   2026-09-21 ön kaydında).
+6. **Epoch sayısı yalnızca seed 42 için ölçüldü; hiperparametre araması yapılmadı.** Orijinal
+   72 koşunun raporunda epoch sayısı yoktu, çünkü RecBole'un epoch satırları loglara
+   düşmemişti. **2026-09-22:** seed 42'nin 24 hücresi aynı veri ve bugünkü kodla Kaggle'da
+   yeniden koşuldu (`reproduction_seed42.json`, kurallar DECISIONS 2026-09-21 ön kaydında).
+   - 24/24 hücre **bit bit aynı**: kullanıcı başı metrikler ve top-K listeleri, test metrikleri
+     ve `test_pairs_sha256`.
+   - Koşular **21–77 epoch** eğitildi (medyan 51; SASRec Toys 21–58, Grocery 48–67; BPR Toys
+     49–77, Grocery 37–43). Hepsi erken durdurmayla bitti, son iyileşmeden 11 değerlendirme
+     sonra. **300 tavanına değen yok.**
+   - Seed 1337 ve 2024'ün epoch sayısı ölçülmedi, süreden **tahmin edildi** (±%10): 22–81.
+     Tavana yaklaşan yok.
+   - Açık kalan: bütün koşullarda RecBole varsayılanları kullanıldı, hiperparametre araması
+     yapılmadı. Protokol her koşulda aynı, ama mutlak metrikler ayarlanmış bir modelinkinden
+     düşük olabilir.
 7. **SASRec'in erken durdurma kümesi koşula göre küçülüyor:** eğitim geçmişi tamamen silinen
    kullanıcının valid satırı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı. Ayrıca
    erken durdurmanın hedefi bütün koşullarda valid satırı, ve bu satır hediye de olabiliyor
@@ -496,11 +509,14 @@ python -m gift_contamination.analysis.experiment_stats  --config configs/base.ya
 python -m gift_contamination.recsys.marketing_metrics   --config configs/base.yaml  # marketing_metrics.json (~4 dk)
 python -m gift_contamination.analysis.result_figures    --config configs/base.yaml  # F20–F23
 python -m gift_contamination.analysis.robustness        --config configs/base.yaml  # robustness_posthoc.json (§4.6, post-hoc, <1 dk)
+# seed 42 yeniden koşusunun denetimi (Kaggle çıktı klasörleri; 24 raporu reproduction/seed42/'ye kopyalar)
+python -m gift_contamination.analysis.reproduction      --config configs/base.yaml --rerun <out_R1> <out_R2>
 ```
 
 Koşular: `scripts/kaggle_experiment.py` (DECISIONS 2026-09-16, 2026-09-18, 2026-09-19).
-Kaggle oturumları arasında iki kez koşan 7 hücrenin çıktısı **bit bit aynı** — deney
-belirlenimci. Bootstrap'lar config'teki seed'den `zlib.crc32` ile türetilen seed'lerle; aynı
+Deney belirlenimci. Kaggle oturumları arasında iki kez koşan 7 hücrenin çıktısı **bit bit
+aynı**. 2026-09-22'de seed 42'nin 24 hücresi bugünkü kodla ayrı oturumlarda yeniden koşuldu;
+24/24 yine bit bit aynı (§7 madde 6). Bootstrap'lar config'teki seed'den `zlib.crc32` ile türetilen seed'lerle; aynı
 girdiyle aynı GA'lar çıkar (`marketing_metrics` ikinci kez koşturuldu, çıktı aynı).
 
 ## Figürler

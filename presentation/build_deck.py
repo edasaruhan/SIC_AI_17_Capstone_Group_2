@@ -38,7 +38,7 @@ SUBTITLE = ("Detecting gift purchases as a distinct class of noise "
             "in e-commerce recommender systems")
 TEAM = "AI in Marketing Capstone, Group 2 — [Team Member 1] / [Team Member 2] / [Team Member 3]"
 RUNNING = "This Was Not For Me · SIC AI 17 Capstone · Group 2"
-DATE = "21 September 2026"
+DATE = "22 September 2026"
 GITHUB = "github.com/edasaruhan/SIC_AI_17_Capstone_Group_2"
 
 CATEGORIES = ["Toys_and_Games", "Grocery_and_Gourmet_Food", "Video_Games", "All_Beauty"]
@@ -88,6 +88,7 @@ def load() -> dict:
     prev = _read("prevalence.json")
     val = _read("validation_500.json")
     distill = _read("distill_report_base.json")
+    repro = _read("reproduction_seed42.json")
 
     funnel = {}
     for kat in CATEGORIES:
@@ -209,6 +210,14 @@ def load() -> dict:
             "student_f1": distill["criteria"]["3_c1_axis_vs_human_not_worse_than_teacher"]["student_f1"],
             "teacher_f1": distill["criteria"]["3_c1_axis_vs_human_not_worse_than_teacher"]["teacher_f1"],
             "max_drop": distill["criteria"]["3_c1_axis_vs_human_not_worse_than_teacher"]["max_drop"],
+        },
+        # Seed 42 yeniden kosusu (2026-09-22): yalnizca denetim, birincil sayi degil.
+        "repro": {
+            "n": repro["summary"]["n_expected"],
+            "identical": repro["summary"]["n_identical"],
+            "epochs": repro["summary"]["epochs_trained_min_max"],
+            "hit_cap": len(repro["summary"]["runs_hit_cap"]),
+            "cap": repro["runs"][0]["epochs"]["epochs"],
         },
         "teacher": {
             "model": _read("llm_annotate_Toys_and_Games.json")["meta"]["model"],
@@ -750,7 +759,10 @@ def s07_honesty(prs, N):
               "ve etki kategorinin hediye payiyla buyuyor. Zayif dedektorun degistirdigi "
               "sey ne olculdugu: 'hediyeler' degil, dedektorun hediye DEDIGI satirlar. "
               "Bunlarin ucte biri insana gore hediye degil, cogu kendi cocuguna alim - "
-              "o yuzden 'alt sinir' okumasi bir varsayima dayaniyor, A4'te yaziyor.")
+              "o yuzden 'alt sinir' okumasi bir varsayima dayaniyor, A4'te yaziyor. "
+              "Eylul'de ikinci ve ucuncu etiketleyiciyle bir tur daha denedik; donen "
+              "sayfalar yapay zeka yardimiyla doldurulmustu, insan etiketi saymadik. "
+              "Yani kappa hala olculmedi.")
 
 
 def s08_distill(prs, N):
@@ -1388,14 +1400,17 @@ def a04_limits(prs, N):
              "Pre-registered, dated, and NDCG is still reported — but it is a change"],
             ["3", f"{N['human']['n_annotators']} human annotator; the planned Fleiss κ "
                   f"was never measured",
-             "No reliability estimate for the reference labels themselves"],
+             "No reliability estimate for the reference labels; a September retry came "
+             "back AI-assisted and was discarded"],
             ["4", "C1 deletes rows the detector believes are gifts, including its "
                   "false positives",
              "The treatment is \"delete what the detector flags\", not \"delete gifts\""],
             ["5", "Gifts in a user's validation row are never removed",
              "Direction of the effect on the sequential model is untested"],
-            ["6", "Number of epochs actually trained was not recorded for the 72 runs",
-             "Seed-42 cells re-run on 21 Sept with the same data to measure it"],
+            ["6", "Epochs trained were not recorded for the 72 original runs",
+             f"Seed-42 re-run: {N['repro']['identical']}/{N['repro']['n']} bit-identical, "
+             f"{N['repro']['epochs'][0]}–{N['repro']['epochs'][1]} epochs, "
+             f"{N['repro']['hit_cap'] or 'none'} at the {N['repro']['cap']} cap"],
             ["7", "Intervals resample users, not training runs (seed variance excluded)",
              "Toys: every seed agrees in sign · Grocery: seed spread ≈ interval width"],
             ["8", "The placebo matches the number of rows, not the users they come from",
@@ -1417,8 +1432,12 @@ def a04_limits(prs, N):
               "dedektorun dogrulugu ve etiket guvenilirligiyle ilgili ve en "
               "agirlari. Dorduncusu ince ama onemli: C1 aslinda 'hediyeleri sil' "
               "degil 'dedektorun isaretledigini sil' kosulu. Besincisi sirali "
-              "modele ozel ve etkisinin yonu sinanmadi. Altincisi bir kayit eksikligi: "
-              "seed 42'nin yirmi dort hucresi ayni veriyle yeniden kosuluyor. Yedi ve "
+              "modele ozel ve etkisinin yonu sinanmadi. Ucuncusu icin Eylul'de ikinci "
+              "bir tur denedik ama donen sayfalar yapay zeka yardimiyla doldurulmustu; "
+              "insan etiketi saymadik. Altincisi bir kayit eksikligiydi: seed 42'nin "
+              "yirmi dort hucresini bugunku kodla yeniden kosturduk, yirmi dordu de bit "
+              "bit ayni cikti; yirmi bir ile yetmis yedi epoch arasinda erken durdular, "
+              "hicbiri uc yuz tavanina yaklasmadi. Yedi ve "
               "sekiz ikinci denetimde bulundu: guven araliklari egitim degiskenligini "
               "kapsamiyor ve plasebo kullanici duzeyinde eslenmedi - ikisi de post-hoc "
               "olculdu ve Toys bulgusunu degistirmiyor. Dokuzuncusu alt sinir okumasinin "
@@ -1456,7 +1475,7 @@ def a05_repro(prs, N):
         size=10.5, bold=True, color=ACCENT, space_after=0)
     for i, (bas, govde, zemin) in enumerate([
         ("Committed",
-         "Code, configs, 441 tests, every result JSON, every figure, the report and "
+         "Code, configs, 463 tests, every result JSON, every figure, the report and "
          "this deck's generator", SOFT),
         ("Deliberately not committed",
          "Review data and model weights (Kaggle datasets are private), the 500 "
@@ -1472,7 +1491,10 @@ def a05_repro(prs, N):
         "Two virtual environments: .venv for the pipeline (polars 1.44, numpy 2.5) and "
         ".venv-recbole for the experiment (numpy < 2, because RecBole 1.2.0 still uses "
         "np.float_). Slides were generated by presentation/build_deck.py, which reads the "
-        "same JSONs — so the deck cannot drift from the artefacts.",
+        "same JSONs — so the deck cannot drift from the artefacts. "
+        f"The {N['repro']['n']} seed-42 cells were re-run with the current code: "
+        f"{N['repro']['identical']}/{N['repro']['n']} bit-identical "
+        "(reproduction_seed42.json).",
         size=10.5, color=INK2, space_after=0, line=1.15)
     foot(sl, "A5")
     notes(sl, "Son ek slayt: her sayiyi nasil kontrol edeceginizi anlatiyor. "
@@ -1483,7 +1505,9 @@ def a05_repro(prs, N):
               "edilmemis KOD degisikligi vardi demek. Alt tabloda neyin commit "
               "edilip neyin edilmedigi var: veri ve model agirliklari kasitli "
               "olarak depoda yok. Bu deck'i ureten betik de ayni JSON'lari "
-              "okuyor, yani slaytlar artefaktlardan sapamaz.")
+              "okuyor, yani slaytlar artefaktlardan sapamaz. En altta: seed 42'nin "
+              "yirmi dort hucresini bugunku kodla yeniden kosturduk ve yirmi dordu de "
+              "bit bit ayni cikti.")
 
 
 SLIDES = [s01_title, s02_problem, s03_cost, s04_questions, s05_pipeline, s06_detector,

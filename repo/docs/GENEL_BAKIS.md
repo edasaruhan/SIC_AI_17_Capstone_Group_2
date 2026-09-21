@@ -153,6 +153,7 @@ de PASS**. Ayrıntılı durum için **§8**.
 | Öğrenciyle etiketlenmiş 5-core satır | **4.598.612** (Toys 2.164.018 + Grocery 2.434.594) |
 | Hediye payı 5-core — Toys / Grocery (öğrenci, ham) | %24,8 / %3,1 |
 | Deney koşusu (Kaggle, 2× T4) | **72 / 72** bitti ve denetlendi |
+| Seed 42 yeniden koşusu (24 hücre, bugünkü kod) | **24/24 bit bit aynı** · 21–77 epoch, tavana değen yok |
 | Kapı 2 | **PASS (4/4)** — Toys/Grocery × SASRec/BPR |
 | **RQ2** — C1 − C4, Recall@10 (Toys) | SASRec **+%15,7** · BPR **+%40,0** (ikisi de GA'sı sıfırın üstünde → alt sınır); Grocery +%1,2 / saptanamadı |
 | **RQ4** — M2 yarı ömür (Toys, SASRec) | **0,66** kendi alımı [0,53–0,82] ≈ 2,4 hafta |
@@ -309,12 +310,13 @@ C1−C4 ve C1b−C4b olmasının sebebi bu. Figür: F20.
 | 1 | Veri indirme, ön işleme, sözcüksel vekil, derin EDA | ✅ bitti |
 | 2 | Katmanlı örnekleme, etiket şeması, prompt v2, 200 deneme etiketi | ✅ bitti |
 | 3 | Kaggle'da vLLM kurulumu, Toys'ta 11.800 satırlık pilot annotation, ilk aylık oran eğrisi | ✅ bitti (57 dk, 2× T4) · **Kapı 1 PASS 4/4** |
-| 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) |
+| 4 | 500 satır insan etiketleme, sınıf bazlı F1, kalibre yaygınlık | ✅ kapandı (2026-09-14) · tek etiketleyici → kapı **INCOMPLETE** (κ ölçülmedi) · 2026-09-22: B/C'nin dönen sayfaları yapay zekâ / betik yardımıyla üretilmişti, insan etiketi sayılmadı |
 | 5 | Üç kategoride tam annotation, ModernBERT damıtma, tam korpus inference | ✅ bitti (2026-09-15) · **sadakat kapısı PASS 3/3** · 4.598.612 satır etiketlendi |
 | 6 | RecBole atomic file'lar, C0 baseline + C4 plasebo | ✅ atomic + altı koşul **gerçek etiketle** · Kaggle'da **72/72 koşu** (2026-09-16/19), denetlendi · **Kapı 2 PASS 4/4** |
 | 7 | C1/C1b/C4b/C3 koşulları, bootstrap güven aralıkları, çoklu seed | ✅ 3 seed, eşli bootstrap; RQ2/RQ3 karşıtlıkları ve doz–yanıt `experiment_stats.json` (C2 kapsam dışı) |
 | 8 | M1/M2/M3 pazarlama metrikleri, figürler, final yazım | ✅ M1/M2/M3 (tanımlar koşulardan önce, M2 onaylı) · F21–F23 · **[`SONUCLAR.md`](SONUCLAR.md)** · Model Refinement + Deployment teslimleri · kalan: capstone raporu/sunum |
 | — | **Denetim (2026-09-20)** | ✅ uçtan uca denetim: kırık `precision_check score` onarıldı, üç deney değişmezi test kilidine alındı, provenans (`-dirty`, eksik `code_version`) düzeltildi, tutturulamayan iki detektör kapısı kayda geçti. **Hiçbir sonuç sayısı değişmedi** (yeniden üretildi, bit düzeyinde aynı). DECISIONS 2026-09-20 |
+| — | **İkinci denetim ve iki doğrulama (2026-09-21/22)** | ✅ makro-F1 yuvarlama hatası (0,5404 → 0,5405), iki post-hoc sağlamlık analizi, üç yeni sınırlılık · **seed 42 × 24 hücre Kaggle'da yeniden koşuldu: 24/24 bit bit aynı**, 21–77 epoch, tavana değen yok · B/C sayfaları insan etiketi değildi, κ ölçülmedi. **Birincil sayı değişmedi.** DECISIONS 2026-09-21, 2026-09-22 |
 
 ### 🚦 Kapı 1 — Hafta 3 sonu · detektör çalışıyor mu?
 
@@ -444,7 +446,7 @@ yayınlanamaz.
 | **Hafta 4 — insan doğrulaması** | **INCOMPLETE** · tek etiketleyici (A), 500 satır | yöntemler `8c697a8`, kod `eed7f35` — ikisi de sonuçtan önce push'landı; `validation_500.json`, F18 |
 | **RQ1 yaygınlık** — ham + insan kalibrasyonlu, F19 | tamam | `prevalence.json`; kalibrasyon elle hesaplanmış örnekle test ediliyor |
 | Koşullar (C0 · C1 · C4 · C1b · C4b · C3 gölge token; C2 açık hata) + `atomic --labels distilled` | **gerçek etiketle üretildi** (Toys + Grocery) | `test_conditions`, `test_no_leakage`, `test_experiment_labels`; `condition_*.json`; maske–pozitif çakışması 0 (yerelde sayıldı) |
-| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | **Kaggle'da 72 gerçek koşu** (2× T4) | 72 raporun çıktısı yerelde bağımsız denetlendi: test çiftleri özeti kategori içinde tek, kullanıcı başı ortalama rapora ≤ 5·10⁻⁷, top-K'da gölge ürün 0; iki oturumda koşan yedi hücre (iki kod sürümünde) **birebir aynı** çıktı — DECISIONS 2026-09-18, 2026-09-19 |
+| Deney koşucusu (BPR + SASRec; gölge ve C0 alınmış ürün maskesi; kullanıcı başı çıktı) | **Kaggle'da 72 gerçek koşu** (2× T4) | 72 raporun çıktısı yerelde bağımsız denetlendi: test çiftleri özeti kategori içinde tek, kullanıcı başı ortalama rapora ≤ 5·10⁻⁷, top-K'da gölge ürün 0; iki oturumda koşan yedi hücre (iki kod sürümünde) **birebir aynı** çıktı — DECISIONS 2026-09-18, 2026-09-19; seed 42'nin 24 hücresi 2026-09-22'de bugünkü kodla yeniden koşuldu, **24/24 bit bit aynı** (`reproduction_seed42.json`) |
 | **Damıtma + çıkarım girdileri** (`distill prepare`, `inference prepare`) | yerelde koşuldu | 46.655 eğitim/ayrılmış satır; doğrulama satırlarıyla kesişim **0** (çift ve birebir metin, koddan bağımsız sayıldı); Toys 2.164.018 + Grocery 2.434.594 girdi satırı, kimlikler 5-core'la birebir |
 | **Damıtma + tam korpus çıkarımı** (Kaggle, T4) | **sadakat kapısı PASS (3/3)** · 4.598.612 satır | `distill_report_base.json`, `inference_*.json`, F20; indirilen etiketler 5-core'la satır satır aynı küme, boş değer yok, olasılıklar toplamı 1 |
 | **Kapı 2 + eşli bootstrap** (`experiment_stats`) | **PASS (4/4)** · 72 koşu (14 dk) | `test_experiment_stats`; `gate2.json`, `experiment_stats.json` |
@@ -487,10 +489,11 @@ anahtar kalmasını engelliyor.
   koşulamaz; sonraki aşamalar `data/interim/` üzerinden çalışıyor.
 - `confidence` alanı analizden düşürüldü (`low` ≡ `unclear`, %100 örtüşme).
 - Deneme setiyle uyum **F1 olarak raporlanamaz**: prompt tam o satırlar okunarak yazıldı.
-- **Deney koşularının kaç epoch eğitildiği bilinmiyor** — RecBole'un epoch satırları loglara
-  düşmedi. 300 tavanına değen koşu olup olmadığı söylenemez; protokol her koşulda aynı
-  olduğu için karşıtlıkları bozmaz. **2026-09-21:** seed 42'nin 24 hücresi bu soru için
-  Kaggle'da yeniden koşuluyor (`analysis.reproduction`, kurallar DECISIONS ön kaydında).
+- **Epoch sayısı yalnızca seed 42 için ölçüldü.** Orijinal 72 koşu epoch sayısını
+  yazmıyordu. 2026-09-22'de seed 42'nin 24 hücresi bugünkü kodla yeniden koşuldu:
+  **24/24 bit bit aynı**, 21–77 epoch, hepsi erken durdurmayla bitti, 300 tavanına değen yok.
+  Seed 1337/2024 süreden tahmin edildi: 22–81 (`reproduction_seed42.json`, DECISIONS
+  2026-09-22). Hiperparametre araması yapılmadı.
 - SASRec'in erken durdurma (valid) kümesi koşula göre küçülüyor: eğitim geçmişi boşalan
   kullanıcı düşüyor (Toys C1b'de %17). Test kümesi her koşulda aynı.
 - **Valid satırındaki hediye hiçbir koşulda silinmiyor** (sonuçtan sonra fark edildi):
