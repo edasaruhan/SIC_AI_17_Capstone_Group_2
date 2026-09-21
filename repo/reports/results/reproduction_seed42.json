@@ -1,0 +1,1517 @@
+{
+  "meta": {
+    "code_version": "4932567",
+    "rules_fixed": "DECISIONS 2026-09-21 on kaydi (yeniden kosu gorulmeden)",
+    "seed": 42,
+    "identical_means": "peruser metrikleri + top-K esit, test metrikleri esit, test_pairs_sha256 esit",
+    "primary_results_unchanged": "orijinal 72 kosu birincil; bu dosya yalnizca denetim"
+  },
+  "summary": {
+    "n_expected": 24,
+    "n_reruns": 24,
+    "missing": [],
+    "stale_copies": [],
+    "n_identical": 24,
+    "n_different": 0,
+    "n_undetermined": 0,
+    "epochs_trained_min_max": [
+      21,
+      77
+    ],
+    "runs_hit_cap": [],
+    "estimates_near_cap": [],
+    "stop_and_decide": false
+  },
+  "inputs": {
+    "Toys_and_Games": {
+      "inter_equal": true,
+      "split_equal": true
+    },
+    "Grocery_and_Gourmet_Food": {
+      "inter_equal": true,
+      "split_equal": true
+    }
+  },
+  "conditions_equal": {
+    "Toys_and_Games/C0": true,
+    "Toys_and_Games/C1": true,
+    "Toys_and_Games/C1b": true,
+    "Toys_and_Games/C3": true,
+    "Toys_and_Games/C4": true,
+    "Toys_and_Games/C4b": true,
+    "Grocery_and_Gourmet_Food/C0": true,
+    "Grocery_and_Gourmet_Food/C1": true,
+    "Grocery_and_Gourmet_Food/C1b": true,
+    "Grocery_and_Gourmet_Food/C3": true,
+    "Grocery_and_Gourmet_Food/C4": true,
+    "Grocery_and_Gourmet_Food/C4b": true
+  },
+  "runs": [
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C0",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 40,
+        "best_epoch": 29,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1011.4,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C0",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 58,
+        "best_epoch": 47,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 10167.7,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 41,
+        "best_epoch": 30,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1006.3,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 53,
+        "best_epoch": 42,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 8967.2,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1b",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 39,
+        "best_epoch": 28,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 948.1,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1b",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 67,
+        "best_epoch": 56,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 10662.9,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C3",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 43,
+        "best_epoch": 32,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1220.4,
+      "original_code_version": "f3183df",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C3",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 48,
+        "best_epoch": 37,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 9192.3,
+      "original_code_version": "f3183df",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 37,
+        "best_epoch": 26,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 903.6,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 48,
+        "best_epoch": 37,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 8162.0,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4b",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 43,
+        "best_epoch": 32,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1033.9,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4b",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 53,
+        "best_epoch": 42,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 8555.7,
+      "original_code_version": "f3183df",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 238756,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C0",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 62,
+        "best_epoch": 51,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1506.3,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C0",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 54,
+        "best_epoch": 43,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 7991.6,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 69,
+        "best_epoch": 58,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1531.4,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 41,
+        "best_epoch": 30,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 4575.1,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1b",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 77,
+        "best_epoch": 66,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1568.2,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1b",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 21,
+        "best_epoch": 10,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1383.6,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C3",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 58,
+        "best_epoch": 47,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 2078.2,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C3",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 57,
+        "best_epoch": 46,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 10889.5,
+      "original_code_version": "f3183df",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 49,
+        "best_epoch": 38,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1113.9,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 58,
+        "best_epoch": 47,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 6541.4,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4b",
+      "model": "BPR",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 54,
+        "best_epoch": 43,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1085.3,
+      "original_code_version": "e1c7f89",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4b",
+      "model": "SASRec",
+      "seed": 42,
+      "rerun_code_version": "4932567",
+      "is_rerun": true,
+      "epochs": {
+        "epochs": 300,
+        "epochs_trained": 23,
+        "best_epoch": 12,
+        "epochs_since_best": 11,
+        "stopping_step": 10,
+        "hit_epoch_cap": false
+      },
+      "versions": {
+        "torch": "2.10.0+cu128",
+        "recbole": "1.2.0",
+        "numpy": "1.26.4",
+        "cuda": "12.8",
+        "gpu": "Tesla T4"
+      },
+      "rerun_fit_seconds": 1506.6,
+      "original_code_version": "f3183df",
+      "test_metrics_equal": true,
+      "test_pairs_equal": true,
+      "peruser": {
+        "identical": true,
+        "n_users": 117386,
+        "max_abs_diff": {
+          "recall@10": 0.0,
+          "ndcg@10": 0.0,
+          "hit@10": 0.0,
+          "recall@20": 0.0,
+          "ndcg@20": 0.0,
+          "hit@20": 0.0
+        },
+        "n_users_topk_differ": 0
+      },
+      "identical": true
+    }
+  ],
+  "estimated_epochs_other_seeds": [
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C0",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 35.3,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=40 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C0",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 36.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=40 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C0",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 44.1,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=58 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C0",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 55.3,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=58 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 36.6,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=41 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 34.0,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=41 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 63.8,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=53 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 69.0,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=53 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1b",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 32.3,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=39 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1b",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 29.3,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=39 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1b",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 44.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=67 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C1b",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 47.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=67 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C3",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 45.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=43 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C3",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 43.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=43 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C3",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 46.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=48 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C3",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 55.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=48 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 44.1,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=37 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 34.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=37 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 62.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=48 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 52.3,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=48 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4b",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 42.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=43 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4b",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 42.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=43 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4b",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 46.8,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=53 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Grocery_and_Gourmet_Food",
+      "condition": "C4b",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 50.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=53 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C0",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 60.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=62 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C0",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 55.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=62 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C0",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 64.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=54 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C0",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 55.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=54 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 55.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=69 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 78.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=69 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 42.8,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=41 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 33.6,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=41 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1b",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 74.6,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=77 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1b",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 71.1,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=77 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1b",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 22.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=21 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C1b",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 31.4,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=21 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C3",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 80.7,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=58 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C3",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 55.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=58 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C3",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 40.0,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=57 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C3",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 38.0,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=57 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 50.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=49 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 47.3,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=49 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 48.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=58 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 54.5,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=58 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4b",
+      "model": "BPR",
+      "seed": 1337,
+      "estimated_epochs": 59.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=54 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4b",
+      "model": "BPR",
+      "seed": 2024,
+      "estimated_epochs": 56.9,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=54 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4b",
+      "model": "SASRec",
+      "seed": 1337,
+      "estimated_epochs": 28.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=23 x fit_1337 / fit_42 (orijinal kosular); +-%10 tahmin"
+    },
+    {
+      "category": "Toys_and_Games",
+      "condition": "C4b",
+      "model": "SASRec",
+      "seed": 2024,
+      "estimated_epochs": 24.2,
+      "cap": 300,
+      "near_cap": false,
+      "basis": "epochs_42=23 x fit_2024 / fit_42 (orijinal kosular); +-%10 tahmin"
+    }
+  ]
+}

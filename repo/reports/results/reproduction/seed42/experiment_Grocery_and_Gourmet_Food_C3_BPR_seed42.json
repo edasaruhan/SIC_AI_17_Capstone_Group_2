@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "category": "Grocery_and_Gourmet_Food",
+    "condition": "C3",
+    "model": "BPR",
+    "seed": 42,
+    "epochs": 300,
+    "epochs_trained": 43,
+    "hit_epoch_cap": false,
+    "best_epoch": 32,
+    "epochs_since_best": 11,
+    "stopping_step": 10,
+    "device": "cuda",
+    "versions": {
+      "torch": "2.10.0+cu128",
+      "recbole": "1.2.0",
+      "numpy": "1.26.4",
+      "cuda": "12.8",
+      "gpu": "Tesla T4"
+    },
+    "eval_batch_size": 67108864,
+    "tensorboard": "VersionError: Detected mismatched Protobuf Gencode/Runtime major versions when loading tensorboard/compat/proto/event.proto: gencode 6.31.1 runtime 5.29.5. Same major version is required. See Protobuf version guarantees at https://protobuf.dev/support/cross-version-runtime-guarantee.",
+    "runtime_seconds": {
+      "fit": 1220.4,
+      "test": 20.8
+    },
+    "code_version": "4932567",
+    "label_source": "distilled",
+    "reportable": true
+  },
+  "split": {
+    "train": 1896612,
+    "valid": 268991,
+    "test": 238756,
+    "n_test_before_self_rule": 268991,
+    "n_test_dropped_not_self": 30235,
+    "test_pairs_sha256": "2b3443240856e9da46cbcd959a427e8b67ccf0bbbcf9372317a49122ff0cf164"
+  },
+  "n_users": 268992,
+  "n_items": 119891,
+  "best_valid_score": 0.008416,
+  "best_valid": {
+    "recall@10": 0.016168,
+    "recall@20": 0.025726,
+    "ndcg@10": 0.008416,
+    "ndcg@20": 0.010813,
+    "hit@10": 0.016168,
+    "hit@20": 0.025726
+  },
+  "test": {
+    "recall@10": 0.013993,
+    "recall@20": 0.022291,
+    "ndcg@10": 0.007276,
+    "ndcg@20": 0.009353,
+    "hit@10": 0.013993,
+    "hit@20": 0.022291
+  },
+  "n_shadow_items_masked": 25031,
+  "eval_history_mask": "c0_train",
+  "n_extra_mask_pairs": 58183,
+  "peruser_file": "C3_BPR_seed42.parquet",
+  "peruser_consistency": {
+    "n_users": 238756,
+    "metrics_checked": [
+      "hit@10",
+      "hit@20",
+      "ndcg@10",
+      "ndcg@20",
+      "recall@10",
+      "recall@20"
+    ],
+    "max_abs_diff": 0.0,
+    "tolerance": 5.00001e-07
+  }
+}

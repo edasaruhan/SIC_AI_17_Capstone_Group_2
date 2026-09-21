@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "category": "Toys_and_Games",
+    "condition": "C4",
+    "model": "BPR",
+    "seed": 42,
+    "epochs": 300,
+    "epochs_trained": 49,
+    "hit_epoch_cap": false,
+    "best_epoch": 38,
+    "epochs_since_best": 11,
+    "stopping_step": 10,
+    "device": "cuda",
+    "versions": {
+      "torch": "2.10.0+cu128",
+      "recbole": "1.2.0",
+      "numpy": "1.26.4",
+      "cuda": "12.8",
+      "gpu": "Tesla T4"
+    },
+    "eval_batch_size": 67108864,
+    "tensorboard": "VersionError: Detected mismatched Protobuf Gencode/Runtime major versions when loading tensorboard/compat/proto/event.proto: gencode 6.31.1 runtime 5.29.5. Same major version is required. See Protobuf version guarantees at https://protobuf.dev/support/cross-version-runtime-guarantee.",
+    "runtime_seconds": {
+      "fit": 1113.9,
+      "test": 8.3
+    },
+    "code_version": "4932567",
+    "label_source": "distilled",
+    "reportable": true
+  },
+  "split": {
+    "train": 1225428,
+    "valid": 268652,
+    "test": 117386,
+    "n_test_before_self_rule": 268652,
+    "n_test_dropped_not_self": 151266,
+    "test_pairs_sha256": "3bed366ea0ca4bab7aab37789c0526aeece59ee823bf12db88611baae46f070c"
+  },
+  "n_users": 268653,
+  "n_items": 103587,
+  "best_valid_score": 0.007592,
+  "best_valid": {
+    "recall@10": 0.013542,
+    "recall@20": 0.019241,
+    "ndcg@10": 0.007592,
+    "ndcg@20": 0.009022,
+    "hit@10": 0.013542,
+    "hit@20": 0.019241
+  },
+  "test": {
+    "recall@10": 0.012003,
+    "recall@20": 0.017481,
+    "ndcg@10": 0.006853,
+    "ndcg@20": 0.008224,
+    "hit@10": 0.012003,
+    "hit@20": 0.017481
+  },
+  "n_shadow_items_masked": 0,
+  "eval_history_mask": "c0_train",
+  "n_extra_mask_pairs": 401215,
+  "peruser_file": "C4_BPR_seed42.parquet",
+  "peruser_consistency": {
+    "n_users": 117386,
+    "metrics_checked": [
+      "hit@10",
+      "hit@20",
+      "ndcg@10",
+      "ndcg@20",
+      "recall@10",
+      "recall@20"
+    ],
+    "max_abs_diff": 0.0,
+    "tolerance": 5.00001e-07
+  }
+}
