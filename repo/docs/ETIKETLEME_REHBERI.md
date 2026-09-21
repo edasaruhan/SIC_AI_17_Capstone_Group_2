@@ -381,6 +381,15 @@ Dosyayı **adını değiştirmeden** kaydedip geri gönderin.
 > etiketlerine karşı ölçüldü. A'nın "kendi çocuğu" notlarının 131'i `KENDI_COCUGU`
 > koduna çevrildi. Sonuçlar ve sınırlılıklar: `DECISIONS.md`, 2026-09-14.
 > Aşağısı özgün üç kişilik tasarımı anlatıyor.
+>
+> **Güncelleme (2026-09-21) — B ve C şimdi etiketliyor.** Sizin işiniz hiç değişmedi:
+> aynı 500 satır, aynı kurallar, birbirinizle ve A ile konuşmadan, modelin cevabını ve
+> A'nın dosyasını görmeden. Değişen tek şey sonuçtan sonra ne olacağı. Bu tur deney
+> bittikten sonra yapıldığı için κ düşük çıkarsa aşağıda yazan **şema sadeleştirme
+> yapılmayacak**: sonuç PASS ya da FAIL olarak olduğu gibi raporlanacak. Raporlanmış
+> sayılar A'nın etiketleriyle kalacak; üçünüzün çoğunluğu yanlarına ikinci bir ölçüm
+> olarak yazılacak. Bu kurallar siz başlamadan önce yazıldı (`DECISIONS.md`,
+> 2026-09-21 ön kaydı).
 
 Üç dosya toplandığında tek bir komut çalışıyor ve üç sayı çıkıyor:
 
