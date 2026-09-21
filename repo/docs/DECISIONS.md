@@ -2600,3 +2600,75 @@ raporda, deck'te ve one-pager'da olduğu gibi duruyor.
 `analysis/validation.py` (yalnızca figür metinleri), kök `README.md`, `docs/GENEL_BAKIS.md`,
 `docs/SONUCLAR.md`, `implementation-plan/implementation-plan.md`
 **Kim:** Ekip
+
+---
+
+### 2026-09-21 — ÖNCEDEN KAYIT: B/C etiketlemesi, seed 42 yeniden koşusu, iki post-hoc analiz (YENİ HİÇBİR SONUÇ GÖRÜLMEDEN)
+
+> Bu kayıt, B ve C'nin sayfaları geri gelmeden ve Kaggle yeniden koşusu başlamadan commit
+> edildi. Aşağıdaki kurallar o sonuçlar görüldükten sonra değiştirilmez.
+
+**Karar (kullanıcı, 2026-09-21):** İki açık sınırlılık kapatılmaya çalışılacak. (1) 500
+satırlık doğrulama setini iki ekip üyesi (B, C) de etiketleyecek. (2) Seed 42'nin 24 hücresi
+Kaggle'da bugünkü kodla yeniden koşacak.
+
+#### κ — Hafta 4 kapısı
+
+- İstatistik **Fleiss κ**, A + B + C, beş sınıf. Eşik `validation.kappa_min` = **0,60**,
+  seyrek sınıf kuralı `validation.min_class_n_for_kappa` = 20. Üçü de 2026-08-29'dan beri
+  config'te; **değişmiyor**.
+- Karar PASS ya da FAIL yazılır. **FAIL çıkarsa** yeniden etiketleme yapılmaz, rehber
+  revize edilip ikinci tur açılmaz, eşik gevşetilmez: sonuç olduğu gibi raporlanır.
+- B ve C **bağımsız** etiketler: birbirleriyle ve A ile konuşmadan, A'nın sayfasını ve model
+  çıktısını görmeden, `docs/ETIKETLEME_REHBERI.md` ile. Sayfalar körlenmiş (LLM'in cevabı
+  yok) — 2026-08-26'dan beri öyle üretiliyor.
+
+#### Referans — yayımlanan sayılar A'ya göre kalır
+
+- 2026-09-14 kaydı ölçüm yöntemlerini tek etiketleyiciyle sabitledi ve aşağı akıştaki her sayı
+  A referansıyla üretildi: kalibre yaygınlık (RQ1), etiket kalitesi
+  (`label_quality_population`), damıtma kapısının 3. ölçütü, deneyin yorum kuralının yanında
+  duran K/D değerleri. Referansı şimdi çoğunluk uzlaşısına çevirmek, sonuç görüldükten sonra
+  tanım değiştirmek olurdu. **Birincil referans A kalır** (`validation.primary_reference: A`).
+- **Çoğunluk uzlaşısı** (üçün en az ikisi; uzlaşısız `tie` satırları dışarıda) **duyarlılık**
+  bloğu olarak eklenir: LLM–insan ölçümleri ve kalibre yaygınlık. Birincil sayının yerine
+  geçmez.
+- Damıtma kapısının 3. ölçütü çoğunluk referansıyla **yeniden hesaplanamaz**: öğrencinin 500
+  satırdaki satır bazlı tahminleri saklanmadı, Kaggle raporunda yalnızca toplamlar var. Bu
+  açıkça yazılır.
+
+#### Seed 42 yeniden koşusu
+
+- İki amaç: (a) 72 koşunun hiçbirinde kaydedilmemiş **epoch sayısı** (SONUCLAR §7 madde 6);
+  (b) bugünkü kodun yayımlanan sayıları ürettiğinin **doğrudan** sınanması.
+- Girdi: 2026-09-15'te yüklenen özel dataset. Yereldeki `.inter` dosyalarıyla SHA-256
+  düzeyinde aynı (ölçüldü 2026-09-21). Notebook girdilerin özetini oturum özetine yazacak.
+- **"Birebir aynı"** için üçü birden gerekir: kullanıcı başı parquet'in bütün metrik kolonları
+  ve top-K listeleri eşit · rapordaki `test` metrikleri eşit · `test_pairs_sha256` eşit. Biri
+  tutmazsa fark hücre hücre raporlanır ve **orijinal 72 koşu birincil kalır**; yeniden
+  koşunun sayıları hiçbir sonuç tablosuna girmez.
+- Seed 1337 ve 2024'ün epoch sayısı ölçülmez, **tahmin edilir**: `epochs_42 × fit_s / fit_42`
+  (aynı hücrede epoch başına sürenin sabit olduğu varsayımıyla; ikiz koşularda süre %7'ye kadar
+  oynuyordu). "Tahmin (±%10)" diye etiketlenir.
+- Herhangi bir koşu 300 tavanına **değerse** (ya da tahmini tavanın %90'ını aşarsa) iş durur ve
+  kullanıcıyla karar verilir. Daha yüksek tavanla yeniden koşu şimdiden kararlaştırılmıyor.
+
+#### İki post-hoc analiz (sonuçlar görüldükten SONRA tanımlandı)
+
+2026-09-21 denetiminde bulundu. 72 koşunun sonuçları görülmüştü; aşağıdaki iki analizin
+**nokta tahminlerine de** denetim sırasında bakıldı. İkisi de `post_hoc: true` damgası
+taşır, hiçbir birincil sayının yerine geçmez (`analysis/robustness.py`).
+
+1. **Seed düzeyi.** Önceden kayıtlı her karşıtlığın üç seed'deki farkı, ortalaması, sd'si ve
+   işaret uyumu. Sebep: eşli bootstrap kullanıcıları yeniden örnekliyor; eğitimin (seed'in)
+   değişkenliğini kapsamıyor.
+2. **Maruziyet ayrıştırması.** Test kullanıcıları dört gruba ayrılır: "C1 bu kullanıcının bir
+   eğitim satırını sildi mi" × "C4 sildi mi" (C1b × C4b için de aynı). Her grupta eşli
+   bootstrap. Sebep: plasebo satır **sayısını** korpus düzeyinde eşliyor, kullanıcı düzeyinde
+   eşlemiyor.
+
+**Etkilediği bölüm:** `configs/base.yaml` (`validation`), `analysis/validation.py`,
+`analysis/prevalence.py`, `analysis/robustness.py` (yeni), `analysis/reproduction.py` (yeni),
+`recsys/run_experiment.py` (yalnızca rapor alanları), `scripts/kaggle_experiment.py`
+(yalnızca girdi özeti)
+**Kim:** Kullanıcı (ekip adına) · kayıt: ekip
