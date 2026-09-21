@@ -1,6 +1,6 @@
 {
   "meta": {
-    "code_version": "791d9d4",
+    "code_version": "05df87b",
     "frame": "main",
     "n_per_category": 10000,
     "model": "Qwen/Qwen3-4B-Instruct-2507",
@@ -223,7 +223,8 @@
       "annotators": [
         "A"
       ],
-      "reliability_measured": false
+      "reliability_measured": false,
+      "primary_reference": "A"
     },
     "ppv": {
       "narrow": {
