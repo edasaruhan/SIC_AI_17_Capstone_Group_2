@@ -125,10 +125,12 @@ def _texts(df: pl.DataFrame) -> list[str]:
 # ------------------------------------------------------------------ prepare
 def _validation_frame(cfg: Config) -> pl.DataFrame:
     """A'nin etiketleri + LLM etiketi, `(category, row_id)` anahtariyla."""
-    from ..analysis.validation import label_columns, load_labels, reference_labels  # noqa: PLC0415
+    from ..analysis.validation import label_columns, load_labels, primary_reference  # noqa: PLC0415
 
     df = load_labels(cfg)
-    df = df.with_columns(reference_labels(df, label_columns(df)))
+    # Birincil referans (on kayit 2026-09-21): B ve C gelse de damitma kapisinin insan
+    # olcutu A'ya karsi kalir - kapi o referansla PASS verdi.
+    df = df.with_columns(primary_reference(cfg, df, label_columns(df)))
     return df.select("val_id", "category", "row_id", "reference", "purchase_type")
 
 

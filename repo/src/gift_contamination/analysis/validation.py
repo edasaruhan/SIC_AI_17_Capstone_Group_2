@@ -186,6 +186,45 @@ def reference_labels(df: pl.DataFrame, cols: list[str]) -> pl.Series:
     return consensus(df, cols).alias("reference")
 
 
+MAJORITY = "majority"
+
+
+def primary_reference_name(cfg: Config, cols: list[str]) -> str:
+    """Birincil referansin adi: bir etiketleyici harfi ya da `majority`.
+
+    ON KAYIT 2026-09-21. B ve C deney bittikten sonra etiketliyor; yayimlanan her sayi
+    (kalibre yayginlik, etiket kalitesi, damitma kapisinin 3. olcutu) A referansiyla
+    uretildi. Referansi sonuc gorulduKTEN sonra cogunluga cevirmek tanim degistirmek
+    olurdu: `validation.primary_reference: A`. Cogunluk uzlasisi duyarlilik bloguna
+    gider. Anahtar yoksa ozgun tasarim: tek etiketleyicide o, cokta cogunluk.
+    """
+    secim = cfg.get("validation.primary_reference", None)
+    if secim is None:
+        return cols[0].removeprefix("label_") if len(cols) == 1 else MAJORITY
+    secim = str(secim)
+    if secim == MAJORITY:
+        if len(cols) < 2:
+            raise ValueError("cogunluk referansi tek etiketleyiciyle kurulamaz "
+                             f"(validation.primary_reference={secim!r}, etiketleyici {cols})")
+        return MAJORITY
+    if f"label_{secim}" not in cols:
+        raise ValueError(f"validation.primary_reference={secim!r} ama etiketleyici kolonlari {cols}")
+    return secim
+
+
+def reference_by_name(df: pl.DataFrame, cols: list[str], name: str) -> pl.Series:
+    """`primary_reference_name`in dondurdugu ada gore referans kolonu."""
+    if name == MAJORITY:
+        return consensus(df, cols).alias("reference")
+    return df[f"label_{name}"].alias("reference")
+
+
+def primary_reference(cfg: Config, df: pl.DataFrame, cols: list[str]) -> pl.Series:
+    """Birincil referans kolonu. Insan etiketini okuyan HER modul bunu kullanir
+    (dogrulama, kalibrasyon, damitma paketi) - uc yerde uc ayri kural olmasin."""
+    return reference_by_name(df, cols, primary_reference_name(cfg, cols))
+
+
 def consensus(df: pl.DataFrame, cols: list[str]) -> pl.Series:
     """Cogunluk etiketi; cogunluk yoksa `tie`.
 
@@ -649,7 +688,8 @@ def kendi_cocugu_table(df: pl.DataFrame, tag: str) -> dict | None:
 
 # ------------------------------------------------------------------- figur
 def fig_llm_vs_human(
-    cfg: Config, per_class: dict, out: Path, *, n_annotators: int = 3
+    cfg: Config, per_class: dict, out: Path, *, n_annotators: int = 3,
+    reference: str = MAJORITY,
 ) -> Path:
     """F18 - sinif bazli F1. Baslik OLCUMU yazar, sonuc ilan etmez."""
     viz.apply_style(cfg.get("eda.figure_dpi"))
@@ -671,12 +711,14 @@ def fig_llm_vs_human(
         ax.text(min(value + 0.02, 0.95), bar.get_y() + bar.get_height() / 2,
                 f"{value:.2f}", va="center", fontsize=9)
 
-    referans = (
-        "The single annotator's (A) labels are the reference; label reliability "
-        "was NOT measured."
-        if n_annotators == 1
-        else f"The majority of {n_annotators} independent annotators is the reference."
-    )
+    if n_annotators == 1:
+        referans = ("The single annotator's (A) labels are the reference; label reliability "
+                    "was NOT measured.")
+    elif reference == MAJORITY:
+        referans = f"The majority of {n_annotators} independent annotators is the reference."
+    else:
+        referans = (f"Annotator {reference}'s labels are the reference (pre-registered); the "
+                    f"agreement of all {n_annotators} annotators is the gate, reported separately.")
     viz.titles(
         ax,
         f"F18 · per-class F1 of the LLM labels — {sum(n)} rows",
@@ -688,46 +730,13 @@ def fig_llm_vs_human(
     return viz.save(fig, out, log)
 
 
-# --------------------------------------------------------------------- kosu
-def evaluate(cfg: Config, n: int | None = None) -> dict:
-    n = int(n if n is not None else cfg.get("validation.n"))
-    tags, mode = annotator_mode(cfg)
-    df = load_labels(cfg, n)
-    cols = label_columns(df)
-    min_class_n = int(cfg.get("validation.min_class_n_for_kappa"))
-    threshold = float(cfg.get("validation.kappa_min"))
-    n_boot = int(cfg.get("validation.bootstrap_n"))
-    seed = int(cfg.get("seed"))
+def _measure(cfg: Config, df: pl.DataFrame, *, n_boot: int, seed: int,
+             min_class_n: int) -> dict:
+    """Referansa karsi butun olcumler. `df` bir `reference` kolonu tasimali.
 
-    kappa = None
-    if mode == "fleiss":
-        kappa = kappa_report(df, cols, min_class_n=min_class_n)
-        # Karsilastirma YUVARLANMAMIS deger uzerinden. Bkz. `kappa_report`.
-        exact = kappa["kappa_exact"]
-        agreement = {
-            **kappa,
-            "threshold": threshold,
-            "passed": None if exact is None else bool(exact >= threshold),
-        }
-    else:
-        # Tek etiketleyici: uyum OLCULEMEZ. `passed: None` -> INCOMPLETE.
-        # PASS yazmak olculmemis bir seyi gecmis gibi gosterirdi; FAIL yazmak
-        # ise olculmemis bir seyi basarisiz ilan ederdi. Ikisi de yanlis.
-        agreement = {
-            "skipped": True,
-            "passed": None,
-            "reason": (
-                f"tek etiketleyici ({', '.join(tags)}); etiket guvenilirligi "
-                "olculmedi - kullanici karari 2026-09-14 (DECISIONS)"
-            ),
-            "design": {
-                "planned_annotators": 3,
-                "planned_statistic": "Fleiss kappa",
-                "threshold": threshold,
-            },
-        }
-
-    df = df.with_columns(reference_labels(df, cols))
+    Birincil referansla BIR KEZ, (cok etiketleyicide) cogunluk referansiyla bir kez
+    daha cagrilir - iki blok ayni kodla uretilsin (on kayit 2026-09-21).
+    """
     # `tie` satirlari referans olamaz: uzlasi yok demek dogru cevap yok demek.
     # Tek etiketleyicide tie olusmaz.
     usable = df.filter(pl.col("reference").is_not_null() & (pl.col("reference") != TIE))
@@ -790,6 +799,79 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
                 w, main_keys, etiketler, n_boot=n_boot, seed=seed,
             )
 
+    return {
+        "n_tie": int((df["reference"] == TIE).sum()),
+        "n_usable": usable.height,
+        "reference_distribution": dict(
+            sorted(usable.group_by("reference").len().iter_rows())
+        ),
+        # DIKKAT: bunlar KAPI DEGIL. F1 icin hicbir esik sabitlenmedi ve
+        # sonucu gordukten sonra esik uydurmak kapiyi sonradan kurmaktir.
+        "llm_vs_human": vs_llm,
+        "llm_vs_human_sample_ci": sample_ci,
+        "llm_vs_human_main_weighted": weighted,
+        # Deneyin kullandigi ikili kararlar. Damitma kapisi ogretmenin C1
+        # F1'ini buradan (`sample`) okur - onceden kayitli kural.
+        "contamination_axes": eksenler,
+        # Vekilin ILK bagimsiz olcumu. Onceki 0,58/0,61 yazar destekliydi.
+        "proxy_vs_human_gift_only": vs_proxy,
+    }
+
+
+# --------------------------------------------------------------------- kosu
+def evaluate(cfg: Config, n: int | None = None) -> dict:
+    n = int(n if n is not None else cfg.get("validation.n"))
+    tags, mode = annotator_mode(cfg)
+    df = load_labels(cfg, n)
+    cols = label_columns(df)
+    min_class_n = int(cfg.get("validation.min_class_n_for_kappa"))
+    threshold = float(cfg.get("validation.kappa_min"))
+    n_boot = int(cfg.get("validation.bootstrap_n"))
+    seed = int(cfg.get("seed"))
+
+    kappa = None
+    if mode == "fleiss":
+        kappa = kappa_report(df, cols, min_class_n=min_class_n)
+        # Karsilastirma YUVARLANMAMIS deger uzerinden. Bkz. `kappa_report`.
+        exact = kappa["kappa_exact"]
+        agreement = {
+            **kappa,
+            "threshold": threshold,
+            "passed": None if exact is None else bool(exact >= threshold),
+        }
+    else:
+        # Tek etiketleyici: uyum OLCULEMEZ. `passed: None` -> INCOMPLETE.
+        # PASS yazmak olculmemis bir seyi gecmis gibi gosterirdi; FAIL yazmak
+        # ise olculmemis bir seyi basarisiz ilan ederdi. Ikisi de yanlis.
+        agreement = {
+            "skipped": True,
+            "passed": None,
+            "reason": (
+                f"tek etiketleyici ({', '.join(tags)}); etiket guvenilirligi "
+                "olculmedi - kullanici karari 2026-09-14 (DECISIONS)"
+            ),
+            "design": {
+                "planned_annotators": 3,
+                "planned_statistic": "Fleiss kappa",
+                "threshold": threshold,
+            },
+        }
+
+    ref_adi = primary_reference_name(cfg, cols)
+    df = df.with_columns(reference_by_name(df, cols, ref_adi))
+    olcum = _measure(cfg, df, n_boot=n_boot, seed=seed, min_class_n=min_class_n)
+    vs_llm = olcum["llm_vs_human"]
+    weighted = olcum["llm_vs_human_main_weighted"]
+    eksenler = olcum["contamination_axes"]
+    vs_proxy = olcum["proxy_vs_human_gift_only"]
+    # DUYARLILIK (on kayit 2026-09-21): birincil referans tek bir etiketleyiciyse ve
+    # birden cok etiketleyici varsa, ayni olcumler cogunluk uzlasisiyla. Birincil
+    # sayinin yerine GECMEZ.
+    cogunluk = None
+    if len(cols) > 1 and ref_adi != MAJORITY:
+        cogunluk = _measure(cfg, df.with_columns(reference_by_name(df, cols, MAJORITY)),
+                            n_boot=n_boot, seed=seed, min_class_n=min_class_n)
+
     kendi = {t: kendi_cocugu_table(df, t) for t in tags}
 
     limitations = []
@@ -801,6 +883,14 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
         limitations = [
             "Referans tek etiketleyicinin yargisi; etiket guvenilirligi olculmedi.",
             f"Belirsizlik isareti (EMIN_DEGIL) kullanilan satir: {emin_degil}.",
+            "Agirliksiz olcumler katmanlama nedeniyle household/gift_given yonunde "
+            "yanli; populasyon icin agirlikli olcum okunmali.",
+        ]
+    elif ref_adi != MAJORITY:
+        limitations = [
+            f"Referans {ref_adi}'nin etiketi (on kayit 2026-09-21): yayimlanan sayilar "
+            "tek etiketleyiciyle uretildi ve oyle kaliyor. Etiketleyicilerin cogunlugu "
+            "`measurements_majority_reference` blogunda - duyarlilik, birincil degil.",
             "Agirliksiz olcumler katmanlama nedeniyle household/gift_given yonunde "
             "yanli; populasyon icin agirlikli olcum okunmali.",
         ]
@@ -823,27 +913,21 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
             "code_version": code_version(),
             "thresholds_fixed": "2026-08-29, configs/base.yaml -> validation",
             "methods_registered": "2026-09-14, DECISIONS (A modelle karsilastirilmadan once)",
+            # Olcumlerin hangi referansa karsi yapildigi: etiketleyici harfi ya da
+            # `majority` (on kayit 2026-09-21).
+            "primary_reference": ref_adi,
         },
         # TEK kapi olcutu. Digerleri olcum.
         "criteria": {"1_annotator_agreement": agreement},
-        "measurements": {
-            "n_tie": int((df["reference"] == TIE).sum()),
-            "n_usable": usable.height,
-            "reference_distribution": dict(
-                sorted(usable.group_by("reference").len().iter_rows())
-            ),
-            # DIKKAT: bunlar KAPI DEGIL. F1 icin hicbir esik sabitlenmedi ve
-            # sonucu gordukten sonra esik uydurmak kapiyi sonradan kurmaktir.
-            "llm_vs_human": vs_llm,
-            "llm_vs_human_sample_ci": sample_ci,
-            "llm_vs_human_main_weighted": weighted,
-            # Deneyin kullandigi ikili kararlar. Damitma kapisi ogretmenin C1
-            # F1'ini buradan (`sample`) okur - onceden kayitli kural.
-            "contamination_axes": eksenler,
-            # Vekilin ILK bagimsiz olcumu. Onceki 0,58/0,61 yazar destekliydi.
-            "proxy_vs_human_gift_only": vs_proxy,
-            "kendi_cocugu": kendi,
-        },
+        "measurements": {**olcum, "kendi_cocugu": kendi},
+        **({"measurements_majority_reference": {
+            "sensitivity": True,
+            "reference": f"{len(cols)} etiketleyicinin cogunlugu; uzlasisiz (tie) satirlar disarida",
+            "note": ("On kayit 2026-09-21: birincil sayinin yerine GECMEZ. Damitma kapisinin "
+                     "3. olcutu burada yeniden hesaplanamaz - ogrencinin satir bazli "
+                     "tahminleri saklanmadi."),
+            **cogunluk,
+        }} if cogunluk is not None else {}),
         "limitations": limitations,
         "verdict": (
             "PASS" if agreement["passed"]
@@ -853,7 +937,8 @@ def evaluate(cfg: Config, n: int | None = None) -> dict:
     }
 
     if vs_llm["per_class"]:
-        fig_llm_vs_human(cfg, vs_llm["per_class"], figure_path(cfg, n), n_annotators=len(cols))
+        fig_llm_vs_human(cfg, vs_llm["per_class"], figure_path(cfg, n), n_annotators=len(cols),
+                         reference=ref_adi)
     write_json(report, validation_report_path(cfg, n), log)
 
     log.info("HAFTA 4 -> %s", report["verdict"])

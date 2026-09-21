@@ -574,3 +574,84 @@ def test_macro_f1_averages_the_unrounded_class_f1s():
     assert out["per_class"]["a"]["f1"] == 0.667
     assert out["per_class"]["b"]["f1"] == 0.667
     assert out["macro_f1"] == 0.6667
+
+
+# ------------------------------------ birincil referans (ON KAYIT 2026-09-21)
+YAYIMLANAN = ("n_tie", "n_usable", "reference_distribution", "llm_vs_human",
+              "llm_vs_human_sample_ci", "llm_vs_human_main_weighted",
+              "contamination_axes", "proxy_vs_human_gift_only")
+
+
+def _abc():
+    """A, B, C ve model. B/C A'dan uc satirda ayrilir; bir satirda uzlasi yok (tie)."""
+    a = ["gift_given"] * 6 + ["household"] * 6 + ["self"] * 6 + ["unclear"] * 6
+    llm = list(a)
+    llm[0], llm[7], llm[13] = "household", "gift_given", "unclear"
+    b, c = list(a), list(a)
+    b[1] = c[1] = "household"          # cogunluk A'yi eziyor: gift_given -> household
+    b[8] = "self"                      # A'yi C destekliyor: cogunluk = A
+    b[14], c[14] = "household", "unclear"   # A self, B household, C unclear -> tie
+    return a, b, c, llm
+
+
+def test_primary_reference_a_leaves_every_published_number_unchanged(cfg: Config):
+    """B ve C sonradan etiketlese de yayimlanan olcumler A'ya gore KALIR.
+
+    On kayit 2026-09-21: referansi sonuc gorulduKTEN sonra cogunluga cevirmek tanim
+    degistirmek olurdu. Kappa kapisi yine hesaplanir; cogunluk ayri blokta.
+    """
+    a, b, c, llm = _abc()
+    cfg._data["validation"].update({"n": 24, "min_class_n_for_kappa": 4, "primary_reference": "A"})
+
+    _write_labeled(cfg, {"A": a}, llm=llm)
+    _single(cfg)
+    tek = evaluate(cfg, 24)
+
+    _write_labeled(cfg, {"A": a, "B": b, "C": c}, llm=llm)
+    cfg._data["validation"].update({"annotators": ["A", "B", "C"], "reliability": "fleiss"})
+    uc = evaluate(cfg, 24)
+
+    for anahtar in YAYIMLANAN:
+        assert uc["measurements"][anahtar] == tek["measurements"][anahtar], anahtar
+    assert uc["meta"]["primary_reference"] == "A" and tek["meta"]["primary_reference"] == "A"
+    assert uc["verdict"] in ("PASS", "FAIL")
+    assert uc["criteria"]["1_annotator_agreement"]["kappa"] is not None
+    assert "measurements_majority_reference" not in tek
+
+    cogunluk = uc["measurements_majority_reference"]
+    assert cogunluk["sensitivity"] is True
+    assert cogunluk["n_tie"] == 1 and cogunluk["n_usable"] == 23
+    assert uc["measurements"]["n_tie"] == 0 and uc["measurements"]["n_usable"] == 24
+    assert cogunluk["llm_vs_human"] != uc["measurements"]["llm_vs_human"]
+
+
+def test_the_primary_reference_must_be_a_configured_annotator(cfg: Config):
+    a, b, c, llm = _abc()
+    _write_labeled(cfg, {"A": a, "B": b, "C": c}, llm=llm)
+    cfg._data["validation"].update({"n": 24, "min_class_n_for_kappa": 4, "primary_reference": "D"})
+
+    with pytest.raises(ValueError, match="primary_reference"):
+        evaluate(cfg, 24)
+
+
+def test_a_majority_reference_needs_more_than_one_annotator(cfg: Config):
+    a, _, _, llm = _abc()
+    _write_labeled(cfg, {"A": a}, llm=llm)
+    _single(cfg)
+    cfg._data["validation"].update({"n": 24, "primary_reference": "majority"})
+
+    with pytest.raises(ValueError, match="cogunluk"):
+        evaluate(cfg, 24)
+
+
+def test_without_the_key_the_original_design_stands(cfg: Config):
+    """Anahtar yoksa ozgun tasarim: cokta cogunluk, sensitivity blogu yok."""
+    a, b, c, llm = _abc()
+    _write_labeled(cfg, {"A": a, "B": b, "C": c}, llm=llm)
+    cfg._data["validation"].update({"n": 24, "min_class_n_for_kappa": 4})
+
+    rapor = evaluate(cfg, 24)
+
+    assert rapor["meta"]["primary_reference"] == "majority"
+    assert rapor["measurements"]["n_tie"] == 1
+    assert "measurements_majority_reference" not in rapor

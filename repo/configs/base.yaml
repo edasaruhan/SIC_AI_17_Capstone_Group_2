@@ -257,6 +257,11 @@ validation:
   # Hafta 4 kapısı INCOMPLETE kalır, asla PASS yazılmaz. Etiketleyici sayısıyla
   # tutarsız bir değer gürültülü hata verir. Kullanıcı kararı, 2026-09-14.
   reliability: none
+  # Ölçümlerin (LLM–insan, kalibre yaygınlık, damıtma paketi) referansı: bir etiketleyici
+  # harfi ya da `majority`. ÖN KAYIT 2026-09-21: B ve C deneyden SONRA etiketliyor;
+  # yayımlanan sayılar A'yla üretildi ve A'yla kalır. Birden çok etiketleyici varken
+  # çoğunluk uzlaşısı ayrıca `*_majority_reference` duyarlılık bloklarına yazılır.
+  primary_reference: A
   # Ölçüm yöntemi (2026-09-14, A'nın etiketleri modelle karşılaştırılmadan ÖNCE):
   # ters olasılık ağırlığında bu değerin altındaki (kategori × LLM sınıfı)
   # hücresinin kütlesi o sınıfın bütün kategorilerine dağıtılır; kalibrasyonda

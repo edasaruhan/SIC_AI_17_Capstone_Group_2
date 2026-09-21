@@ -300,7 +300,8 @@ def test_calibration_end_to_end_matches_a_hand_computed_case(cfg: Config):
     lo, hi = kal["by_category"][slug]["narrow"]["ci95_pct"]
     assert lo <= 20.0 <= hi
     assert kal["ppv"]["narrow"]["gift_given"] == {"value": 0.6, "n": 10, "source": "main"}
-    assert kal["reference"] == {"annotators": ["A"], "reliability_measured": False}
+    assert kal["reference"] == {"annotators": ["A"], "reliability_measured": False,
+                                "primary_reference": "A"}
 
 
 def test_calibration_is_skipped_not_invented_without_labels(annotated: Config):
@@ -391,3 +392,49 @@ def test_a_category_interval_does_not_depend_on_processing_order(cfg: Config):
 
     assert ab["X"]["narrow"]["ci95_pct"] == ba["X"]["narrow"]["ci95_pct"]
     assert ab["Y"]["broad"]["ci95_pct"] == ba["Y"]["broad"]["ci95_pct"]
+
+
+def test_calibration_keeps_the_primary_reference_and_adds_the_majority_beside_it(cfg: Config):
+    """On kayit 2026-09-21: B ve C gelse de kalibre oran A'ya gore KALIR.
+
+    Elle hesap (yukaridaki vaka): A ile dar %20,0. B ve C, A'nin `gift_given`
+    dedigi ilk satirda `self` diyor -> cogunlukta LLM=gift sinifinin PPV'si
+    6/10 -> 5/10, dar oran 0,2*0,5 + 0,8*0,1 = %18,0. Bu yalnizca duyarlilik blogunda.
+    """
+    from gift_contamination.analysis.prevalence import evaluate as prev_eval
+    from gift_contamination.data.labelsheet import (
+        LABEL_SOURCE, LABEL_SOURCE_COLUMN, labeled_path,
+    )
+    from gift_contamination.data.sampling import validation_path
+
+    cfg._data["validation"].update({"n": 20, "bootstrap_n": 60, "primary_reference": "A",
+                                    "annotators": ["A", "B", "C"], "reliability": "fleiss"})
+    dest = annotation_path(cfg, "pilot")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "sample_frame": ["main"] * 100,
+        "purchase_type": ["gift_given"] * 20 + ["self"] * 80,
+        "backend": ["vllm"] * 100, "model": ["m"] * 100, "prompt_version": ["v3"] * 100,
+    }).write_parquet(dest)
+    llm = ["gift_given"] * 10 + ["self"] * 10
+    a = ["gift_given"] * 6 + ["household"] * 4 + ["self"] * 9 + ["gift_given"]
+    bc = ["self"] + a[1:]
+    csv = labeled_path(validation_path(cfg, 20))
+    csv.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame({
+        "val_id": list(range(1, 21)), "category": [cfg.category_slug("pilot")] * 20,
+        "sample_frame": ["main"] * 20, "purchase_type": llm, "val_stratum": llm,
+        "label_A": a, "label_B": bc, "label_C": bc,
+        "notes_A": [None] * 20, "notes_B": [None] * 20, "notes_C": [None] * 20,
+        LABEL_SOURCE_COLUMN: [LABEL_SOURCE] * 20,
+    }).write_csv(csv)
+
+    rapor = prev_eval(cfg, ["pilot"])
+    slug = cfg.category_slug("pilot")
+
+    assert rapor["calibration"]["by_category"][slug]["narrow"]["calibrated_pct"] == pytest.approx(20.0)
+    assert rapor["calibration"]["reference"]["primary_reference"] == "A"
+    duy = rapor["calibration_majority_reference"]
+    assert duy["sensitivity"] is True
+    assert duy["by_category"][slug]["narrow"]["calibrated_pct"] == pytest.approx(18.0)
+    assert duy["reference"]["primary_reference"] == "majority"

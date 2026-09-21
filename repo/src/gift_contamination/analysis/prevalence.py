@@ -56,11 +56,13 @@ from ..utils.stats import Z95, wilson_interval
 from ..utils.logging import get_logger
 from . import viz
 from .validation import (
+    MAJORITY,
     TIE,
     annotator_mode,
     label_columns,
     load_labels,
-    reference_labels,
+    primary_reference_name,
+    reference_by_name,
     validation_report_path,
 )
 
@@ -205,11 +207,12 @@ def _by_class(df: pl.DataFrame) -> dict[str, list[str]]:
     return out
 
 
-def calibration(cfg: Config, kategoriler: dict) -> dict:
+def calibration(cfg: Config, kategoriler: dict, reference: str | None = None) -> dict:
     """Insan kalibrasyonlu yaygınlık - dort kategori, iki tanim, bootstrap GA.
 
     Dogrulama etiketleri henuz yoksa blok `skipped` doner; yaygınlık tablosu
-    kalibrasyonsuz uretilmeye devam eder.
+    kalibrasyonsuz uretilmeye devam eder. `reference` verilmezse BIRINCIL referans
+    (`validation.primary_reference`, on kayit 2026-09-21); `majority` duyarlilik icin.
     """
     try:
         df = load_labels(cfg)
@@ -217,7 +220,9 @@ def calibration(cfg: Config, kategoriler: dict) -> dict:
         return {"skipped": True, "reason": "dogrulama etiketleri henuz yok"}
 
     tags, mode = annotator_mode(cfg)
-    df = df.with_columns(reference_labels(df, label_columns(df)))
+    cols = label_columns(df)
+    ref_adi = reference if reference is not None else primary_reference_name(cfg, cols)
+    df = df.with_columns(reference_by_name(df, cols, ref_adi))
     df = df.filter(pl.col("reference").is_not_null() & (pl.col("reference") != TIE))
     min_cell_n = int(cfg.get("validation.min_cell_n"))
     n_boot = int(cfg.get("validation.bootstrap_n"))
@@ -340,6 +345,7 @@ def calibration(cfg: Config, kategoriler: dict) -> dict:
         "reference": {
             "annotators": tags,
             "reliability_measured": mode != "none",
+            "primary_reference": ref_adi,
         },
         "ppv": {
             ad: {
@@ -481,6 +487,16 @@ def evaluate(cfg: Config, roles: list[str]) -> dict:
     # Insan dogrulamasinin DURUMU iddia edilmiyor, diskten okunuyor.
     durum = human_validation_status(cfg)
     kalibrasyon = calibration(cfg, kategoriler)
+    # DUYARLILIK (on kayit 2026-09-21): birden cok etiketleyici varsa ve birincil
+    # referans tek kisiyse ayni kalibrasyon cogunluk uzlasisiyla. Birincil degil.
+    duyarlilik = None
+    birincil = (kalibrasyon.get("reference") or {}).get("primary_reference")
+    if not kalibrasyon.get("skipped") and len(annotator_mode(cfg)[0]) > 1 and birincil != MAJORITY:
+        duyarlilik = {
+            "sensitivity": True,
+            "note": "On kayit 2026-09-21: birincil kalibre oranin yerine GECMEZ.",
+            **calibration(cfg, kategoriler, reference=MAJORITY),
+        }
 
     if not durum["report_exists"]:
         insan = "Etiketler LLM'den; insan dogrulamasi HENUZ YOK (Hafta 4)."
@@ -520,6 +536,7 @@ def evaluate(cfg: Config, roles: list[str]) -> dict:
         ],
         "human_validation": durum,
         "calibration": kalibrasyon,
+        **({"calibration_majority_reference": duyarlilik} if duyarlilik else {}),
         "caveats": [
             insan,
             "HAM dar tanim UST SINIR: deneme kosusunda household -> gift_given "
